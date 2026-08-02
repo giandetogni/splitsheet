@@ -22,10 +22,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import gzip
 import hashlib
 import json
-import datetime as dt
 import os
 import sys
 import time
@@ -33,7 +33,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from normalization import load_rules, normalize  # noqa: E402
+from normalization import load_rules, normalize
 
 SEP = "\x1f"
 EXPECTED_DISTINCT_PAIRS = 4_599_791

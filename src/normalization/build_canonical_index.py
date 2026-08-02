@@ -30,7 +30,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from normalization import load_rules, normalize  # noqa: E402
+from normalization import load_rules, normalize
 
 
 def main() -> None:
