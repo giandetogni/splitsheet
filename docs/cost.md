@@ -160,8 +160,9 @@ Rates are list prices applied from memory, not fetched from the pricing API.
 ## Phase 2B — contract, failure-safe publication, firewall
 
 17 jobs, **42,010,148,864 bytes billed = 0.0382 TiB**, 4,296,391 slot-ms.
-At the $6.25/TiB on-demand list rate that is **≈ $0.24**, inside the 1 TiB/month free
-query tier, so the expected invoice line remains **$0.00**.
+List-price equivalent **≈ $0.24**, a conversion of consumption rather than a known charge.
+Consumption sits inside the 1 TiB monthly free query allowance, so the actual monetary cost
+is **UNKNOWN without billing evidence** and is expected to be $0.00.
 
 | run | jobs | bytes billed | slot ms |
 |---|---|---|---|
@@ -198,8 +199,10 @@ never by a push or a pull request — and never by a fork.
 
 Measured from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` over the phase window:
 **224 query jobs, 584,590,557,184 bytes billed = 0.5317 TiB, 58,720,559 slot-ms.**
-At the $6.25/TiB on-demand list rate that is **≈ $3.32** — the first phase to consume a
-meaningful share of the 1 TiB monthly free query tier (about 53 % of it).
+**List-price equivalent ≈ $3.32.** That is a conversion of processing consumption at the
+$6.25/TiB on-demand rate, **not** an amount known to have been charged. The actual monetary
+cost is **UNKNOWN** until the billing account is inspected, and is plausibly $0: the
+measured consumption is about 53 % of the 1 TiB monthly free query allowance.
 
 Largest single contributors:
 
@@ -224,3 +227,15 @@ Two cost lessons worth carrying:
   re-reads caused by my own diagnosis errors (`compression: NONE`, an ambiguous column, a
   schema overwritten by `bq load --replace`). Getting the table definition right on paper
   before scanning would have saved a measurable fraction of the 0.53 TiB.
+
+
+## A note on every figure in this document
+
+Every currency figure here is a **list-price equivalent**: bytes billed converted at the
+published on-demand rate. It is a measure of **processing consumption**, not of money known
+to have left the account.
+
+No billing export has been inspected, so the **actual monetary cost of this project is
+UNKNOWN**. Given that consumption has stayed within the free query allowance every month so
+far, the real invoice may well be $0.00 — but that is an expectation, not evidence, and this
+document will not claim otherwise until a billing export says so.

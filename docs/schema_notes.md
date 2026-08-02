@@ -311,8 +311,19 @@ by joining the same listens across both artifacts.)
 
 ### Evaluation policy for `recording_mbid` — binding
 
+> **The ListenBrainz mapper output is a correlated reference label, not independent ground
+> truth. Agreement metrics must not be presented as absolute matching accuracy.**
+
 This column is a **ListenBrainz mapper reference label**. It is *not* ground truth and
 must never be described as such, in this repository or anywhere else.
+
+Required naming, everywhere — code, reports and documentation:
+
+| use this | never this |
+|---|---|
+| candidate recall **against mapper reference label** | recall, accuracy |
+| unique-candidate **agreement with** mapper reference label | correctness, precision |
+| false-unique **disagreement with** mapper reference label | false positive rate, error rate |
 
 - Its provenance is **inferred, not confirmed** (§9, coverage comparison). Even once
   confirmed, it stays a **proxy** for evaluation, carrying the mapper's own errors and
@@ -324,9 +335,11 @@ must never be described as such, in this repository or anywhere else.
   evaluation step, after match results are frozen.
 - Metrics are reported **only on the labelled subset**, never over all 38,199,641
   listens. Required reporting, always together:
-  `label_coverage`, `precision_vs_mapper`, `recall_vs_mapper`, `false_positive_count`,
-  `abstention_rate`, `matcher_vs_mapper_divergences`, and results for the
-  **unlabelled subset reported separately** with no accuracy claim attached.
+  `label_coverage`, `agreement_vs_mapper`, `recall_vs_mapper`,
+  `disagreement_count_vs_mapper`, `abstention_rate`, `matcher_vs_mapper_divergences`, and
+  results for the **unlabelled subset reported separately** with no accuracy claim
+  attached. The names avoid "precision" and "false positive" deliberately: both imply a
+  ground truth that does not exist here.
 
 Any statement of the form "the matcher is N % accurate on 38.2 M listens" is
 prohibited: roughly 14.3 % of the period has no reference label at all.
@@ -940,9 +953,9 @@ split frozen before any metric existed.
 | | dev | holdout |
 |---|---|---|
 | evaluable listens | 25,727,285 | 5,504,853 |
-| **candidate recall** | **95.5153 %** | **96.5356 %** |
-| unique-candidate correctness | 99.9853 % | 99.9818 % |
-| **false-unique rate** | **0.0147 %** | **0.0182 %** |
+| **candidate recall against mapper reference label** | **95.5153 %** | **96.5356 %** |
+| unique-candidate agreement with mapper reference label | 99.9853 % | 99.9818 % |
+| **false-unique disagreement with mapper reference label** | **0.0147 %** | **0.0182 %** |
 | zero-candidate | 4.4637 % | 3.4390 % |
 | multi-candidate | 0.3504 % | 0.7835 % |
 | fallback recall | 77.7176 % | 77.4645 % |
@@ -1008,3 +1021,99 @@ label-blind, matcher still denied on eval after gaining silver write, and
 `LABEL_NOT_IN_CANONICAL_SNAPSHOT` kept as its own class. Two are marked
 `integration_destructive` — idempotent re-run and injected-failure survival — and never
 run in CI.
+
+
+## 18. Phase 3B patch — block analysis and the fallback trade-off
+
+Read-only. No rule, table, IAM binding or infrastructure was changed.
+
+### The 945-candidate exact block is destructive normalization, not a homonym
+
+Key **`cvver`**, 945 canonical recordings, 460 listens, 434,700 candidate pairs.
+
+The members are Japanese titles such as `感情アクセラレイション -早乙女彩華ソロver.-` by
+`ミシェル・イェーガー(CV.市ノ瀬加那)`. Folding to ASCII discards every CJK character, and the
+only survivors are the Latin fragments embedded in them — `CV` from the voice-actor credit
+and `ver` from the version marker. Every such recording collapses onto `cvver`.
+
+This is a defect class the current statuses do not catch. The key is not `PARTIAL` and not
+`EMPTY`: both halves contain *some* ASCII, so the pair is `AVAILABLE` while being
+semantically empty. **A key can be structurally valid and still carry no information.**
+
+Recorded, not fixed: adding a guard here would be a new rule, which this patch excludes.
+
+### The largest blocks by pairs are mostly benign volume
+
+Nine of the top ten exact blocks are single-recording BTS tracks — `btsswim` alone is
+2,038,476 listens against **1** canonical recording, so 2,038,476 pairs and zero ambiguity.
+**Largest block is not the same as most skewed.** Only `cvver` is a genuine collision.
+
+### The largest fallback blocks are episodic content and version proliferation
+
+| key | canonical recordings | listens | pairs | cause |
+|---|---|---|---|---|
+| `abovebeyondgrouptherapy` | 476 | 227 | 108,052 | radio show; `[ABGT262]`, `[ABGT286]` … strip to one key |
+| `arminvanbuurenstateoftrance` | 455 | 144 | 65,520 | same, episodic show |
+| `beatlesstrawberryfieldsforever` | 225 | 198 | 44,550 | genuine version proliferation: demos, takes, mixes |
+| `beatlestwistandshout` | 138 | 150 | 20,700 | same |
+| `btsswim` | 12 | 6,354 | 76,248 | remix/acoustic variants |
+
+Episodic content is the interesting case: bracketed episode identifiers are exactly what
+the fallback strips, so a show with hundreds of episodes becomes one key. That is the
+fallback working as designed and being wrong for this content type.
+
+### The fallback trade-off, quantified — with numerators and denominators
+
+Both buckets, listens with **zero** exact candidates that have an evaluable reference label:
+
+| | dev | holdout |
+|---|---|---|
+| reached fallback (denominator) | 1,168,119 | 194,668 |
+| fallback key unavailable | 1,040,247 (89.1 %) | 167,037 (85.8 %) |
+| fallback zero candidates | 108,130 | 22,275 |
+| fallback exactly one | 11,601 | 3,268 |
+| fallback multiple | 8,141 | 2,088 |
+| reference found by fallback | 15,343 | 4,149 |
+| **incremental recall against mapper reference label** | **1.3135 %** | **2.1313 %** |
+| unique agrees with reference | 8,937 | 2,494 |
+| unique disagrees with reference | 2,664 | 774 |
+| **false-unique disagreement rate** | **22.9635 %** | **23.6842 %** |
+| multi-candidate containing the reference | 6,406 | 1,655 |
+| multi-candidate missing the reference | 1,735 | 433 |
+| mean / p50 / p90 / p95 / p99 / max candidates | 0.0533 / 0 / 0 / 0 / 1 / 145 | 0.0791 / 0 / 0 / 0 / 2 / 107 |
+
+### Answers
+
+**Does the fallback add enough recall to justify keeping it?** It adds **1.31 % (dev) /
+2.13 % (holdout)** incremental recall on the listens that reach it — 15,343 and 4,149
+references found. Modest but real.
+
+**What share of the gain comes from unique candidates?** 8,937 / 15,343 = **58.2 %** (dev),
+2,494 / 4,149 = **60.1 %** (holdout).
+
+**What share ends in ambiguity?** Of listens that got any fallback candidate,
+8,141 / 19,742 = **41.2 %** (dev) and 2,088 / 5,356 = **39.0 %** (holdout) are
+multi-candidate.
+
+**Is there evidence to remove, restrict or keep it unchanged?** The decisive number is the
+**false-unique disagreement rate of 22.96 % / 23.68 %** — against **0.0147 % / 0.0182 %**
+for the corpus as a whole, roughly **1,500× worse**. Nearly one in four fallback listens
+that look unambiguous disagrees with the reference. Those are precisely the rows a naive
+downstream stage would accept without scrutiny, and under this project's stated principle —
+paying the wrong rights holder is worse than suspending payment — that is the dangerous
+shape.
+
+The evidence supports **restricting, not removing**: the recall is real, and 89 % of listens
+reaching the fallback have no usable fallback key anyway, so the tier is small. What it does
+not support is treating a lone fallback candidate as confident. That is an input to scoring
+design, and the holdout agrees with dev on every direction, so the conclusion is not an
+artefact of one split.
+
+**No rule was changed.** No salting, no exception list, no blacklist.
+
+### Cost of this patch
+
+Two analytical queries, dry-run estimates 11,654,921,446 and 12,079,772,161 bytes, both run
+under `maximum_bytes_billed`. List-price equivalent well under $0.20; **actual monetary cost
+UNKNOWN without billing evidence**, and consumption remains inside the monthly free query
+allowance.
