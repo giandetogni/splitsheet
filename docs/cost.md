@@ -193,3 +193,34 @@ test cannot turn into a large bill.
 
 Because the workflow is `workflow_dispatch` only, this cost is incurred deliberately and
 never by a push or a pull request — and never by a fork.
+
+## Phase 3B — canonical ingestion and staged blocking
+
+Measured from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` over the phase window:
+**224 query jobs, 584,590,557,184 bytes billed = 0.5317 TiB, 58,720,559 slot-ms.**
+At the $6.25/TiB on-demand list rate that is **≈ $3.32** — the first phase to consume a
+meaningful share of the 1 TiB monthly free query tier (about 53 % of it).
+
+Largest single contributors:
+
+| step | bytes billed |
+|---|---|
+| load `bronze_canonical_recordings` (31.5 M rows) | 7,519,338,496 |
+| staged blocking build, end to end | 42,752,540,672 |
+| candidate-space and evaluation queries | tens of GB each over 34–58 M row joins |
+
+Storage added: canonical CSV 1.99 GB and the blocking index 1.20 GB in GCS, plus
+`bronze_canonical_recordings` (31.5 M rows), `canonical_blocking_index` (58.8 M rows),
+`listen_pair_normalization` (4.6 M rows), `silver_listens_normalized` (38.2 M rows) and
+`silver_match_candidates` (34.5 M rows) in BigQuery. This is the point at which storage
+stops being free-tier noise and starts being a real line item; it should be watched in the
+next phase rather than assumed.
+
+Two cost lessons worth carrying:
+
+- **Normalizing per distinct pair instead of per listen** cut the Python work 8.30×
+  (4,599,791 instead of 38,199,641) and moved zero rules into SQL.
+- **Iterating on a 31.5 M-row external table is expensive.** Several of those 224 jobs were
+  re-reads caused by my own diagnosis errors (`compression: NONE`, an ambiguous column, a
+  schema overwritten by `bq load --replace`). Getting the table definition right on paper
+  before scanning would have saved a measurable fraction of the 0.53 TiB.
