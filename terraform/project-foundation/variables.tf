@@ -30,5 +30,7 @@ variable "enabled_apis" {
     "iam.googleapis.com",
     # Phase 2B: impersonation, so the matcher identity needs no JSON key.
     "iamcredentials.googleapis.com",
+    # Phase 2C: Workload Identity Federation token exchange for GitHub Actions.
+    "sts.googleapis.com",
   ]
 }

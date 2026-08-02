@@ -153,7 +153,7 @@ tf-plan:
 	    && echo "No changes" || echo "CHANGES"; \
 	done
 
-.PHONY: test test-integration
+.PHONY: test test-integration test-integration-readonly
 
 # Unit tests only: no cloud, no credentials, no cost.
 test:
@@ -163,3 +163,7 @@ test:
 # These read real tables and bill real bytes.
 test-integration:
 	uv run pytest tests/integration -v -m integration
+
+# The subset CI is allowed to run: reads only, no GCS object access.
+test-integration-readonly:
+	uv run pytest tests/integration -v -m "integration_readonly and not requires_gcs"

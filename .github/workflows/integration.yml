@@ -1,0 +1,70 @@
+name: integration-readonly
+
+# Manual only. This job reaches real BigQuery and bills real bytes, so it must never be
+# triggered by a push or a pull request -- least of all from a fork.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required to mint the GitHub OIDC token that WIF exchanges. This is the only elevated
+  # permission, and it grants nothing on its own: the provider pins repository_id,
+  # repository_owner_id and ref, so a token from anywhere else is rejected.
+  id-token: write
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  readonly:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout happens before authentication on purpose: nothing privileged should be
+      # in scope while arbitrary repository content is being fetched.
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ss-de-944054e7
+          workload_identity_provider: projects/227919566032/locations/global/workloadIdentityPools/github-actions/providers/github-oidc
+          service_account: splitsheet-ci-integration@ss-de-944054e7.iam.gserviceaccount.com
+          # No credentials_json, no secret, no key file anywhere in this workflow.
+
+      - name: Set up gcloud (explicit, not relying on runner pre-installs)
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Confirm the federated identity (no token printed)
+        run: |
+          gcloud auth list --filter=status:ACTIVE --format='value(account)'
+          echo "identity above must be splitsheet-ci-integration@ss-de-944054e7.iam.gserviceaccount.com"
+
+      - name: Prove the CI identity cannot write
+        run: |
+          set +e
+          gcloud projects get-iam-policy ss-de-944054e7 \
+            --flatten='bindings[].members' \
+            --filter='bindings.members:splitsheet-ci-integration@ss-de-944054e7.iam.gserviceaccount.com' \
+            --format='value(bindings.role)'
+          echo "--- attempting a write that must fail ---"
+          bq --location=us-central1 query --nouse_legacy_sql --format=none \
+            "CREATE TABLE splitsheet_bronze.ci_should_not_exist (x INT64)" 2>&1 | tail -3
+          echo "(a successful creation here would be a failure of this phase)"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies from lockfile only
+        run: uv sync --frozen --all-groups
+
+      # Read-only subset only. Destructive tests carry integration_destructive and the
+      # GCS-object test carries requires_gcs; neither is selected here, and the CI
+      # identity has no permission to satisfy them anyway.
+      - name: Read-only integration tests
+        run: uv run pytest tests/integration -v --durations=10 -m "integration_readonly and not requires_gcs"
