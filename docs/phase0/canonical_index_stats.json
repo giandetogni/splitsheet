@@ -1,0 +1,18 @@
+{
+ "normalization_version": "1.0.0+0bc0dd643e06",
+ "counts": {
+  "canonical_rows": 31554198,
+  "exact_AVAILABLE": 29412719,
+  "fallback_AVAILABLE": 29412719,
+  "index_rows_exact": 29412719,
+  "index_rows_fallback": 29412719,
+  "stages_identical": 21933622,
+  "exact_PARTIAL": 1131494,
+  "fallback_PARTIAL": 1131494,
+  "exact_EMPTY": 1009985,
+  "fallback_EMPTY": 1009985
+ },
+ "index_rows_total": 58825438,
+ "recordings_with_no_ascii_key_pct": 3.2008,
+ "seconds": 1710.2
+}

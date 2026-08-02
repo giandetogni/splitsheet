@@ -1,0 +1,10 @@
+{
+ "object": "gs://splitsheet-raw-944054e7/derived/normalization/version=1.0.0+0bc0dd643e06/period=2026-06/listen_pair_mapping.tsv.gz",
+ "bytes": 427524976,
+ "sha256": "c032eac2988bca75d433d7361273fc754cb3ddaf626f6a8a5c33d83511feb33a",
+ "normalization_version": "1.0.0+0bc0dd643e06",
+ "distinct_pairs": 4599791,
+ "listens_covered": 38199641,
+ "reduction_factor": 8.3,
+ "note": "Derived artifact: normalization output, not raw source data."
+}

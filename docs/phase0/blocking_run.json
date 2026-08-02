@@ -1,0 +1,69 @@
+{
+ "candidate_run_id": "blk:c005e9a56b1ec542",
+ "normalization_version": "1.0.0+0bc0dd643e06",
+ "blocking_version": "staged-1.0.0",
+ "normalized_rows": 38199641,
+ "candidate_rows": 34466312,
+ "listens_with_both_stages": 0,
+ "total_bytes_billed": 42752540672,
+ "total_slot_ms": 5171812,
+ "wall_seconds": 77.2,
+ "jobs": [
+  {
+   "step": "stage_normalized",
+   "job_id": "7788cac0-57f0-4ea7-a7d0-d20b05d29462",
+   "bytes_billed": 7811891200,
+   "slot_ms": 972315,
+   "duration_ms": 19440,
+   "dml_rows": null
+  },
+  {
+   "step": "validate_normalized",
+   "job_id": "1c9d38f0-8e05-4243-9f74-3b5e18ba3250",
+   "bytes_billed": 3285188608,
+   "slot_ms": 188853,
+   "duration_ms": 4596,
+   "dml_rows": null
+  },
+  {
+   "step": "stage_candidates",
+   "job_id": "002daefc-78c8-421d-9a49-c32aa481430c",
+   "bytes_billed": 9547284480,
+   "slot_ms": 1548120,
+   "duration_ms": 19532,
+   "dml_rows": null
+  },
+  {
+   "step": "validate_candidates",
+   "job_id": "050d8476-d8fc-4754-a60f-46f3ec811566",
+   "bytes_billed": 4562354176,
+   "slot_ms": 434796,
+   "duration_ms": 2175,
+   "dml_rows": null
+  },
+  {
+   "step": "publish_atomic",
+   "job_id": "aeff44df-cc90-480f-8af4-4d9f6bb04521",
+   "bytes_billed": 17545822208,
+   "slot_ms": 2027728,
+   "duration_ms": 23625,
+   "dml_rows": null
+  },
+  {
+   "step": "drop_staging",
+   "job_id": "907c2747-46d0-42ab-ae73-144b78dfd15e",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 215,
+   "dml_rows": null
+  },
+  {
+   "step": "drop_staging",
+   "job_id": "72533b2a-3578-48f2-a26b-aa0d2e2ea8e1",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 132,
+   "dml_rows": null
+  }
+ ]
+}

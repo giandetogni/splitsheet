@@ -801,15 +801,23 @@ That splits into **PARTIAL 2.1949 %** and **EMPTY 1.1230 %** (sum 3.3179 %, matc
 content validity is now measured separately: **99.968 % VALID**, only 0.032 %
 `NO_ALPHANUMERIC_CONTENT`. Non-Latin listens are no longer miscounted as invalid.
 
-**Staged beats blanket, confirmed with production code:**
+**Staged beats blanket, confirmed with production code.**
 
-| | % of all listens |
+The figure below is **unique-candidate coverage**: the share of listens with exactly one
+blocking candidate. It is emphatically *not* a match rate, an attribution rate or a payout
+rate. Nothing has been matched yet: there is no scoring, no threshold, no rights data and
+no payout anywhere in this project.
+
+| | % of all listens with exactly one blocking candidate |
 |---|---|
-| exact unique | 71.1931 |
-| + unique gained by staged fallback | 3.2025 |
-| **= staged payable** | **74.3956** |
-| blanket aggressive payable | 49.8402 |
+| exact stage | 71.1931 |
+| + gained by staged fallback | 3.2025 |
+| **= staged unique-candidate coverage** | **74.3956** |
+| blanket aggressive, same measure | 49.8402 |
 | **staged advantage** | **24.56 pp** |
+
+A single candidate means only that blocking narrowed the field to one row. Whether that row
+is correct is unknown until evaluation, and whether it is payable is several phases away.
 
 The fallback key matches the legacy probe on 91.4316 % of listens; the 8.57 % difference is
 the deliberate change — restricted year handling, suffix-position anchoring, and the
@@ -858,3 +866,103 @@ A regex pre-filter was added to skip the fallback transforms when nothing could 
 measured **slower** (0.18 s vs 0.02 s per 22,000 strings) *and* wrong on 3 cases, so it was
 deleted the same sitting. Recorded because it is the B.6 rule working as intended: the
 justification for keeping code is a number, not the effort already spent on it.
+
+## 17. Phase 3B — canonical ingestion and staged blocking (partial)
+
+### Canonical snapshot
+
+Grain **measured before** the table was defined, not assumed: 31,554,198 rows,
+31,554,198 distinct `recording_mbid`, **0 repeats, 0 rows without an MBID, 0 exact
+duplicates**, `combined_lookup` 100 % (one blank), blocking fields 100 %. Phase 0A had
+only a 1-in-64 estimate. Because repeats were zero, the planned second characterisation
+pass had nothing to examine and was skipped rather than run for form.
+
+Landed at `gs://…/raw/musicbrainz/canonical/snapshot_date=2026-07-17/…csv.gz`,
+1,992,824,873 B, sha256 `8de737f4…`, manifest committed, **bound by explicit URI, no
+wildcard**. `bronze_canonical_recordings` loaded with all 31,554,198 rows and reconciled
+against the local measurement exactly.
+
+**Two BigQuery ingestion faults worth recording.** The first read failed at a byte offset
+that looked like binary; I wrongly blamed quoted newlines and added
+`allow_quoted_newlines`, which failed earlier still. The real cause was
+`compression: NONE` — the provider does not infer GZIP from the extension, so BigQuery was
+parsing gzip bytes as text. Setting `compression = "GZIP"` fixed it and the unjustified
+setting was **removed**. Separately, the mapping TSV genuinely does need
+`allow_quoted_newlines`: it contains **790 extra physical lines** from newlines inside
+titles. Same-looking symptom, two different causes; only measurement separated them.
+
+### Normalization of the June corpus
+
+Distinct-tuple strategy, as required: **38,199,641 listens carry 4,599,791 distinct
+(artist, recording) pairs — 8.30×** less normalization work, ~5 min instead of ~40. The
+rules stay in one Python implementation and are never re-expressed in SQL; the mapping
+table is how their output reaches BigQuery.
+
+The builder asserts its distinct-pair count against BigQuery's, **and that assertion
+caught a real error**: the first run read the local slice unfiltered, taking all
+39,200,000 rows instead of the 38,199,641 in period.
+
+`silver_listens_normalized`: **38,199,641 rows, listen_hash unique**. `release_normalized_*`
+is deliberately absent — nothing in this phase uses it.
+
+### Staged blocking
+
+Precedence enforced and verified: EXACT for every listen with an AVAILABLE exact key;
+FALLBACK **only** for listens with zero EXACT candidates. Validated before publication:
+grain unique, no candidate from an empty key, and **`listens_with_both_stages = 0`**.
+
+Generated entirely as the matcher service account, which is denied `splitsheet_eval` and
+`bronze_listens` — re-proved after the IAM change. The candidate table is label-blind by
+construction, not by convention.
+
+| candidate-space, June | |
+|---|---|
+| listens | 38,199,641 |
+| exact eligible | 36,584,394 |
+| exact zero / one / many | 5,030,438 / **31,421,104** / 132,852 |
+| exact candidates, mean per eligible | 32,354,243, **0.8844** |
+| exact p50 / p90 / p95 / p99 / max | 1 / 1 / 1 / 1 / **945** |
+| fallback executed | 536,546 (one 319,001, many 217,545, max 476) |
+| zero after both stages | 6,109,139 |
+| **total candidate pairs** | **34,466,312** |
+
+Unique-candidate coverage — *not* a match rate, nothing is matched: **82.25 % exact plus
+0.84 % fallback = 83.09 %**, against July's 74.40 %. The corpora differ materially, which
+is exactly the risk flagged at the end of Phase 3A; July is a submission-day dump that is
+68 % historical backfill, June is a real listening period.
+
+### Evaluation on the frozen split
+
+Labels were read only after candidates were published, under the human identity, using the
+split frozen before any metric existed.
+
+| | dev | holdout |
+|---|---|---|
+| evaluable listens | 25,727,285 | 5,504,853 |
+| **candidate recall** | **95.5153 %** | **96.5356 %** |
+| unique-candidate correctness | 99.9853 % | 99.9818 % |
+| **false-unique rate** | **0.0147 %** | **0.0182 %** |
+| zero-candidate | 4.4637 % | 3.4390 % |
+| multi-candidate | 0.3504 % | 0.7835 % |
+| fallback recall | 77.7176 % | 77.4645 % |
+| fallback false-unique | 2,664 | 774 |
+
+Dev and holdout agree closely, and the holdout was used for nothing except this table.
+
+Two classes are reported separately and are **not** blocking failures:
+`NOT_EVALUABLE` **5,400,438** listens with no label, and
+`LABEL_NOT_IN_CANONICAL_SNAPSHOT` **1,567,065** listens whose label does not exist in the
+snapshot — blocking cannot propose a candidate that is not in its index.
+
+### BigQuery versus Spark — decided on the numbers
+
+**Chosen: BigQuery SQL. Rejected: Spark/Dataproc.**
+
+- total candidate pairs **34,466,312** for 38.2 M listens — mean **0.90** per listen;
+- exact p99 = **1**; largest single block 945;
+- whole staged build ran in **77.2 s**, 42.75 GB billed, 5,171,812 slot-ms;
+- no compute here is awkward in SQL: blocking is one equality join per stage.
+
+Nothing about this is Spark-shaped. Evidence that would change it: candidate pairs in the
+billions, a p99 in the thousands, a runtime in hours, or Tier-D fuzzy scoring over tens of
+millions of pairs, which is genuinely awkward in BigQuery. Spark is **not** implemented.

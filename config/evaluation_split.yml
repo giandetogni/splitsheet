@@ -1,0 +1,55 @@
+# Evaluation split — FROZEN 2026-08-02, before any blocking metric was observed.
+#
+# This file is written first on purpose. A split chosen or adjusted after seeing results is
+# not a holdout, it is a second dev set with a reassuring name.
+#
+# THE RULE
+#
+#   bucket = first 8 hex chars of sha256(salt + ":" + mapper_recording_mbid), mod 100
+#   bucket <  80  -> dev
+#   bucket >= 80  -> holdout
+#
+# Keyed on mapper_recording_mbid, NOT on listen_hash, and NOT on read order:
+#
+#   * read order is not stable across runs, engines or partition pruning;
+#   * splitting by listen would put the same recording on both sides, so a rule tuned on
+#     dev would already have seen the holdout's recordings. Splitting by the recording
+#     keeps the two sides disjoint in the thing the matcher actually resolves.
+#
+# The salt is fixed and public. It exists to decorrelate this split from any other hash in
+# the project (listen_hash, block keys), not to keep anything secret.
+#
+# BINDING CONSTRAINTS
+#
+#   * The holdout may NOT be used to choose rules, thresholds, exceptions or fallbacks.
+#   * Metrics are reported for dev and holdout SEPARATELY, always both.
+#   * Changing any value below invalidates every comparison made under the old split.
+#     Bump split_version in the same commit and say so in the report.
+#   * Labels remain forbidden in normalization, key construction, candidate generation,
+#     fallback selection, filtering and ranking. This file governs EVALUATION only.
+
+split_version: "1.0.0"
+frozen_at: "2026-08-02"
+
+algorithm: "sha256_mod_100"
+key_field: "mapper_recording_mbid"
+salt: "splitsheet-eval-split-v1"
+hex_prefix_chars: 8
+modulus: 100
+
+buckets:
+  dev:
+    lower_inclusive: 0
+    upper_exclusive: 80
+  holdout:
+    lower_inclusive: 80
+    upper_exclusive: 100
+
+# Rows whose label is absent are in neither bucket. They cannot be evaluated for
+# correctness and must be reported as their own class, never folded into a failure count.
+unlabelled_bucket: "NOT_EVALUABLE"
+
+# A label that exists but is not present in the canonical snapshot is also its own class:
+# the blocking stage cannot propose a candidate that does not exist in its index, so
+# counting it as a blocking failure would be wrong.
+label_absent_from_canonical_bucket: "LABEL_NOT_IN_CANONICAL_SNAPSHOT"

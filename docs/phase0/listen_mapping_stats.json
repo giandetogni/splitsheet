@@ -1,0 +1,33 @@
+{
+ "columns": [
+  "pair_hash",
+  "artist_name",
+  "recording_name",
+  "artist_normalized_unicode",
+  "recording_normalized_unicode",
+  "lookup_exact",
+  "lookup_fallback",
+  "normalization_status",
+  "exact_key_status",
+  "fallback_key_status"
+ ],
+ "counts": {
+  "rows_in_member": 39200000,
+  "rows_outside_period": 1000359,
+  "listens": 38199641,
+  "norm_VALID": 4596865,
+  "exact_AVAILABLE": 4260612,
+  "fallback_AVAILABLE": 4260612,
+  "exact_EMPTY": 124322,
+  "fallback_EMPTY": 124322,
+  "exact_PARTIAL": 214857,
+  "fallback_PARTIAL": 214857,
+  "norm_NO_ALPHANUMERIC_CONTENT": 2926,
+  "distinct_pairs": 4599791
+ },
+ "normalization_version": "1.0.0+0bc0dd643e06",
+ "normalization_rules_sha256": "0bc0dd643e06",
+ "reduction_factor": 8.3,
+ "seconds": 318.2,
+ "problems": []
+}
