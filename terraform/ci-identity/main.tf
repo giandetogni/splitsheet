@@ -140,3 +140,26 @@ resource "google_service_account_iam_member" "ci_can_impersonate_matcher" {
   role               = "roles/iam.serviceAccountTokenCreator"
   member             = "serviceAccount:${google_service_account.ci_integration.email}"
 }
+
+# Read access to the raw objects, scoped to the one bucket.
+#
+# NECESSITY DEMONSTRATED, not assumed. The reconciliation test must recompute
+# 39,200,000 = 38,199,641 + 1,000,359 from the external table, and a plain (non-BigLake)
+# external table is read using the CALLER's credentials. Without this the query fails with:
+#
+#   Access Denied: BigQuery: Permission denied while globbing file pattern.
+#   splitsheet-ci-integration@... does not have storage.objects.get access to
+#   .../period=2026-06/1495.parquet
+#
+# (GitHub Actions run 30757048973.) The alternative considered and rejected was to assert
+# a pre-recorded count instead, which would stop detecting source drift -- the exact thing
+# the reconciliation exists to catch.
+#
+# This is objectViewer on this bucket only: read, no write, no delete, no other bucket. It
+# does not weaken the evaluation firewall, which constrains the MATCHER identity; CI's
+# purpose is to verify that constraint from the outside.
+resource "google_storage_bucket_iam_member" "ci_reads_raw_objects" {
+  bucket = var.raw_bucket_name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.ci_integration.email}"
+}

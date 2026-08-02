@@ -32,3 +32,8 @@ variable "matcher_service_account_id" {
   description = "Full resource name of the matcher SA, so CI can test that it is denied access."
   type        = string
 }
+
+variable "raw_bucket_name" {
+  description = "Raw slice bucket. CI needs object read here so the reconciliation test can query the external table; see the necessity note in main.tf."
+  type        = string
+}
