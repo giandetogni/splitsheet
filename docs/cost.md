@@ -239,3 +239,15 @@ No billing export has been inspected, so the **actual monetary cost of this proj
 UNKNOWN**. Given that consumption has stayed within the free query allowance every month so
 far, the real invoice may well be $0.00 — but that is an expectation, not evidence, and this
 document will not claim otherwise until a billing export says so.
+
+## Phase 4 preflight — ASCII residual analysis
+
+Read-only, 6 query jobs. **47,130,812,005 bytes processed, 47,133,491,200 billed
+= 0.0429 TiB**, 4,373,301 slot-ms, 54,973 ms wall.
+
+Dry-run estimates were reliable here because every query reads materialised tables rather
+than an external table: 6,660,108,241 / 11,654,921,446 / 12,079,772,161 / 13,178,229,491
+bytes against actuals in the same range. Every query ran under `maximum_bytes_billed`.
+
+**List-price equivalent ≈ $0.27.** A conversion of consumption, not a known charge.
+**Actual monetary cost UNKNOWN without billing evidence.**

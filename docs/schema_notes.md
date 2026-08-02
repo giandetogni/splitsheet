@@ -1117,3 +1117,107 @@ Two analytical queries, dry-run estimates 11,654,921,446 and 12,079,772,161 byte
 under `maximum_bytes_billed`. List-price equivalent well under $0.20; **actual monetary cost
 UNKNOWN without billing evidence**, and consumption remains inside the monthly free query
 allowance.
+
+## 19. Phase 4 preflight — ASCII residual and low-information keys
+
+Read-only. No rule, status, table, IAM binding or infrastructure changed. The label
+`POTENTIAL_LOW_INFORMATION_KEY` is **experimental and analytical only**; it exists nowhere
+in production and affects no candidate. The mapper reference label took no part in defining
+it.
+
+### Signals
+
+Per distinct pair in `listen_pair_normalization` (4,599,791 rows, the natural universe):
+`unicode_alnum_length`, `ascii_lookup_length`, `ascii_retention_ratio`, per-script character
+counts, surviving ASCII token count and max token length, block cardinality, listens and
+candidate pairs.
+
+### Sensitivity across cuts — exact stage, keys `AVAILABLE`
+
+| `ascii_retention_ratio` | keys | listens | % of 38,199,641 | cand. pairs* | % of 34,466,312 | mostly non-Latin | only short tokens (≤3) | card ≥10 | card ≥100 | card max |
+|---|---|---|---|---|---|---|---|---|---|---|
+| < 0.05 | 28 | 33 | 0.0001 % | 92 | 0.0003 % | 28/28 | 25 | 1 | 0 | 19 |
+| < 0.10 | 122 | 227 | 0.0006 % | 239 | 0.0007 % | 122/122 | 99 | 5 | 0 | 28 |
+| < 0.20 | 793 | 2,046 | 0.0054 % | 314,175 | 0.9115 % | 791/793 | 396 | 114 | **82** | **945** |
+| < 0.30 | 1,898 | 8,409 | 0.0220 % | 165,115 | 0.4791 % | 1,892/1,898 | 485 | 120 | 68 | 945 |
+| ≥ 0.30 | 4,257,771 | 36,573,679 | 95.7435 % | 31,874,622 | 92.4805 % | 8,184 | 7,911 | 1,124 | 117 | 715 |
+
+\* Band pair counts are reconstructed as `listens × block cardinality` and **undercount**
+against the candidate table: the band containing `cvver` reconstructs to 314,175 where the
+candidate table holds 434,700 for `cvver` alone. Treat the band figures as lower bounds and
+the candidate-table figures as authoritative.
+
+Cumulative for ratio < 0.30: **2,841 keys, 10,715 listens (0.028 %)**, and on the order of
+**1.4 % of candidate pairs**.
+
+Note that `mostly_non_latin` is essentially 100 % in every low band — the phenomenon is
+entirely non-Latin content leaving Latin residue. `single_ascii_token` was 0 everywhere and
+proved useless as a signal, because the residue is typically two fragments, not one.
+
+### `cvver` reproduced
+
+144 distinct pairs, **`ascii_retention_ratio` 0.1957**, mean 26.3 Unicode alphanumerics
+reduced to 5 ASCII characters, mean 20.8 CJK characters discarded. Example normalized value:
+`チノ cv 水瀬いのり しんかーそんくはやほやメロティー チノver` — the survivors are the voice-actor
+marker `cv` and the version marker `ver`. Block cardinality 945, 460 listens,
+**434,700 candidate pairs** from a single key.
+
+### The finding I did not expect
+
+| band | bucket | evaluable | recall vs reference | unique agreement | false-unique disagreement | multi-candidate |
+|---|---|---|---|---|---|---|
+| low-info < 0.20 | dev | 739 | 98.5115 % | **100.0000 %** | **0.0000 %** | **67.2530 %** |
+| low-info < 0.20 | holdout | 223 | 99.5516 % | **100.0000 %** | **0.0000 %** | **33.1839 %** |
+| normal ≥ 0.20 | dev | 24,686,299 | 99.5401 % | 99.9853 % | 0.0147 % | 0.3632 % |
+| normal ≥ 0.20 | holdout | 5,337,593 | 99.5565 % | 99.9818 % | 0.0182 % | 0.8067 % |
+
+**Low-information keys do not produce wrong answers. They produce ambiguity.** Unique
+agreement is 100 % in both buckets with zero disagreement, and recall against the reference
+is 98.5–99.6 % — the correct recording is almost always *in* the block. What collapses is
+uniqueness: 67.25 % / 33.18 % multi-candidate against 0.36 % / 0.81 % for normal keys.
+
+This inverts the intuition I carried in from the block analysis. I expected a
+false-positive generator; the measurement says a **cost and ambiguity** generator. Any
+future rule that *suppressed* these candidates would destroy 98.5 %+ recall to fix a
+problem that is not a correctness problem.
+
+### Fallback top-20 concentration — earlier gap closed
+
+| | |
+|---|---|
+| top-20 fallback blocks, candidate pairs | 569,797 |
+| all fallback candidate pairs | 2,112,069 |
+| **top-20 share of fallback pairs** | **26.9781 %** |
+| distinct fallback keys | 131,860 |
+| fallback multi-candidate listens | 217,545 |
+| of those, from top-20 blocks | 40,230 (**18.4927 %**) |
+
+Twenty keys out of 131,860 drive **27 %** of all fallback candidate pairs. Concentrated, not
+diffuse.
+
+### Decision
+
+**Is low-information ASCII residual material, or a tail?** By listens it is a tail:
+10,715 listens, **0.028 %**. By candidate pairs it is larger and concentrated: roughly
+**1.4 %**, with a single key (`cvver`) responsible for 434,700 pairs.
+
+**Concentrated or distributed?** Sharply concentrated. 82 keys in the `< 0.20` band have
+cardinality ≥ 100; the remainder of the band is small.
+
+**Do these groups agree worse with the reference?** **No.** Unique agreement is 100 % and
+false-unique is 0 % in both buckets. They are worse only in *ambiguity*.
+
+**Is there evidence to create `key_information_status` in Phase 4?** **Yes — but as a cost
+and routing signal, never as a validity or suppression flag.** The evidence supports marking
+these keys so scoring can skip an expensive comparison it cannot win, and so a
+multi-candidate outcome here is understood as a normalization artefact rather than a genuine
+tie. The evidence explicitly does **not** support dropping their candidates.
+
+**Which cut is the candidate for evaluation in dev?** **`ascii_retention_ratio < 0.20`**,
+chosen on dev-side structure only: it is where cardinality explodes (82 keys with ≥100
+recordings, max 945, capturing `cvver` at 0.1957) while still covering only 0.0054 % of
+listens. The holdout was used solely to check that the direction holds — it does, with the
+same 100 % / 0 % agreement pattern — and was not used to select the cut.
+
+Given the tiny listen share, the honest framing for Phase 4 is that this is a **precision-of-
+diagnosis** improvement, not a recall or revenue one.
