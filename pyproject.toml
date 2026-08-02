@@ -12,6 +12,7 @@ dependencies = [
     # Default Credentials only; no key material is referenced or committed.
     "google-cloud-storage>=2.14,<4",
     "google-cloud-bigquery>=3.42.3",
+    "pyyaml>=6,<7",
 ]
 
 [dependency-groups]
@@ -28,6 +29,8 @@ target-version = "py312"
 # Integration tests hit real BigQuery and cost real bytes. They are never part of the
 # default unit-test run and must never be reported as unit tests.
 testpaths = ["tests/unit"]
+# So tests import the libraries by package name instead of manipulating sys.path.
+pythonpath = ["src", "src/ingestion"]
 markers = [
     "integration: requires a live GCP project and Application Default Credentials",
     "slow: invokes the real loader end to end",

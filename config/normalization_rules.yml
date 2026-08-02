@@ -1,0 +1,90 @@
+# Normalization rules for SplitSheet.
+#
+# TWO STAGES, and the split is the whole point.
+#
+# Phase 0A measured what aggressive normalization actually costs. Stripping version
+# markers moved 5.5 pp of listens from zero candidates to at least one, but moved
+# 27.29 pp from exactly one candidate to many -- so listens with a single, unambiguous
+# candidate fell from 73.64% to 51.93%. Under a conservative matcher that never pays an
+# ambiguous tie, aggressive normalization therefore turns "no match" into "unresolvable
+# tie" and both land in the black box.
+#
+#   stage 1, `exact`    -- conservative. Reproduces MusicBrainz's own combined_lookup
+#                          convention (measured: identical for 90.84% of canonical rows).
+#                          Version information is PRESERVED, because that is what keeps
+#                          distinct recordings distinct.
+#   stage 2, `fallback` -- aggressive. Applied ONLY to listens that found zero candidates
+#                          at stage 1, so the ambiguity it creates is confined to a tier
+#                          that had nothing to lose.
+#
+# Article, featuring and version-suffix handling live in `fallback` and NOT in `exact`,
+# deliberately. The exact stage is the one that was measured at 73.64%; adding steps to it
+# would change the thing the measurement described, with no evidence that the change helps.
+#
+# Editing this file changes `normalization_version` automatically (the version embeds a
+# hash of the effective rules), which is what makes a rule change traceable and what would
+# trigger a restatement rather than silently altering history.
+
+# Semantic part of the version. Bump on an intentional behavioural change.
+version: "1.0.0"
+
+# --- applied in BOTH stages -------------------------------------------------------------
+common:
+  # NFKD then drop combining marks, so "Déjà Vu" and "Deja Vu" agree.
+  unicode_form: NFKD
+  strip_diacritics: true
+  lowercase: true
+
+  # Keep ASCII alphanumerics only. This subsumes punctuation removal and whitespace
+  # collapsing: both simply disappear.
+  #
+  # Known and measured limitation: MusicBrainz romanises non-Latin scripts and we have no
+  # transliteration table, so a CJK title folds to the empty string. That affects 3.32% of
+  # listens and 6.79% of canonical rows. Those cases are CLASSIFIED as UNSUPPORTED_SCRIPT,
+  # never silently dropped.
+  keep: ascii_alphanumeric
+
+# --- stage 2 only -----------------------------------------------------------------------
+fallback:
+  # "Song (Live)" -> "Song". Bracketed segments are where version information usually hides.
+  strip_bracketed_segments: true
+
+  # Four-digit years, which appear in reissue titles such as "- Remastered 2017".
+  strip_four_digit_years: true
+
+  # Everything from a featuring marker onward is dropped, because the listen side and the
+  # canonical side disagree on how credits are written far more often than on who they are.
+  featuring_markers:
+    - feat
+    - feat.
+    - ft
+    - ft.
+    - featuring
+    - with
+
+  # Leading articles, English only. Deliberately not extended to other languages: no
+  # measurement yet shows it helps, and a wrong article list silently merges distinct works.
+  leading_articles:
+    - the
+    - a
+    - an
+
+  # Version markers removed in the fallback stage. Each one collapses recordings that
+  # MusicBrainz keeps separate, which is exactly the trade this stage exists to make.
+  version_suffixes:
+    - remaster
+    - remastered
+    - live
+    - deluxe
+    - deluxe edition
+    - radio edit
+    - mono
+    - stereo
+    - bonus track
+    - anniversary edition
+    - explicit
+    - album version
+    - single version
+    - remix
+    - mix
+    - version

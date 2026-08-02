@@ -10,7 +10,8 @@
 > - **Phase 2A — BigQuery datasets and bronze ingestion: COMPLETE** (§14).
 > - **Phase 2B — ingestion contract, failure-safe publication, evaluation firewall: COMPLETE** (§15).
 > - **Phase 2C — public CI and read-only integration via WIF: COMPLETE** (`docs/runbook.md`).
-> - Not started: matching, silver/gold, dbt, rights data, Airflow, Dataproc.
+> - **Phase 3A — deterministic staged normalization library: COMPLETE** (§16).
+> - Not started: blocking, matching, silver/gold, dbt, rights data, Airflow, Dataproc.
 
 Every number here was produced by the commands in `src/recon/` against the pinned
 artifacts below. Nothing is quoted from documentation or memory. Raw data is not
@@ -725,3 +726,55 @@ changing if and only if slice content changes.
 reported `skipped` only because the tables had been populated by manual inserts, so it
 never exercised the insert path. It is not evidence of anything and is no longer on the
 evidence path.
+
+## 16. Phase 3A — deterministic staged normalization
+
+A pure library (`src/normalization/`): no I/O, no clock, no randomness, no GCP. It produces
+keys and a status; it does not match, block or score.
+
+### Two stages, because the measurement said so
+
+`config/normalization_rules.yml` defines two stages, and the split is the design:
+
+| stage | behaviour | rationale |
+|---|---|---|
+| `exact` | NFKD, strip diacritics, lowercase, keep ASCII alphanumerics. **Version information preserved.** | Reproduces MusicBrainz's `combined_lookup` convention — measured identical for 90.84% of canonical rows — and is the stage measured at 73.64% single-candidate. |
+| `fallback` | additionally strips bracketed segments, version suffixes, featuring clauses, leading articles, four-digit years | Applied **only** to listens that found zero candidates at `exact`, so the ambiguity it creates is confined to a tier that had nothing to lose. |
+
+Article, featuring and suffix handling live in `fallback` and deliberately **not** in
+`exact`. `PROJECT_SPEC.md` lists them as normalization steps generally; Phase 0A measured
+that applying them everywhere drops unambiguous candidates from 73.64% to 51.93%, so they
+are confined to the fallback tier. Adding them to the exact stage would change the thing
+the 73.64% measurement described, with no evidence the change helps.
+
+### `normalization_version` cannot drift from the rules
+
+The version is `<semantic>+<12-hex digest of the effective rules>`, currently
+**`1.0.0+28cd5a685280`**. Editing the YAML changes it whether or not anyone bumps the
+semantic part, which is what makes a rule change traceable and what a restatement would key
+off. Reordering a YAML list does **not** change it, because reordering is not a behavioural
+change — the digest is computed over a canonicalised, sorted projection of the rules.
+
+### Unusable input is classified, never dropped
+
+| status | meaning |
+|---|---|
+| `OK` | both halves folded to something usable |
+| `MISSING_FIELD` | artist or recording absent/blank in the input |
+| `UNSUPPORTED_SCRIPT` | non-empty input folds to empty; MusicBrainz romanises non-Latin scripts and we have no transliteration table (measured: 3.32% of listens, 6.79% of canonical rows) |
+
+A key is only formed when **both** halves survive. Concatenating a present artist with an
+empty recording would yield a key equal to the artist alone, collapsing every
+unromanisable track by that artist into one bucket — a silent false-positive generator.
+
+### Tests
+
+56 unit tests, table-driven, running in the credential-free public CI. Two mutation probes
+were run to confirm they are not decorative:
+
+- making the exact stage aggressive (the forbidden failure mode) → **4 tests fail**,
+  including the staged-design property test;
+- removing word-boundary anchoring from featuring markers → **5 tests fail**, catching
+  `Aftermath`, `Drift`, `Withered Hand` and `Within Temptation` being truncated.
+
+Both mutations were reverted and the suite is green.
