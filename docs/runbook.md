@@ -20,6 +20,8 @@ Everything past this line is Terraform-managed and reproducible:
 | `terraform/project-foundation` | `gs://…/project-foundation/default.tfstate` | the project's enabled APIs |
 | `terraform/raw-storage` | `gs://…/raw-storage/default.tfstate` | the raw preservation bucket |
 | `terraform/governance` | `gs://…/governance/default.tfstate` | the monthly budget alert |
+| `terraform/bigquery` | `gs://…/bigquery/default.tfstate` | datasets, bronze/eval tables, matcher view and SA |
+| `terraform/ci-identity` | `gs://…/ci-identity/default.tfstate` | Workload Identity pool, provider and CI service account |
 
 Each root has its own state prefix, so no module can read or overwrite another's state,
 and a mistake in one cannot plan a change against another's resources.
@@ -33,6 +35,8 @@ terraform -chdir=terraform/bootstrap-state    init && terraform -chdir=terraform
 terraform -chdir=terraform/project-foundation init && terraform -chdir=terraform/project-foundation apply
 terraform -chdir=terraform/raw-storage        init && terraform -chdir=terraform/raw-storage        apply
 terraform -chdir=terraform/governance         init && terraform -chdir=terraform/governance         apply
+terraform -chdir=terraform/bigquery           init && terraform -chdir=terraform/bigquery           apply
+terraform -chdir=terraform/ci-identity        init && terraform -chdir=terraform/ci-identity        apply
 ```
 
 `project-foundation` must run before `raw-storage` and `governance`, because those two
@@ -42,7 +46,7 @@ Bucket names are globally unique, so a different deployment must supply its own 
 `terraform.tfvars` (see each root's `terraform.tfvars.example`). `terraform.tfvars` is
 git-ignored.
 
-### Why five APIs and not more
+### Why these APIs and not more
 
 `project-foundation` declares only what the project uses **today**:
 
@@ -53,12 +57,16 @@ git-ignored.
 | `storage.googleapis.com` | raw bucket, state bucket |
 | `cloudbilling.googleapis.com` | billing account reads |
 | `billingbudgets.googleapis.com` | the budget in `governance` |
+| `bigquery.googleapis.com` | datasets and tables in `bigquery` |
+| `iam.googleapis.com` | the matcher and CI service accounts |
+| `iamcredentials.googleapis.com` | impersonation, so no key is ever needed |
+| `sts.googleapis.com` | OIDC token exchange for GitHub Actions |
 
-BigQuery, Dataproc and Composer APIs are deliberately absent. Adding them now would turn
+Dataproc and Composer APIs are deliberately absent. Adding them now would turn
 this list from a description of the project into a wish, and would enable services that
 nothing uses. They are added by the phase that first needs them.
 
-All five carry `disable_on_destroy = false` and `disable_dependent_services = false`:
+All of them carry `disable_on_destroy = false` and `disable_dependent_services = false`:
 destroying one root module must never disable a project-wide service that the other roots
 depend on. For `serviceusage` in particular, disabling it would remove the ability to
 re-enable anything.
