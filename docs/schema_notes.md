@@ -11,7 +11,8 @@
 > - **Phase 2B — ingestion contract, failure-safe publication, evaluation firewall: COMPLETE** (§15).
 > - **Phase 2C — public CI and read-only integration via WIF: COMPLETE** (`docs/runbook.md`).
 > - **Phase 3A — deterministic staged normalization library: COMPLETE** (§16).
-> - Not started: blocking, matching, silver/gold, dbt, rights data, Airflow, Dataproc.
+> - **Phase 3B — canonical ingestion and staged blocking: COMPLETE** (§17).
+> - Not started: scoring, tiers, matching decisions, gold, dbt, rights data, Airflow, Dataproc.
 
 Every number here was produced by the commands in `src/recon/` against the pinned
 artifacts below. Nothing is quoted from documentation or memory. Raw data is not
@@ -966,3 +967,44 @@ snapshot — blocking cannot propose a candidate that is not in its index.
 Nothing about this is Spark-shaped. Evidence that would change it: candidate pairs in the
 billions, a p99 in the thousands, a runtime in hours, or Tier-D fuzzy scoring over tens of
 millions of pairs, which is genuinely awkward in BigQuery. Spark is **not** implemented.
+
+### Idempotency and failure safety — proven, not asserted
+
+| | before | after re-run | after injected failure |
+|---|---|---|---|
+| candidates | 34,466,312 | **34,466,312** | **34,466,312** |
+| distinct `candidate_run_id` | 1 | **1** | **1** |
+| normalized rows | 38,199,641 | **38,199,641** | **38,199,641** |
+
+The re-run produced the identical `candidate_run_id` `blk:c005e9a56b1ec542`, because the id
+is derived from source and config rather than from wall-clock time. The injected-failure
+run exited **1** after staging validation and before publication, left staging behind for
+audit, and changed nothing that was published.
+
+### June corpus by script
+
+| script | listens | share | exact AVAILABLE | PARTIAL | EMPTY |
+|---|---|---|---|---|---|
+| Latin | ~35,826,000 | ~93.79 % | high | low | low |
+| CJK | 1,472,011 | 3.85 % | — | — | — |
+| Other | 602,914 | 1.58 % | 96.93 % | 2.85 % | 0.22 % |
+| Cyrillic | 264,884 | 0.69 % | **7.86 %** | 47.19 % | 44.95 % |
+| Greek | 12,451 | 0.03 % | 36.43 % | 26.58 % | 36.99 % |
+| Arabic | 10,316 | 0.03 % | 37.49 % | 50.50 % | 12.01 % |
+| Hebrew | 6,143 | 0.02 % | 8.97 % | 53.41 % | 37.62 % |
+| Thai | 4,743 | 0.01 % | 47.71 % | 46.43 % | 5.86 % |
+
+Content validity stays ≥97.8 % in every script — non-Latin listens are **valid**, they
+simply lack an ASCII key. Cyrillic is the clearest case: 7.86 % have a usable exact key
+while 92 % are PARTIAL or EMPTY. June is also markedly more international than July
+(CJK 3.85 % against 1.92 %), which is part of why the two corpora differ.
+
+### Tests
+
+11 integration tests for blocking: normalized grain, no PII or derived identifier in
+silver, **fallback never runs where exact hit**, unique candidate grain, no candidate from
+an EMPTY or PARTIAL key, every candidate exists in the canonical snapshot, candidate table
+label-blind, matcher still denied on eval after gaining silver write, and
+`LABEL_NOT_IN_CANONICAL_SNAPSHOT` kept as its own class. Two are marked
+`integration_destructive` — idempotent re-run and injected-failure survival — and never
+run in CI.
