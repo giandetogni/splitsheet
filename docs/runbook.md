@@ -82,3 +82,53 @@ is the evidence that state matches reality and nothing was toggled.
 
 Raw objects contain `user_id`. The buckets are private with public access prevention
 enforced, and `user_id` must not appear in any published derivative.
+
+## CI
+
+Two workflows, split by whether they need credentials.
+
+### `ci.yml` — public, credential-free
+
+Triggers on every push and pull request. `permissions: contents: read`, no `id-token`, no
+secrets, no path to GCP, so it runs safely on a fork. Steps: `uv lock --check` (explicit,
+so an inconsistent lockfile fails unambiguously), `uv sync --frozen --all-groups`, `ruff`,
+`make test` (unit only), `make tf-fmt`, `make tf-validate`.
+
+`make tf-validate` runs `terraform init -backend=false` per root, which is what lets it
+validate all six roots without touching the remote state bucket or holding any credential.
+
+No dependency cache: install measured under ~10 s, so caching would add moving parts for
+no measurable gain.
+
+### `integration.yml` — manual only, OIDC
+
+`workflow_dispatch` only. Authenticates with `google-github-actions/auth` via Workload
+Identity Federation. **No service-account key exists anywhere** — verified: 0 user-managed
+keys on both service accounts, and no GitHub secrets configured at all.
+
+Federation is pinned three ways, all by immutable numeric ID:
+
+```
+assertion.repository_owner_id == "122053316"
+assertion.repository_id       == "1320369792"
+assertion.ref                 == "refs/heads/main"
+```
+
+Names are deliberately not used: a repository name can be re-created by someone else and
+an account can be renamed, but these IDs cannot be reassigned. The `principalSet` is
+additionally scoped to `attribute.repository_id`, not to the whole pool, so adding another
+provider or repository to the pool later grants nothing.
+
+### Blast-radius split
+
+| marker | runs in CI | why |
+|---|---|---|
+| `integration_readonly` | **yes** | reads only |
+| `requires_gcs` | no | needs raw object read; excluded to keep CI's grant narrow |
+| `integration_destructive` | **never** | invokes the loader, creates staging, can republish |
+
+CI identity permissions: `bigquery.jobUser` on the project, `metadataViewer` on the two
+datasets, `dataViewer` on exactly four tables, `serviceAccountTokenCreator` on the matcher
+SA (only so the firewall assertions can run), and `storage.objectViewer` on the raw bucket
+(necessity demonstrated — see `terraform/ci-identity/main.tf`). **No write or admin role
+anywhere**, and the workflow proves it by attempting a `CREATE TABLE` that must fail.

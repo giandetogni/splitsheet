@@ -177,3 +177,19 @@ the wrong trade at this price.
 
 Staging roughly doubles peak storage during a publish (two 38.2 M-row tables exist at
 once) and drops back after commit. At this size both remain inside the free storage tier.
+
+## Phase 2C — CI
+
+The public workflow costs nothing: it has no credentials and no path to GCP.
+
+The read-only integration workflow, measured from
+`INFORMATION_SCHEMA.JOBS_BY_PROJECT` filtered to the CI identity:
+**14 jobs, 10,671,357,952 bytes billed = 0.0097 TiB, 403,418 slot-ms.**
+At the $6.25/TiB list rate that is **≈ $0.06 per manual run**, inside the free tier.
+
+Most of that is the reconciliation test recomputing 39.2 M rows from the external table.
+Every query in the suite is capped by `maximum_bytes_billed = 50 GiB`, so a mistake in a
+test cannot turn into a large bill.
+
+Because the workflow is `workflow_dispatch` only, this cost is incurred deliberately and
+never by a push or a pull request — and never by a fork.

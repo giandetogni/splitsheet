@@ -9,6 +9,7 @@
 > - **Phase 1C — project APIs under Terraform: COMPLETE** (`docs/runbook.md`).
 > - **Phase 2A — BigQuery datasets and bronze ingestion: COMPLETE** (§14).
 > - **Phase 2B — ingestion contract, failure-safe publication, evaluation firewall: COMPLETE** (§15).
+> - **Phase 2C — public CI and read-only integration via WIF: COMPLETE** (`docs/runbook.md`).
 > - Not started: matching, silver/gold, dbt, rights data, Airflow, Dataproc.
 
 Every number here was produced by the commands in `src/recon/` against the pinned

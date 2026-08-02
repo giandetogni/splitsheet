@@ -124,7 +124,7 @@ phase1a-verify:
 # All Terraform roots. Ordered: project-foundation enables the APIs the other
 # roots need, so it must be applied before raw-storage and governance.
 # ---------------------------------------------------------------------------
-TF_ROOTS := bootstrap-state project-foundation raw-storage governance bigquery
+TF_ROOTS := bootstrap-state project-foundation raw-storage governance bigquery ci-identity
 
 .PHONY: tf-fmt tf-validate tf-plan
 
