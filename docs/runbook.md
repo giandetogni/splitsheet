@@ -140,3 +140,43 @@ datasets, `dataViewer` on exactly four tables, `serviceAccountTokenCreator` on t
 SA (only so the firewall assertions can run), and `storage.objectViewer` on the raw bucket
 (necessity demonstrated — see `terraform/ci-identity/main.tf`). **No write or admin role
 anywhere**, and the workflow proves it by attempting a `CREATE TABLE` that must fail.
+
+### Branch protection — BLOCKED_BY_GITHUB_PLAN
+
+**`main` is not protected, and cannot be on the current plan.** Verified by probing the
+API rather than reading documentation — both mechanisms are refused for this private
+repository:
+
+```
+GET /repos/giandetogni/splitsheet/branches/main/protection
+GET /repos/giandetogni/splitsheet/rulesets
+  -> HTTP 403
+  "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
+
+Classic branch protection and repository rulesets are both gated. The two remedies GitHub
+offers are a paid upgrade or making the repository public; neither was taken — no purchase,
+and the repository stays private because publication is gated on criteria this project has
+not met.
+
+**What this means in practice, stated plainly so nobody mistakes CI for a gate:**
+
+- CI **reports** failures. It does **not prevent** anything.
+- A direct push to `main` succeeds even when the `checks` job is red.
+- Force-push to `main` and deletion of `main` are both possible.
+- Nothing requires a pull request, and nothing requires a green check before merge.
+
+The protection therefore rests on operator discipline, exactly as it did before Phase 2C —
+CI shortens the time to *notice* a regression, not the ability to introduce one.
+
+No workaround was implemented. A local `pre-push` hook was considered and rejected: it
+lives outside version control's enforcement, is bypassed by `--no-verify`, and does not
+exist in a fresh clone, so it would create the appearance of a gate without the substance.
+
+**Revisit when** the repository becomes public (protection becomes available on Free) or
+the account moves to a paid plan. The intended configuration, ready to apply, is: require
+pull requests into `main`, require the status check named **`checks`** (the job id in
+`ci.yml`; `integration.yml` uses `readonly`, so the two never collide), include
+administrators with no bypass, block force pushes, block deletion, and require **no**
+second reviewer since the repository has a single author. The GCP integration workflow must
+**not** be a required PR check — it would need `id-token` on unreviewed pull-request code.
