@@ -1,0 +1,15 @@
+{
+ "rows_scanned": 39200000,
+ "msid_sample_fraction": "1/8",
+ "sampled_distinct_msids": 844184,
+ "sampled_msids_seen_twice_or_more": 332607,
+ "of_those_all_rows_have_mbid": 252141,
+ "of_those_no_rows_have_mbid": 77559,
+ "of_those_MIXED_null_and_nonnull": 2907,
+ "mixed_pct": 0.874,
+ "of_those_with_CONFLICTING_mbids": 354,
+ "conflicting_pct": 0.1064,
+ "occurrences_per_msid_mean": 13.251,
+ "occurrences_per_msid_max": 428863,
+ "interpretation": "strong structural evidence consistent with ListenBrainz-derived mapping: recording_mbid behaves as a deterministic function of recording_msid, presence is all-or-nothing per string, and values rarely conflict across users. No direct proof exists because the event-level join was impossible. The column remains a ListenBrainz mapper reference label, not ground truth. Mixed and conflicting cases are candidates for upstream changes; attributing them to mapper revision requires a temporal analysis ruling out redirects and canonical corrections."
+}

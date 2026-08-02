@@ -1,0 +1,4 @@
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+raw_bucket_name = "splitsheet-raw-<suffix>"
+human_principal = "you@example.com"

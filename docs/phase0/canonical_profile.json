@@ -1,0 +1,37 @@
+{
+  "header": [
+    "id",
+    "artist_credit_id",
+    "artist_mbids",
+    "artist_credit_name",
+    "release_mbid",
+    "release_name",
+    "recording_mbid",
+    "recording_name",
+    "combined_lookup",
+    "score"
+  ],
+  "total_rows": 31554198,
+  "malformed_rows": 0,
+  "blank_combined_lookup": 1,
+  "non_ascii_combined_lookup": 0,
+  "non_ascii_combined_lookup_pct": 0.0,
+  "combined_lookup_with_space": 1506827,
+  "combined_lookup_with_space_pct": 4.7754,
+  "score_min": 1,
+  "score_max": 5623672,
+  "est_distinct_recording_mbid": 31645952,
+  "sampled_lookups": 491953,
+  "est_distinct_combined_lookup": 31484992,
+  "recordings_per_lookup": {
+    "mean": 1.0,
+    "p50": 1,
+    "p90": 1,
+    "p95": 1,
+    "p99": 1,
+    "p999": 1,
+    "max": 1
+  },
+  "lookups_with_gt1_recording": 0,
+  "lookups_with_gt1_recording_pct": 0.0
+}

@@ -1,0 +1,44 @@
+{
+  "listen_side": {
+    "listens_in_scope": 1249723,
+    "listens_no_usable_key": 41465
+  },
+  "canonical_counts": {
+    "canonical_rows": 31554198,
+    "our_key_equals_combined_lookup": 28664075,
+    "canonical_no_usable_key": 2141479
+  },
+  "our_key_equals_combined_lookup_pct": 90.8408,
+  "exact": {
+    "label": "exact normalization",
+    "distinct_keys": 442440,
+    "listens_covered": 1208258,
+    "keys_zero_candidates": 157416,
+    "keys_one_candidate": 284241,
+    "keys_many_candidates": 783,
+    "listens_zero_candidates_pct": 26.0246,
+    "listens_one_candidate_pct": 73.6363,
+    "listens_many_candidates_pct": 0.3392,
+    "mean_candidates_per_listen": 0.7529,
+    "p50_candidates_per_listen": 1,
+    "p99_candidates_per_listen": 1,
+    "max_candidates_for_any_key": 945,
+    "total_candidate_pairs": 909727
+  },
+  "aggressive": {
+    "label": "aggressive suffix-stripped",
+    "distinct_keys": 420822,
+    "listens_covered": 1203247,
+    "keys_zero_candidates": 127486,
+    "keys_one_candidate": 214463,
+    "keys_many_candidates": 78873,
+    "listens_zero_candidates_pct": 20.439,
+    "listens_one_candidate_pct": 51.9275,
+    "listens_many_candidates_pct": 27.6335,
+    "mean_candidates_per_listen": 2.3172,
+    "p50_candidates_per_listen": 1,
+    "p99_candidates_per_listen": 25,
+    "max_candidates_for_any_key": 459,
+    "total_candidate_pairs": 2788222
+  }
+}

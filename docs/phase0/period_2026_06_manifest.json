@@ -1,0 +1,207 @@
+{
+ "slice_id": "listenbrainz-fullexport-2593-2026-06",
+ "period": "2026-06",
+ "source_url": "https://data.metabrainz.org/pub/musicbrainz/listenbrainz/fullexport/listenbrainz-dump-2593-20260712-000004-full/listenbrainz-spark-dump-2593-20260712-000004-full.tar",
+ "source_archive_bytes": 205073162240,
+ "source_etag": "\"6a591543-2fbf502000\"",
+ "source_last_modified": "Thu, 16 Jul 2026 17:30:43 GMT",
+ "source_license": "CC0 1.0 Universal (COPYING inside archive)",
+ "extraction_method": "HTTP Range over uncompressed tar members",
+ "member_count": 23,
+ "total_bytes": 2671810509,
+ "expected_rows_in_period": 38199641,
+ "period_start": "2026-06-01T00:00:00",
+ "period_end_exclusive": "2026-07-01T00:00:00",
+ "bytes_transferred": 2671810509,
+ "requests": 333,
+ "retries_total": 0,
+ "members_reused_without_download": 0,
+ "seconds": 332.8,
+ "pii_note": "raw members contain user_id; it must not appear in published outputs",
+ "members": [
+  {
+   "member": "1495.parquet",
+   "tar_offset": 201474532864,
+   "size_bytes": 117161558,
+   "sha256": "bd092116ae5408c9b0c35d207a673eda11b2173928044a073a7374f5dbc1f1b9",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1496.parquet",
+   "tar_offset": 201591696384,
+   "size_bytes": 118020873,
+   "sha256": "8d97ce5722d08f1add7185d00cf0aa0cfd7029ba43373e4fb0e5fddfb73ba63c",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1497.parquet",
+   "tar_offset": 201709719040,
+   "size_bytes": 113834610,
+   "sha256": "0ddba85694b35ed646020a629b1e6522996cc7be0034bfbf3d92b31710e8f94e",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1498.parquet",
+   "tar_offset": 201823555584,
+   "size_bytes": 118245897,
+   "sha256": "2116059a616f06ce755bc63c8c351dfeb85d0f19ca13b2917e2021efe2ac228e",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1499.parquet",
+   "tar_offset": 201941803520,
+   "size_bytes": 117763610,
+   "sha256": "8b22b7826d264b97457c67a3bf01985371601f5e6a016e0664cb26915d4fbc60",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1500.parquet",
+   "tar_offset": 202059569152,
+   "size_bytes": 110175571,
+   "sha256": "cd508bbafc3f1cdfce1a541b7cdb6484238cda879a0d066157b87f027c099028",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1501.parquet",
+   "tar_offset": 202169746432,
+   "size_bytes": 122025939,
+   "sha256": "023a53d4a7ce006111faad27df8cc22135d59c14c854ad1d9b0ed8c15686ef48",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1502.parquet",
+   "tar_offset": 202291773952,
+   "size_bytes": 119856981,
+   "sha256": "f7b5bfe51457694fa46351adc79390a506e6928e1d6a55262d77883b5712c216",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1503.parquet",
+   "tar_offset": 202411632640,
+   "size_bytes": 115181664,
+   "sha256": "99e5fd54c69c1896f4d3808c87aa5d3ba05aa82a9778e8092f663c402ea2e399",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1504.parquet",
+   "tar_offset": 202526816256,
+   "size_bytes": 117035336,
+   "sha256": "27971bf112e25088b5758376e3a33ee6dbecf8ac3008019139d6b9d14614d5b9",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1505.parquet",
+   "tar_offset": 202643853312,
+   "size_bytes": 110347707,
+   "sha256": "9ef426fb2c4b9e0efb9870ae58098edce419815b2efa38cc0510b48af1ca8b0d",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1506.parquet",
+   "tar_offset": 202754202624,
+   "size_bytes": 115199519,
+   "sha256": "2791f3a19ca5fdc0897ec04898723cb121298f799fe9bfc0c3b450a2da28b0c3",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1507.parquet",
+   "tar_offset": 202869404160,
+   "size_bytes": 120165009,
+   "sha256": "1811f8447b53371c78fd11bce779d10cb280a6a116d16539425c4aa9be6b8669",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1508.parquet",
+   "tar_offset": 202989571072,
+   "size_bytes": 118301274,
+   "sha256": "8dde4c823d94efebb02ec149de552965c0dbb43819121fa3730aa620768bf227",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1509.parquet",
+   "tar_offset": 203107874304,
+   "size_bytes": 113566815,
+   "sha256": "dd03e4ad6ce67290b689476e7df2ee6a8baf5c92d5ff9463ba34c14d46d2d7d9",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1510.parquet",
+   "tar_offset": 203221443072,
+   "size_bytes": 116222708,
+   "sha256": "8170e9b013d58f915d03be7278e3887761cc1e8bba1dd37b146e7c1fa8c34791",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1511.parquet",
+   "tar_offset": 203337667584,
+   "size_bytes": 113120299,
+   "sha256": "fb8cc11c559ca9f43ee1bd9ea4f10cfae5751feacece3ace86aaa2ad02537428",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1512.parquet",
+   "tar_offset": 203450789888,
+   "size_bytes": 113953527,
+   "sha256": "0b062ba56fd41c72195efb1f902ee0f0280f4524c990837edf948f4598b832ba",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1513.parquet",
+   "tar_offset": 203564745216,
+   "size_bytes": 129677464,
+   "sha256": "2eb45214204a279ce5b7d285cc9cce0dc58ee28c5b85cc2c707082a5ee9d2875",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1514.parquet",
+   "tar_offset": 203694424576,
+   "size_bytes": 105028606,
+   "sha256": "f548147a1eae475b326d7f588612d18f43ab5b546a2df2b1628e427327e9522e",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1515.parquet",
+   "tar_offset": 203799454720,
+   "size_bytes": 136329147,
+   "sha256": "4b82a300ff747078e5dd486c8590692e4606a6887bfed5ebb0a7f453883a75e2",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1516.parquet",
+   "tar_offset": 203935785472,
+   "size_bytes": 105534765,
+   "sha256": "e935f2f7b9c0c3c064fe7af91ee72980f0ec409545042fa36c684838dd40f0a0",
+   "retries": 0,
+   "state": "downloaded"
+  },
+  {
+   "member": "1517.parquet",
+   "tar_offset": 204041321984,
+   "size_bytes": 105061630,
+   "sha256": "aa44ee0042329e2e99f9e5896a7ccf1d55a55f65b299817c8fa6759b58ea730d",
+   "retries": 0,
+   "state": "downloaded"
+  }
+ ]
+}

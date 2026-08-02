@@ -1,0 +1,228 @@
+{
+ "bucket": "splitsheet-raw-944054e7",
+ "prefix": "raw/listenbrainz/fullexport-2593/period=2026-06",
+ "bucket_location": "US-CENTRAL1",
+ "bucket_storage_class": "STANDARD",
+ "public_access_prevention": "enforced",
+ "uniform_bucket_level_access": true,
+ "public_iam_members": [],
+ "objects_expected": 23,
+ "objects_found": 23,
+ "manifest_object_present": true,
+ "rows_in_period": 38199641,
+ "expected_rows_in_period": 38199641,
+ "rows_match": true,
+ "all_sha256_metadata_ok": true,
+ "all_md5_match_local": true,
+ "verification_egress_bytes": 2891884,
+ "failures": [],
+ "objects": [
+  {
+   "member": "1495.parquet",
+   "size_bytes": 117161558,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 886038,
+   "generation": 1785618942037382
+  },
+  {
+   "member": "1496.parquet",
+   "size_bytes": 118020873,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785618951006664
+  },
+  {
+   "member": "1497.parquet",
+   "size_bytes": 113834610,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785618959769919
+  },
+  {
+   "member": "1498.parquet",
+   "size_bytes": 118245897,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785618968766602
+  },
+  {
+   "member": "1499.parquet",
+   "size_bytes": 117763610,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785618977673536
+  },
+  {
+   "member": "1500.parquet",
+   "size_bytes": 110175571,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785618986358760
+  },
+  {
+   "member": "1501.parquet",
+   "size_bytes": 122025939,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785618995464322
+  },
+  {
+   "member": "1502.parquet",
+   "size_bytes": 119856981,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619004453280
+  },
+  {
+   "member": "1503.parquet",
+   "size_bytes": 115181664,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619013294309
+  },
+  {
+   "member": "1504.parquet",
+   "size_bytes": 117035336,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619022565751
+  },
+  {
+   "member": "1505.parquet",
+   "size_bytes": 110347707,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619031231553
+  },
+  {
+   "member": "1506.parquet",
+   "size_bytes": 115199519,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619040076700
+  },
+  {
+   "member": "1507.parquet",
+   "size_bytes": 120165009,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619049074363
+  },
+  {
+   "member": "1508.parquet",
+   "size_bytes": 118301274,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619058104500
+  },
+  {
+   "member": "1509.parquet",
+   "size_bytes": 113566815,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619067223782
+  },
+  {
+   "member": "1510.parquet",
+   "size_bytes": 116222708,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619076152812
+  },
+  {
+   "member": "1511.parquet",
+   "size_bytes": 113120299,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619084892297
+  },
+  {
+   "member": "1512.parquet",
+   "size_bytes": 113953527,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619093685059
+  },
+  {
+   "member": "1513.parquet",
+   "size_bytes": 129677464,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619103037206
+  },
+  {
+   "member": "1514.parquet",
+   "size_bytes": 105028606,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619109724128
+  },
+  {
+   "member": "1515.parquet",
+   "size_bytes": 136329147,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 2240000,
+   "rows_in_period": 2240000,
+   "generation": 1785619118136651
+  },
+  {
+   "member": "1516.parquet",
+   "size_bytes": 105534765,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1680000,
+   "generation": 1785619124901177
+  },
+  {
+   "member": "1517.parquet",
+   "size_bytes": 105061630,
+   "sha256_metadata_ok": true,
+   "md5_matches_local": true,
+   "rows": 1680000,
+   "rows_in_period": 1473603,
+   "generation": 1785619131469901
+  }
+ ]
+}

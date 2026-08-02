@@ -1,0 +1,4 @@
+project_id           = "your-gcp-project-id"
+billing_account_id   = "XXXXXX-XXXXXX-XXXXXX"
+currency_code        = "BRL"
+monthly_amount_units = "50"

@@ -1,0 +1,37 @@
+[project]
+name = "splitsheet"
+version = "0.1.0"
+description = "Royalty attribution and unmatched revenue pipeline"
+# Pinned to 3.12: PySpark does not support 3.14, which is the system interpreter here.
+requires-python = ">=3.12,<3.13"
+# Phase 0B only needs Parquet footer metadata. Further dependencies are added when a
+# phase actually requires them, not in advance. Exact versions live in uv.lock.
+dependencies = [
+    "pyarrow>=17,<23",
+    # Phase 1A: upload and verify the preserved slice in GCS. Uses Application
+    # Default Credentials only; no key material is referenced or committed.
+    "google-cloud-storage>=2.14,<4",
+    "google-cloud-bigquery>=3.42.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+    "ruff>=0.6,<1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+# Integration tests hit real BigQuery and cost real bytes. They are never part of the
+# default unit-test run and must never be reported as unit tests.
+testpaths = ["tests/unit"]
+markers = [
+    "integration: requires a live GCP project and Application Default Credentials",
+    "slow: invokes the real loader end to end",
+    "integration_readonly: reads only; safe to run from CI",
+    "integration_destructive: invokes the loader and can write; never run in CI",
+    "requires_gcs: needs read access to the raw GCS objects",
+]

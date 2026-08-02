@@ -1,0 +1,45 @@
+{
+ "action": "cleanup_orphan_staging",
+ "dropped": [
+  "splitsheet_bronze.stg_bronze_listens_2026_06_4a52f96df7ab21d1",
+  "splitsheet_eval.stg_labels_2026_06_4a52f96df7ab21d1"
+ ],
+ "jobs": [
+  {
+   "step": "list_staging_splitsheet_bronze",
+   "job_id": "3c175aa7-541a-46ca-bbd3-0db6e900ac62",
+   "bytes_processed": 10485760,
+   "bytes_billed": 10485760,
+   "slot_ms": 93,
+   "duration_ms": 235,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "drop_orphan_staging",
+   "job_id": "048ea31a-5673-443e-b7ef-7545dbf6029f",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 146,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "list_staging_splitsheet_eval",
+   "job_id": "94b05824-3b54-4335-8170-52e30a6640b7",
+   "bytes_processed": 10485760,
+   "bytes_billed": 10485760,
+   "slot_ms": 109,
+   "duration_ms": 267,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "drop_orphan_staging",
+   "job_id": "e4684661-bd31-4ae8-8185-101b2413c12d",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 147,
+   "dml_affected_rows": null
+  }
+ ]
+}

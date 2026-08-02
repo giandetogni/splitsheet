@@ -1,0 +1,33 @@
+### Raw source data: never committed. Identified by URL + SHA-256 in
+### docs/schema_notes.md and re-fetchable via src/recon/fetch_phase0_samples.sh.
+data/
+*.tar
+*.tar.zst
+*.listens
+*.parquet
+*.sha256
+*.md5
+
+### Secrets / credentials
+.env
+*.json.key
+service-account*.json
+**/gcp-key*.json
+
+### Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+### Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+### OS / editor
+.DS_Store

@@ -1,0 +1,62 @@
+{
+ "ingestion_run_id": "listenbrainz-fullexport-2593-2026-06:4a52f96df7ab21d1",
+ "reconciliation": {
+  "source_total_rows": 39200000,
+  "in_period_rows": 38199641,
+  "outside_target_period_rows": 1000359,
+  "classified_sum_equals_total": true,
+  "unclassified_rows": 0
+ },
+ "outcome": {
+  "inserted": 0,
+  "skipped": 38199641,
+  "failed": 0
+ },
+ "bronze_rows": 38199641,
+ "bronze_distinct_hashes": 38199641,
+ "label_rows": 38199641,
+ "labels_present": 32799203,
+ "label_coverage_pct": 85.8626,
+ "total_bytes_processed": 4927753689,
+ "total_bytes_billed": 4928307200,
+ "total_slot_ms": 147378,
+ "wall_seconds": 5.1,
+ "jobs": [
+  {
+   "step": "reconcile_source",
+   "job_id": "3daea47c-6d53-4dc3-84e5-fef45426e65e",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": null,
+   "duration_ms": 123,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "inspect_target",
+   "job_id": "acb28cae-ee08-48ec-95f2-83e6ded91eb8",
+   "bytes_processed": 4927753689,
+   "bytes_billed": 4928307200,
+   "slot_ms": 147378,
+   "duration_ms": 847,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "verify_bronze",
+   "job_id": "dae1362a-0e6d-4abd-b9e4-21eee2784baa",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": null,
+   "duration_ms": 102,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "verify_labels",
+   "job_id": "eb1f706b-31c0-4863-894c-7d12905f4442",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": null,
+   "duration_ms": 96,
+   "dml_affected_rows": null
+  }
+ ]
+}

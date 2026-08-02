@@ -1,0 +1,98 @@
+{
+ "ingestion_run_id": "listenbrainz-fullexport-2593-2026-06:4a52f96df7ab21d1",
+ "reconciliation": {
+  "source_total_rows": 39200000,
+  "in_period_rows": 38199641,
+  "outside_target_period_rows": 1000359,
+  "classified_sum_equals_total": true,
+  "unclassified_rows": 0
+ },
+ "outcome": {
+  "inserted": 38199641,
+  "skipped": 0,
+  "failed": 0
+ },
+ "bronze_rows": 38199641,
+ "bronze_distinct_hashes": 38199641,
+ "label_rows": 38199641,
+ "labels_present": 32799203,
+ "label_coverage_pct": 85.8626,
+ "total_bytes_processed": 10452518142,
+ "total_bytes_billed": 10454302720,
+ "total_slot_ms": 2061248,
+ "wall_seconds": 33.9,
+ "jobs": [
+  {
+   "step": "reconcile_source",
+   "job_id": "28306df0-2ad7-4b6c-963e-2fbe69fea372",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": null,
+   "duration_ms": 105,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "inspect_target",
+   "job_id": "bff06c65-af07-45aa-ad83-e8a9aa5cf081",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": 23,
+   "duration_ms": 192,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "truncate_bronze",
+   "job_id": "9fed96db-5876-4a4f-8f11-ea3e5e54083d",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 796,
+   "dml_affected_rows": 0
+  },
+  {
+   "step": "insert_bronze",
+   "job_id": "15e07c03-9afa-44ec-a3f9-b3b742ecd74f",
+   "bytes_processed": 4191743575,
+   "bytes_billed": 4192206848,
+   "slot_ms": 1337799,
+   "duration_ms": 15716,
+   "dml_affected_rows": 38199641
+  },
+  {
+   "step": "truncate_labels",
+   "job_id": "3a5a1552-2c38-4ea8-8a64-98156e3e13de",
+   "bytes_processed": 0,
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 770,
+   "dml_affected_rows": 0
+  },
+  {
+   "step": "insert_labels",
+   "job_id": "4e37de0c-e090-49e3-8515-d80fdc82154b",
+   "bytes_processed": 3395801492,
+   "bytes_billed": 3396337664,
+   "slot_ms": 595002,
+   "duration_ms": 7817,
+   "dml_affected_rows": 38199641
+  },
+  {
+   "step": "verify_bronze",
+   "job_id": "012a5158-8c53-45f2-b273-c1d9006a964c",
+   "bytes_processed": 2826773434,
+   "bytes_billed": 2826960896,
+   "slot_ms": 126300,
+   "duration_ms": 1072,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "verify_labels",
+   "job_id": "6d54631c-4105-4afc-923e-f127f7729517",
+   "bytes_processed": 38199641,
+   "bytes_billed": 38797312,
+   "slot_ms": 2124,
+   "duration_ms": 223,
+   "dml_affected_rows": null
+  }
+ ]
+}

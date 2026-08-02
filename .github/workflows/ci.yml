@@ -1,0 +1,66 @@
+name: ci
+
+# Public, credential-free CI. It must be able to run on a fork and on any pull request,
+# so it has no secrets, no id-token, and no path to GCP. Everything requiring cloud
+# access lives in integration.yml, which is manual only.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer commit on the same ref makes the older run irrelevant; cancel it rather than
+# paying for both.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # No cache: dependency install measured under ~10s locally, so caching would
+          # add moving parts for no measurable gain. Revisit if install time grows.
+          enable-cache: false
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      # Explicit and separate from `uv sync` so an out-of-date lockfile fails with an
+      # unambiguous message rather than surfacing as a confusing resolution error.
+      - name: Verify lockfile is consistent with pyproject.toml
+        run: uv lock --check
+
+      - name: Install dependencies from lockfile only
+        run: uv sync --frozen --all-groups
+
+      - name: Lint
+        run: uv run ruff check src tests
+
+      # Unit tests only. tests/integration is excluded by testpaths in pyproject.toml
+      # and additionally requires credentials this job does not have.
+      - name: Unit tests
+        run: make test
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        run: make tf-fmt
+
+      # Runs `init -backend=false`, so no GCP credentials and no state access.
+      - name: Terraform validate
+        run: make tf-validate
+
+      - name: Confirm no integration test ran
+        run: |
+          uv run pytest tests/unit --collect-only -q | tail -1
+          echo "integration tests are not part of this job by construction"

@@ -1,0 +1,62 @@
+{
+ "ingestion_run_id": "listenbrainz-fullexport-2593-2026-06:4a52f96df7ab21d1",
+ "reconciliation": {
+  "source_total_rows": 39200000,
+  "in_period_rows": 38199641,
+  "outside_target_period_rows": 1000359,
+  "classified_sum_equals_total": true,
+  "unclassified_rows": 0
+ },
+ "outcome": {
+  "inserted": 0,
+  "skipped": 38199641,
+  "failed": 0
+ },
+ "bronze_rows": 38199641,
+ "bronze_distinct_hashes": 38199641,
+ "label_rows": 38199641,
+ "labels_present": 32799203,
+ "label_coverage_pct": 85.8626,
+ "total_bytes_processed": 8106326764,
+ "total_bytes_billed": 8108638208,
+ "total_slot_ms": 392276,
+ "wall_seconds": 10.2,
+ "jobs": [
+  {
+   "step": "reconcile_source",
+   "job_id": "fdd6ea62-16fa-4c23-9a29-96fed22a5a40",
+   "bytes_processed": 313600000,
+   "bytes_billed": 314572800,
+   "slot_ms": 6144,
+   "duration_ms": 366,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "inspect_target",
+   "job_id": "3ea72ad6-8c8f-4561-91bd-0c97158eecf6",
+   "bytes_processed": 4927753689,
+   "bytes_billed": 4928307200,
+   "slot_ms": 198581,
+   "duration_ms": 2896,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "verify_bronze",
+   "job_id": "34250d47-a7e7-4302-97ab-2ef50e977f0d",
+   "bytes_processed": 2826773434,
+   "bytes_billed": 2826960896,
+   "slot_ms": 184690,
+   "duration_ms": 2261,
+   "dml_affected_rows": null
+  },
+  {
+   "step": "verify_labels",
+   "job_id": "cfd8bff1-efd8-4525-b492-1a049c5e4ecb",
+   "bytes_processed": 38199641,
+   "bytes_billed": 38797312,
+   "slot_ms": 2861,
+   "duration_ms": 235,
+   "dml_affected_rows": null
+  }
+ ]
+}

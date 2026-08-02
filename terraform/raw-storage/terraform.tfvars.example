@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is git-ignored.
+project_id      = "your-gcp-project-id"
+raw_bucket_name = "splitsheet-raw-<unique-suffix>"
+region          = "us-central1"
+storage_class   = "STANDARD"

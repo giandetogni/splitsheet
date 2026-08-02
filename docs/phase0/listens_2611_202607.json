@@ -1,0 +1,836 @@
+{
+  "counts": {
+    "total_lines": 3949921,
+    "kept_in_month": 1249723,
+    "no_mbid_any_origin": 1121254,
+    "duration_present": 731402,
+    "ts_plausible": 1249723,
+    "client_recording_mbid": 127442,
+    "client_artist_mbids": 143505,
+    "client_release_mbid": 130920,
+    "track_has_version_marker": 98443,
+    "track_has_bracketed_segment": 153392,
+    "filtered_out_other_month": 2700198,
+    "isrc_present": 217440,
+    "isrc_valid_format": 217291,
+    "duration_from_seconds_field": 109948,
+    "mapping_recording_mbid": 1027
+  },
+  "derived": {
+    "parsed_rows": 1249723,
+    "distinct_users": 20360,
+    "distinct_artist_strings": 147726,
+    "distinct_artist_track_raw": 480233,
+    "distinct_artist_track_suffix_stripped": 461473,
+    "suffix_collapse_ratio": 1.0407,
+    "ts_min": 1782864019,
+    "ts_max": 1785372955
+  },
+  "rates_pct_of_parsed": {
+    "client_recording_mbid": 10.1976,
+    "mapping_recording_mbid": 0.0822,
+    "both_mbid_origins": 0.0,
+    "no_mbid_any_origin": 89.7202,
+    "isrc_present": 17.3991,
+    "duration_present": 58.5251,
+    "null_or_blank_artist": 0.0,
+    "null_or_blank_track": 0.0,
+    "track_has_version_marker": 7.8772,
+    "dup_on_user_ts_msid": 0.0
+  },
+  "mbid_agreement_pct_of_both": 0.0,
+  "field_presence_pct": {
+    "user_id": 100.0,
+    "user_name": 100.0,
+    "timestamp": 100.0,
+    "track_metadata": 100.0,
+    "track_metadata.track_name": 100.0,
+    "track_metadata.artist_name": 100.0,
+    "track_metadata.additional_info": 100.0,
+    "track_metadata.additional_info.recording_msid": 100.0,
+    "recording_msid": 100.0,
+    "track_metadata.additional_info.submission_client": 96.2688,
+    "track_metadata.release_name": 95.6628,
+    "track_metadata.additional_info.duration_ms": 49.7273,
+    "track_metadata.additional_info.submission_client_version": 40.8882,
+    "track_metadata.additional_info.tracknumber": 32.9584,
+    "track_metadata.additional_info.artist_names": 30.832,
+    "track_metadata.additional_info.lastfm_artist_mbid": 25.2586,
+    "track_metadata.additional_info.lastfm_track_mbid": 23.3653,
+    "track_metadata.additional_info.origin_url": 22.9628,
+    "track_metadata.additional_info.lastfm_release_mbid": 22.5765,
+    "track_metadata.additional_info.spotify_id": 19.0729,
+    "track_metadata.additional_info.music_service": 17.4361,
+    "track_metadata.additional_info.isrc": 17.4196,
+    "track_metadata.additional_info.release_artist_name": 17.1114,
+    "track_metadata.additional_info.discnumber": 16.9291,
+    "track_metadata.additional_info.spotify_album_id": 16.8565,
+    "track_metadata.additional_info.spotify_artist_ids": 16.8561,
+    "track_metadata.additional_info.spotify_album_artist_ids": 16.773,
+    "track_metadata.additional_info.release_artist_names": 16.6336,
+    "track_metadata.additional_info.artist_mbids": 15.9116,
+    "track_metadata.additional_info.media_player": 10.726,
+    "track_metadata.additional_info.release_mbid": 10.4759,
+    "track_metadata.additional_info.recording_mbid": 10.1976,
+    "track_metadata.additional_info.release_group_mbid": 8.8319,
+    "track_metadata.additional_info.duration": 8.7978,
+    "track_metadata.additional_info.music_service_name": 7.6446,
+    "track_metadata.additional_info.track_mbid": 2.5854,
+    "track_metadata.additional_info.media_player_version": 1.7121,
+    "track_metadata.additional_info.listening_from": 1.5433,
+    "track_metadata.additional_info.tags": 1.3527,
+    "track_metadata.additional_info.date": 0.614,
+    "track_metadata.additional_info.albumartist": 0.5326,
+    "track_metadata.additional_info.totaltracks": 0.4113,
+    "track_metadata.additional_info.end_ms": 0.3598,
+    "track_metadata.additional_info.start_ms": 0.3598,
+    "track_metadata.additional_info.totaldiscs": 0.346,
+    "track_metadata.additional_info.ms_played": 0.2771,
+    "track_metadata.additional_info.source": 0.2702,
+    "track_metadata.additional_info.track_number": 0.2676,
+    "track_metadata.additional_info.track_length": 0.2664,
+    "track_metadata.additional_info.rating": 0.2526,
+    "track_metadata.additional_info.trackNumber": 0.1638,
+    "track_metadata.additional_info.work_mbids": 0.0871,
+    "track_metadata.mbid_mapping": 0.0823,
+    "track_metadata.brainzplayer_metadata": 0.0823,
+    "track_metadata.brainzplayer_metadata.track_name": 0.0823,
+    "track_metadata.mbid_mapping.recording_mbid": 0.0822,
+    "track_metadata.mbid_mapping.artists": 0.0821,
+    "track_metadata.mbid_mapping.artist_mbids": 0.0821,
+    "track_metadata.mbid_mapping.artists[].artist_mbid": 0.0819,
+    "track_metadata.mbid_mapping.artists[].join_phrase": 0.0819,
+    "track_metadata.mbid_mapping.artists[].artist_credit_name": 0.0819,
+    "track_metadata.mbid_mapping.release_mbid": 0.0813,
+    "track_metadata.mbid_mapping.caa_id": 0.0809,
+    "track_metadata.mbid_mapping.caa_release_mbid": 0.0809,
+    "track_metadata.additional_info.duration_played": 0.0787,
+    "track_metadata.tags": 0.0341,
+    "track_metadata.tracknumber": 0.0303,
+    "track_metadata.additional_info.original_submission_client": 0.0292,
+    "track_metadata.additional_info.choosen_by_user": 0.0264,
+    "track_metadata.additional_info.genre": 0.0234,
+    "track_metadata.track_mbid": 0.0148,
+    "track_metadata.additional_info.year": 0.0098,
+    "track_metadata.additional_info.artist_mbid": 0.0076,
+    "track_metadata.additional_info.label": 0.0054,
+    "track_metadata.duration": 0.0054,
+    "track_metadata.additional_info.comment": 0.0052,
+    "track_metadata.additional_info.artist_msid": 0.0047,
+    "track_metadata.additional_info.release_msid": 0.0047,
+    "track_metadata.mbid_mapping.recording_name": 0.0044,
+    "track_metadata.additional_info.cover_url": 0.0043,
+    "track_metadata.additional_info.spotify_url": 0.0043,
+    "track_metadata.additional_info.accent_color": 0.0043,
+    "track_metadata.additional_info.cover_source": 0.0043,
+    "track_metadata.additional_info.qq_music_url": 0.0043,
+    "track_metadata.additional_info.lyrics_source": 0.0042,
+    "track_metadata.additional_info.apple_music_url": 0.0042,
+    "track_metadata.brainzplayer_metadata.artist_name": 0.0042,
+    "track_metadata.additional_info.netease_url": 0.0041,
+    "track_metadata.additional_info.progress_ms": 0.0036,
+    "track_metadata.additional_info.progress_ts": 0.0036,
+    "track_metadata.additional_info.playback_rate": 0.0036,
+    "track_metadata.brainzplayer_metadata.release_name": 0.0032,
+    "track_metadata.additional_info.metadata_confidence": 0.0023,
+    "track_metadata.additional_info.youtube_music_video_id": 0.0023,
+    "track_metadata.media_player": 0.0019,
+    "track_metadata.additional_info.artists_mbids": 0.0018,
+    "track_metadata.additional_info.album_artist_name": 0.0016,
+    "track_metadata.release_mbid": 0.0012,
+    "track_metadata.additional_info.musicbrainz_albumartistid": 0.0012,
+    "track_metadata.artist_mbids": 0.001,
+    "track_metadata.addtional_info": 0.001,
+    "track_metadata.addtional_info.duration_ms": 0.001,
+    "track_metadata.addtional_info.media_player": 0.001,
+    "track_metadata.addtional_info.submission_client": 0.001,
+    "track_metadata.addtional_info.submission_client_version": 0.001,
+    "track_metadata.additional_info.phoebe_track_id": 0.0008,
+    "track_metadata.mbid_mapping.url_rels": 0.0005,
+    "track_metadata.mbid_mapping.url_rels[].url": 0.0005,
+    "track_metadata.mbid_mapping.url_rels[].type": 0.0005,
+    "track_metadata.recording_mbid": 0.0002,
+    "track_metadata.additional_info.release_name": 0.0002
+  },
+  "field_types": {
+    "user_id": {
+      "int": 1249723
+    },
+    "user_name": {
+      "str": 1249723
+    },
+    "timestamp": {
+      "int": 1249723
+    },
+    "track_metadata": {
+      "dict": 1249723
+    },
+    "track_metadata.track_name": {
+      "str": 1249723
+    },
+    "track_metadata.artist_name": {
+      "str": 1249723
+    },
+    "track_metadata.release_name": {
+      "str": 1195520
+    },
+    "track_metadata.additional_info": {
+      "dict": 1249723
+    },
+    "track_metadata.additional_info.duration_ms": {
+      "int": 621454
+    },
+    "track_metadata.additional_info.media_player": {
+      "str": 134045
+    },
+    "track_metadata.additional_info.submission_client": {
+      "str": 1203093
+    },
+    "track_metadata.additional_info.submission_client_version": {
+      "str": 510989
+    },
+    "track_metadata.additional_info.recording_msid": {
+      "str": 1249723
+    },
+    "recording_msid": {
+      "str": 1249723
+    },
+    "track_metadata.additional_info.tracknumber": {
+      "int": 404422,
+      "str": 7365,
+      "NoneType": 102
+    },
+    "track_metadata.additional_info.artist_mbids": {
+      "list": 198851
+    },
+    "track_metadata.additional_info.artist_names": {
+      "list": 385255,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.release_mbid": {
+      "str": 130920
+    },
+    "track_metadata.additional_info.recording_mbid": {
+      "str": 127442
+    },
+    "track_metadata.additional_info.release_group_mbid": {
+      "str": 110374
+    },
+    "track_metadata.additional_info.trackNumber": {
+      "str": 2047
+    },
+    "track_metadata.additional_info.date": {
+      "str": 7673
+    },
+    "track_metadata.additional_info.albumartist": {
+      "str": 6656
+    },
+    "track_metadata.additional_info.totaltracks": {
+      "int": 3913,
+      "str": 1227
+    },
+    "track_metadata.additional_info.media_player_version": {
+      "str": 21397
+    },
+    "track_metadata.additional_info.isrc": {
+      "str": 217638,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.discnumber": {
+      "int": 210346,
+      "str": 1118,
+      "NoneType": 103
+    },
+    "track_metadata.additional_info.origin_url": {
+      "str": 286913,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.spotify_id": {
+      "str": 238300,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.music_service": {
+      "str": 217903
+    },
+    "track_metadata.additional_info.spotify_album_id": {
+      "str": 210601,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.spotify_artist_ids": {
+      "list": 210596,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.release_artist_name": {
+      "str": 213786,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.release_artist_names": {
+      "list": 207815,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.spotify_album_artist_ids": {
+      "list": 209557,
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.lastfm_track_mbid": {
+      "str": 292001
+    },
+    "track_metadata.additional_info.lastfm_artist_mbid": {
+      "str": 315662
+    },
+    "track_metadata.additional_info.lastfm_release_mbid": {
+      "str": 282144
+    },
+    "track_metadata.additional_info.duration": {
+      "int": 109948
+    },
+    "track_metadata.additional_info.music_service_name": {
+      "str": 95536
+    },
+    "track_metadata.additional_info.tags": {
+      "list": 16905
+    },
+    "track_metadata.additional_info.track_mbid": {
+      "str": 32310
+    },
+    "track_metadata.additional_info.listening_from": {
+      "str": 19228,
+      "NoneType": 59
+    },
+    "track_metadata.mbid_mapping": {
+      "dict": 1029
+    },
+    "track_metadata.mbid_mapping.artists": {
+      "list": 1026
+    },
+    "track_metadata.mbid_mapping.artists[].artist_mbid": {
+      "str": 1024
+    },
+    "track_metadata.mbid_mapping.artists[].join_phrase": {
+      "str": 1024
+    },
+    "track_metadata.mbid_mapping.artists[].artist_credit_name": {
+      "str": 1024
+    },
+    "track_metadata.mbid_mapping.artist_mbids": {
+      "list": 1026
+    },
+    "track_metadata.mbid_mapping.release_mbid": {
+      "str": 1016
+    },
+    "track_metadata.mbid_mapping.recording_mbid": {
+      "str": 1027
+    },
+    "track_metadata.mbid_mapping.recording_name": {
+      "str": 55
+    },
+    "track_metadata.brainzplayer_metadata": {
+      "dict": 1028
+    },
+    "track_metadata.brainzplayer_metadata.track_name": {
+      "str": 1028
+    },
+    "track_metadata.additional_info.end_ms": {
+      "int": 4496
+    },
+    "track_metadata.additional_info.start_ms": {
+      "int": 4496
+    },
+    "track_metadata.additional_info.work_mbids": {
+      "list": 1089
+    },
+    "track_metadata.additional_info.totaldiscs": {
+      "str": 1097,
+      "int": 3227
+    },
+    "track_metadata.mbid_mapping.caa_id": {
+      "int": 1002,
+      "NoneType": 9
+    },
+    "track_metadata.mbid_mapping.caa_release_mbid": {
+      "str": 1001,
+      "NoneType": 10
+    },
+    "track_metadata.brainzplayer_metadata.artist_name": {
+      "str": 52
+    },
+    "track_metadata.brainzplayer_metadata.release_name": {
+      "str": 39,
+      "NoneType": 1
+    },
+    "track_metadata.additional_info.rating": {
+      "str": 3157
+    },
+    "track_metadata.additional_info.source": {
+      "str": 3377
+    },
+    "track_metadata.additional_info.track_length": {
+      "str": 3319,
+      "int": 10
+    },
+    "track_metadata.additional_info.track_number": {
+      "str": 3319,
+      "int": 25
+    },
+    "track_metadata.additional_info.duration_played": {
+      "int": 955,
+      "float": 29
+    },
+    "track_metadata.additional_info.metadata_confidence": {
+      "str": 29
+    },
+    "track_metadata.additional_info.youtube_music_video_id": {
+      "str": 29
+    },
+    "track_metadata.tags": {
+      "list": 426
+    },
+    "track_metadata.tracknumber": {
+      "int": 379
+    },
+    "track_metadata.track_mbid": {
+      "str": 185
+    },
+    "track_metadata.additional_info.choosen_by_user": {
+      "int": 330
+    },
+    "track_metadata.artist_mbids": {
+      "list": 13
+    },
+    "track_metadata.release_mbid": {
+      "str": 15
+    },
+    "track_metadata.media_player": {
+      "str": 24
+    },
+    "track_metadata.additional_info.year": {
+      "int": 123
+    },
+    "track_metadata.addtional_info": {
+      "dict": 13
+    },
+    "track_metadata.addtional_info.duration_ms": {
+      "int": 13
+    },
+    "track_metadata.addtional_info.media_player": {
+      "str": 13
+    },
+    "track_metadata.addtional_info.submission_client": {
+      "str": 13
+    },
+    "track_metadata.addtional_info.submission_client_version": {
+      "str": 13
+    },
+    "track_metadata.additional_info.artist_mbid": {
+      "str": 95
+    },
+    "track_metadata.additional_info.label": {
+      "str": 68
+    },
+    "track_metadata.additional_info.cover_url": {
+      "str": 54
+    },
+    "track_metadata.additional_info.netease_url": {
+      "str": 51
+    },
+    "track_metadata.additional_info.progress_ms": {
+      "int": 45
+    },
+    "track_metadata.additional_info.progress_ts": {
+      "int": 45
+    },
+    "track_metadata.additional_info.spotify_url": {
+      "str": 54
+    },
+    "track_metadata.additional_info.accent_color": {
+      "str": 54
+    },
+    "track_metadata.additional_info.cover_source": {
+      "str": 54
+    },
+    "track_metadata.additional_info.qq_music_url": {
+      "str": 54
+    },
+    "track_metadata.additional_info.lyrics_source": {
+      "str": 53
+    },
+    "track_metadata.additional_info.playback_rate": {
+      "int": 45
+    },
+    "track_metadata.additional_info.apple_music_url": {
+      "str": 53
+    },
+    "track_metadata.additional_info.ms_played": {
+      "int": 3463
+    },
+    "track_metadata.additional_info.genre": {
+      "str": 293
+    },
+    "track_metadata.additional_info.comment": {
+      "str": 65
+    },
+    "track_metadata.mbid_mapping.url_rels": {
+      "list": 6
+    },
+    "track_metadata.mbid_mapping.url_rels[].url": {
+      "str": 6
+    },
+    "track_metadata.mbid_mapping.url_rels[].type": {
+      "str": 6
+    },
+    "track_metadata.duration": {
+      "float": 56,
+      "int": 11
+    },
+    "track_metadata.additional_info.artist_msid": {
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.release_msid": {
+      "NoneType": 59
+    },
+    "track_metadata.additional_info.musicbrainz_albumartistid": {
+      "list": 15
+    },
+    "track_metadata.additional_info.artists_mbids": {
+      "list": 23
+    },
+    "track_metadata.additional_info.phoebe_track_id": {
+      "str": 10
+    },
+    "track_metadata.recording_mbid": {
+      "str": 2
+    },
+    "track_metadata.additional_info.album_artist_name": {
+      "str": 20
+    },
+    "track_metadata.additional_info.release_name": {
+      "str": 2
+    },
+    "track_metadata.additional_info.original_submission_client": {
+      "str": 365
+    }
+  },
+  "additional_info_keys_pct": {
+    "recording_msid": 100.0,
+    "submission_client": 96.2688,
+    "duration_ms": 49.7273,
+    "submission_client_version": 40.8882,
+    "tracknumber": 32.9584,
+    "artist_names": 30.832,
+    "lastfm_artist_mbid": 25.2586,
+    "lastfm_track_mbid": 23.3653,
+    "origin_url": 22.9628,
+    "lastfm_release_mbid": 22.5765,
+    "spotify_id": 19.0729,
+    "music_service": 17.4361,
+    "isrc": 17.4196,
+    "release_artist_name": 17.1114,
+    "discnumber": 16.9291,
+    "spotify_album_id": 16.8565,
+    "spotify_artist_ids": 16.8561,
+    "spotify_album_artist_ids": 16.773,
+    "release_artist_names": 16.6336,
+    "artist_mbids": 15.9116,
+    "media_player": 10.726,
+    "release_mbid": 10.4759,
+    "recording_mbid": 10.1976,
+    "release_group_mbid": 8.8319,
+    "duration": 8.7978,
+    "music_service_name": 7.6446,
+    "track_mbid": 2.5854,
+    "media_player_version": 1.7121,
+    "listening_from": 1.5433,
+    "tags": 1.3527,
+    "date": 0.614,
+    "albumartist": 0.5326,
+    "totaltracks": 0.4113,
+    "end_ms": 0.3598,
+    "start_ms": 0.3598,
+    "totaldiscs": 0.346,
+    "ms_played": 0.2771,
+    "source": 0.2702,
+    "track_number": 0.2676,
+    "track_length": 0.2664,
+    "rating": 0.2526,
+    "trackNumber": 0.1638,
+    "work_mbids": 0.0871,
+    "duration_played": 0.0787,
+    "original_submission_client": 0.0292,
+    "choosen_by_user": 0.0264,
+    "genre": 0.0234,
+    "year": 0.0098,
+    "artist_mbid": 0.0076,
+    "label": 0.0054,
+    "comment": 0.0052,
+    "artist_msid": 0.0047,
+    "release_msid": 0.0047,
+    "cover_url": 0.0043,
+    "spotify_url": 0.0043,
+    "accent_color": 0.0043,
+    "cover_source": 0.0043,
+    "qq_music_url": 0.0043,
+    "lyrics_source": 0.0042,
+    "apple_music_url": 0.0042,
+    "netease_url": 0.0041,
+    "progress_ms": 0.0036,
+    "progress_ts": 0.0036,
+    "playback_rate": 0.0036,
+    "metadata_confidence": 0.0023,
+    "youtube_music_video_id": 0.0023,
+    "artists_mbids": 0.0018,
+    "album_artist_name": 0.0016,
+    "musicbrainz_albumartistid": 0.0012,
+    "phoebe_track_id": 0.0008,
+    "release_name": 0.0002
+  },
+  "mbid_mapping_keys_pct": {
+    "recording_mbid": 0.0822,
+    "artists": 0.0821,
+    "artist_mbids": 0.0821,
+    "release_mbid": 0.0813,
+    "caa_id": 0.0809,
+    "caa_release_mbid": 0.0809,
+    "recording_name": 0.0044,
+    "url_rels": 0.0005
+  },
+  "listened_at_month_top20": {
+    "2026-07": 1249723
+  },
+  "listened_at_distinct_months": 1,
+  "suffix_marker_hits": {
+    "feat": 40501,
+    "mix": 23710,
+    "year4": 15152,
+    "version": 10957,
+    "live": 8210,
+    "remaster": 7660,
+    "explicit": 2747,
+    "radio_edit": 1769,
+    "album_version": 1350,
+    "bonus_track": 668,
+    "single_version": 607,
+    "stereo": 334,
+    "mono": 266,
+    "anniversary": 242,
+    "deluxe": 223
+  },
+  "top_submission_clients": {
+    "ListenBrainz lastfm importer v2": 455710,
+    "listenbrainz": 205899,
+    "navidrome": 163616,
+    "Pano Scrobbler": 115058,
+    "Web Scrobbler": 78153,
+    "ListenBrainz Android": 65505,
+    "Roon": 16714,
+    "ListenBrainz plugin for Jellyfin": 15721,
+    "multi-scrobbler": 15571,
+    "eavesdrop.fm": 10006,
+    "foo_listenbrainz2": 5504,
+    "Strawberry": 5280,
+    "YouTube Music Desktop App - Scrobbler Plugin": 4580,
+    "Morphe": 3796,
+    "sub-wave/scrobble": 3650
+  },
+  "top_track_strings": [
+    [
+      "SWIM",
+      47996
+    ],
+    [
+      "NORMAL",
+      32284
+    ],
+    [
+      "Come Over",
+      20794
+    ],
+    [
+      "Aliens",
+      12585
+    ],
+    [
+      "Body to Body",
+      11562
+    ],
+    [
+      "Hooligan",
+      11428
+    ],
+    [
+      "2.0",
+      11023
+    ],
+    [
+      "FYA",
+      10688
+    ],
+    [
+      "Merry Go Round",
+      10376
+    ],
+    [
+      "Into the Sun",
+      10286
+    ],
+    [
+      "One More Night",
+      10251
+    ],
+    [
+      "Please",
+      10200
+    ],
+    [
+      "Like Animals",
+      10190
+    ],
+    [
+      "No. 29",
+      10137
+    ],
+    [
+      "they don’t know ’bout us",
+      10098
+    ],
+    [
+      "Haegeum",
+      6876
+    ],
+    [
+      "NORMAL (Korean Ver.)",
+      5327
+    ],
+    [
+      "Don’t Say You Love Me",
+      4257
+    ],
+    [
+      "Seven (feat. Latto)",
+      3271
+    ],
+    [
+      "Wild Flower (with youjeen)",
+      2603
+    ],
+    [
+      "Winter Ahead (with PARK HYO SHIN)",
+      2558
+    ],
+    [
+      "Killin' It Girl (feat. GloRilla)",
+      2426
+    ],
+    [
+      "NORMAL (Instrumental)",
+      1858
+    ],
+    [
+      "KISS N TELL",
+      1843
+    ],
+    [
+      "Who",
+      1790
+    ],
+    [
+      "Standing Next to You",
+      1606
+    ],
+    [
+      "We Are One(Ole Ola)[The Official 2014 FIFA World Cup Song]",
+      1510
+    ],
+    [
+      "Seven (feat. Latto) (Explicit Ver.)",
+      1305
+    ],
+    [
+      "Ice Cream",
+      1026
+    ],
+    [
+      "WannaCry",
+      905
+    ],
+    [
+      "SWIM (Instrumental)",
+      876
+    ],
+    [
+      "NORMAL (Explicit Ver.)",
+      875
+    ],
+    [
+      "LOST!",
+      862
+    ],
+    [
+      "3D (feat. Jack Harlow)",
+      848
+    ],
+    [
+      "Life Goes On",
+      842
+    ],
+    [
+      "Blood Sweat & Tears",
+      832
+    ],
+    [
+      "Faraway Days",
+      813
+    ],
+    [
+      "Intro",
+      786
+    ],
+    [
+      "SWIM with SUGA (Melodic Techno Remix)",
+      757
+    ],
+    [
+      "Seven (feat. Latto) (Clean Ver.)",
+      741
+    ],
+    [
+      "Agust D",
+      720
+    ],
+    [
+      "DNA",
+      675
+    ],
+    [
+      "Daechwita",
+      664
+    ],
+    [
+      "Alone",
+      643
+    ],
+    [
+      "Dynamite",
+      594
+    ],
+    [
+      "SWIM with RM (Chill Hip Hop Remix)",
+      593
+    ],
+    [
+      "Interlude : Dream, Reality",
+      576
+    ],
+    [
+      "Intro : DT sugA (Feat. DJ Friz)",
+      574
+    ],
+    [
+      "SWIM with j-hope (Afrobeat Remix)",
+      561
+    ],
+    [
+      "FRI(END)S",
+      560
+    ]
+  ]
+}

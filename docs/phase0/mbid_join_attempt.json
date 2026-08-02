@@ -1,0 +1,10 @@
+{
+ "period": "2026-06",
+ "counts": {
+  "jsonl_events_in_period": 46382,
+  "jsonl_join_keys": 46382,
+  "parquet_rows_scanned": 39200000,
+  "matched_events": 0
+ },
+ "verdict": "inconclusive: no overlapping events between artifacts"
+}
