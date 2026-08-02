@@ -141,42 +141,66 @@ SA (only so the firewall assertions can run), and `storage.objectViewer` on the 
 (necessity demonstrated — see `terraform/ci-identity/main.tf`). **No write or admin role
 anywhere**, and the workflow proves it by attempting a `CREATE TABLE` that must fail.
 
-### Branch protection — BLOCKED_BY_GITHUB_PLAN
+## Gate patch — CLOSED, status `BLOCKED_BY_GITHUB_PLAN`
 
-**`main` is not protected, and cannot be on the current plan.** Verified by probing the
-API rather than reading documentation — both mechanisms are refused for this private
-repository:
+Attempted once, before Phase 3. **Not to be retried.** `main` is unprotected and cannot be
+protected in this context.
+
+### Evidence
+
+| check | result |
+|---|---|
+| Classic branch protection | **refused by the API, HTTP 403** |
+| Repository rulesets | **refused by the API, HTTP 403** |
+| Repository visibility | **private** |
+| Plan capability | **does not support enforcement in this context** |
 
 ```
-GET /repos/giandetogni/splitsheet/branches/main/protection
-GET /repos/giandetogni/splitsheet/rulesets
-  -> HTTP 403
-  "Upgrade to GitHub Pro or make this repository public to enable this feature."
+GET /repos/giandetogni/splitsheet/branches/main/protection   -> 403
+GET /repos/giandetogni/splitsheet/rulesets                   -> 403
+"Upgrade to GitHub Pro or make this repository public to enable this feature."
 ```
 
-Classic branch protection and repository rulesets are both gated. The two remedies GitHub
-offers are a paid upgrade or making the repository public; neither was taken — no purchase,
-and the repository stays private because publication is gated on criteria this project has
-not met.
+Verified by probing the API, not by reading documentation. The message names the gate
+itself.
 
-**What this means in practice, stated plainly so nobody mistakes CI for a gate:**
+### Decisions taken
 
-- CI **reports** failures. It does **not prevent** anything.
-- A direct push to `main` succeeds even when the `checks` job is red.
-- Force-push to `main` and deletion of `main` are both possible.
-- Nothing requires a pull request, and nothing requires a green check before merge.
+- **Repository was not made public.** Publication is gated on criteria this project has not
+  met, and visibility is not a lever to be pulled for a CI convenience.
+- **No paid upgrade.** No purchase of any kind.
+- **No local workaround.** A `pre-push` hook was considered and rejected: it sits outside
+  version control's enforcement, is bypassed by `--no-verify`, and is absent from a fresh
+  clone. Presenting it as a remote control would be a false claim about the repository's
+  guarantees.
 
-The protection therefore rests on operator discipline, exactly as it did before Phase 2C —
-CI shortens the time to *notice* a regression, not the ability to introduce one.
+### Declared state after the patch
 
-No workaround was implemented. A local `pre-push` hook was considered and rejected: it
-lives outside version control's enforcement, is bypassed by `--no-verify`, and does not
-exist in a fresh clone, so it would create the appearance of a gate without the substance.
+- The **`ci` workflow continues to run on `push` and `pull_request`**, credential-free.
+- **Failures are visible but do not block a direct push to `main`.** A push succeeds with
+  the `checks` job red. Force-push to `main` and deletion of `main` also remain possible.
+  Nothing requires a pull request, and nothing requires a green check before merge.
+- The **integration workflow remains `workflow_dispatch` only, read-only, and restricted to
+  `main`.** It was not extended to `pull_request`, and no `base_ref` or `head_ref`
+  authorisation was added.
+- **WIF was not widened.** The provider condition is unchanged:
+  `assertion.repository_owner_id == "122053316" && assertion.repository_id == "1320369792"
+  && assertion.ref == "refs/heads/main"`. The public workflow grants only `contents: read`
+  and no `id-token`.
+- **No GCP infrastructure or data was changed.** `terraform plan` reports **No changes**
+  across all six roots; no IAM binding, dataset, table, bucket or published row was touched.
 
-**Revisit when** the repository becomes public (protection becomes available on Free) or
-the account moves to a paid plan. The intended configuration, ready to apply, is: require
-pull requests into `main`, require the status check named **`checks`** (the job id in
-`ci.yml`; `integration.yml` uses `readonly`, so the two never collide), include
-administrators with no bypass, block force pushes, block deletion, and require **no**
-second reviewer since the repository has a single author. The GCP integration workflow must
-**not** be a required PR check — it would need `id-token` on unreviewed pull-request code.
+Protection therefore rests on operator discipline. CI shortens the time to *notice* a
+regression; it does not prevent one. That is the accurate description and should not be
+restated as a gate anywhere in this repository.
+
+### If the constraint ever lifts
+
+Should the repository become public or the account move to a paid plan, the intended
+configuration is: require pull requests into `main`; require the status check named
+**`checks`** (the job id in `ci.yml` — `integration.yml` uses `readonly`, so the two names
+never collide); include administrators with no bypass; block force pushes; block branch
+deletion; require **no** second reviewer, since the repository has a single author. The GCP
+integration workflow must **never** be a required pull-request check, because that would
+put `id-token` in reach of unreviewed code. This configuration has never been applied and
+is therefore unverified.
