@@ -161,8 +161,8 @@ are extrapolations, not measurements:
 candidates. Listen side: `listened_at` 2026-07, 1,249,723 listens. Canonical side: all
 31,554,198 rows. Runtime 3 m 42 s.
 
-Our fold reproduces MusicBrainz's own `combined_lookup` **exactly for 90.84 %** of
-canonical rows. It cannot reproduce the rest because MusicBrainz romanises non-Latin
+Our fold **matches the observed MusicBrainz `combined_lookup` key on 90.84 % of the
+measured canonical rows.** Parity is not total and must not be described as such. It cannot reproduce the rest because MusicBrainz romanises non-Latin
 scripts: **6.79 % of canonical rows** and **3.32 % of listens (41,465)** fold to an
 empty key and are unreachable by any string method. That is a hard floor, not a bug.
 
@@ -730,51 +730,131 @@ evidence path.
 ## 16. Phase 3A — deterministic staged normalization
 
 A pure library (`src/normalization/`): no I/O, no clock, no randomness, no GCP. It produces
-keys and a status; it does not match, block or score.
+values, keys and statuses; it does not match, block or score.
 
-### Two stages, because the measurement said so
+### Three outputs per field, and they are not interchangeable
 
-`config/normalization_rules.yml` defines two stages, and the split is the design:
+Conflating them was the defect this module was rewritten to fix. An ASCII lookup key is a
+*blocking artefact*, not "the normalized value".
 
-| stage | behaviour | rationale |
-|---|---|---|
-| `exact` | NFKD, strip diacritics, lowercase, keep ASCII alphanumerics. **Version information preserved.** | Reproduces MusicBrainz's `combined_lookup` convention — measured identical for 90.84% of canonical rows — and is the stage measured at 73.64% single-candidate. |
-| `fallback` | additionally strips bracketed segments, version suffixes, featuring clauses, leading articles, four-digit years | Applied **only** to listens that found zero candidates at `exact`, so the ambiguity it creates is confined to a tier that had nothing to lose. |
-
-Article, featuring and suffix handling live in `fallback` and deliberately **not** in
-`exact`. `PROJECT_SPEC.md` lists them as normalization steps generally; Phase 0A measured
-that applying them everywhere drops unambiguous candidates from 73.64% to 51.93%, so they
-are confined to the fallback tier. Adding them to the exact stage would change the thing
-the 73.64% measurement described, with no evidence the change helps.
-
-### `normalization_version` cannot drift from the rules
-
-The version is `<semantic>+<12-hex digest of the effective rules>`, currently
-**`1.0.0+28cd5a685280`**. Editing the YAML changes it whether or not anyone bumps the
-semantic part, which is what makes a rule change traceable and what a restatement would key
-off. Reordering a YAML list does **not** change it, because reordering is not a behavioural
-change — the digest is computed over a canonicalised, sorted projection of the rules.
-
-### Unusable input is classified, never dropped
-
-| status | meaning |
+| output | what it is |
 |---|---|
-| `OK` | both halves folded to something usable |
-| `MISSING_FIELD` | artist or recording absent/blank in the input |
-| `UNSUPPORTED_SCRIPT` | non-empty input folds to empty; MusicBrainz romanises non-Latin scripts and we have no transliteration table (measured: 3.32% of listens, 6.79% of canonical rows) |
+| `*_normalized_unicode` | the real normalized value, **script-preserving**: NFKD, combining marks dropped, casefolded, Unicode punctuation to space, whitespace collapsed. Cyrillic stays Cyrillic, CJK stays CJK. |
+| `*_lookup_exact` | an ASCII-only key. ASCII **only** because that is what matches the observed MusicBrainz `combined_lookup` convention. |
+| `*_lookup_fallback` | the aggressive key, usable **only** after the exact key has failed. |
 
-A key is only formed when **both** halves survive. Concatenating a present artist with an
-empty recording would yield a key equal to the artist alone, collapsing every
-unromanisable track by that artist into one bucket — a silent false-positive generator.
+A Cyrillic title normalizes perfectly well and is `VALID`. It simply has no ASCII key.
+
+### Status is independent of key availability
+
+| `normalization_status` | meaning |
+|---|---|
+| `VALID` | content is usable |
+| `MISSING_ARTIST` / `MISSING_RECORDING` | field absent or blank |
+| `NO_ALPHANUMERIC_CONTENT` | no letters or digits in **any** script (e.g. `"!!!"`) |
+
+| `exact_key_status` / `fallback_key_status` | meaning |
+|---|---|
+| `AVAILABLE` | both halves folded; a combined key is emitted |
+| `PARTIAL` | exactly one half folded; **no key is emitted** |
+| `EMPTY` | neither half folded |
+
+`PARTIAL` exists because a key built from one half would equal the artist alone, collapsing
+every unromanisable track by that artist into a single bucket — a silent false-positive
+generator. Nothing downstream may block on a `PARTIAL`.
+
+### Years are removed only inside recognised structures
+
+A bare four-digit strip destroys real titles. Removal now requires a configured reissue
+structure (`remastered 2017`, `2017 remaster`, `anniversary edition 2017`, `… reissue`),
+and version markers are stripped **only when something precedes them**, because a version
+marker is by definition a suffix.
+
+Preserved, with tests: `1999`, `1984`, `2001`, `Class of 1984`, **`Live 2000`**,
+`Live at Leeds`, `Mono`, `2112`. Every transformation applied is recorded in
+`transformations_applied`, including `reverted:would_empty_title` when the fallback would
+have destroyed a title outright.
+
+### Parity re-run with the production library
+
+`src/recon/normalization_parity.py` re-ran the Phase 0A experiment using **only**
+`src/normalization`, on local files, with no GCP call. 1,249,723 listens, 499,433 distinct
+pairs, all 31,554,198 canonical rows, 33 min.
+
+**The exact stage reproduces Phase 0A to the row:**
+
+| | Phase 0A probe | production library |
+|---|---|---|
+| exact keys identical | — | **100.00 %** |
+| listens with an exact key | 1,208,258 | **1,208,258** |
+| exact unique-candidate count | 889,716 | **889,716** |
+| exact unique %, same denominator | 73.6363 % | **73.6363 %** |
+| exact zero %, same denominator | 26.0246 % | **26.0246 %** |
+
+Over *all* 1,249,723 listens the same figure reads 71.1931 %, purely because the
+denominator now includes listens that have no key at all. Both numbers are correct; only
+one is comparable to the baseline, and quoting the wrong one would be an accidental
+regression claim.
+
+**What the patch newly reveals.** Phase 0A could only say 3.32 % had "no usable key".
+That splits into **PARTIAL 2.1949 %** and **EMPTY 1.1230 %** (sum 3.3179 %, matching), and
+content validity is now measured separately: **99.968 % VALID**, only 0.032 %
+`NO_ALPHANUMERIC_CONTENT`. Non-Latin listens are no longer miscounted as invalid.
+
+**Staged beats blanket, confirmed with production code:**
+
+| | % of all listens |
+|---|---|
+| exact unique | 71.1931 |
+| + unique gained by staged fallback | 3.2025 |
+| **= staged payable** | **74.3956** |
+| blanket aggressive payable | 49.8402 |
+| **staged advantage** | **24.56 pp** |
+
+The fallback key matches the legacy probe on 91.4316 % of listens; the 8.57 % difference is
+the deliberate change — restricted year handling, suffix-position anchoring, and the
+revert-if-empty guard. Blanket aggressive now scores 49.8402 % against the old 51.9275 %:
+**2.09 pp lower, and that is the price of not destroying titles like `Live 2000`.** It is a
+cost, it is paid knowingly, and it is far smaller than the 24.56 pp the staging gains.
+
+**By script group** — the transliteration gap, quantified:
+
+| script | listens | share | exact unique | exact zero |
+|---|---|---|---|---|
+| Latin | 1,199,620 | 95.99 % | 72.99 % | 26.71 % |
+| CJK | 23,970 | 1.92 % | 1.40 % | 97.99 % |
+| NoLetters | 15,717 | 1.26 % | 86.85 % | 11.10 % |
+| Cyrillic | 8,983 | 0.72 % | 0.75 % | 98.60 % |
+| Hebrew / Thai / Arabic / Greek | 1,090 | 0.09 % | ≤2.03 % | ≥97.3 % |
+
+Non-Latin scripts are close to unmatchable by an ASCII key — 2.7 % of listens, essentially
+all of them landing in the black box for want of a transliteration table. That is now a
+measured, named limitation rather than an invisible one.
+
+### Version cannot drift from the rules — demonstrated, not asserted
+
+`normalization_version` is `<semantic>+<12-hex digest of the effective rules>`, currently
+**`1.0.0+0bc0dd643e06`**, and it is pinned in `tests/unit/test_normalization.py`.
+
+Proven by mutation: adding one suffix to the YAML without touching the pin fails
+`test_version_matches_the_pinned_value`, reporting the new digest `1.0.0+353dee247928`;
+reverting restores green. Reordering a list does **not** change the version, because
+reordering is not a behavioural change.
 
 ### Tests
 
-56 unit tests, table-driven, running in the credential-free public CI. Two mutation probes
-were run to confirm they are not decorative:
+**163 unit tests**, table-driven, credential-free, running in the public CI. Covering CJK,
+Cyrillic, Greek, Arabic, Hebrew, Hangul, composed vs decomposed Unicode, mixed
+Latin/non-Latin pairs, punctuation-only input, numeric-title preservation, word-boundary
+safety, and invariants over a fixed corpus (idempotence, no partial key, valid content
+never empties, exact never applies fallback rules).
 
-- making the exact stage aggressive (the forbidden failure mode) → **4 tests fail**,
-  including the staged-design property test;
-- removing word-boundary anchoring from featuring markers → **5 tests fail**, catching
-  `Aftermath`, `Drift`, `Withered Hand` and `Within Temptation` being truncated.
+Earlier mutation probes confirmed the suite is not decorative: making the exact stage
+aggressive fails 4 tests; removing word-boundary anchoring fails 5.
 
-Both mutations were reverted and the suite is green.
+### One optimisation added, measured, and removed
+
+A regex pre-filter was added to skip the fallback transforms when nothing could match. It
+measured **slower** (0.18 s vs 0.02 s per 22,000 strings) *and* wrong on 3 cases, so it was
+deleted the same sitting. Recorded because it is the B.6 rule working as intended: the
+justification for keeping code is a number, not the effort already spent on it.

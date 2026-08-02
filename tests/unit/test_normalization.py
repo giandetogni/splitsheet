@@ -1,9 +1,9 @@
 """Unit tests for staged normalization. Pure: no GCP, no credentials, no cost.
 
-The tests are organised around the risks that matter rather than around coverage: that the
-two stages behave differently in the specific way the Phase 0A measurement relies on, that
-word-boundary handling cannot silently truncate real names, that unusable input is
-classified instead of dropped, and that the version tracks the rules.
+Organised around risks, not coverage: that the Unicode value and the ASCII lookup key are
+genuinely separate concepts, that non-Latin content stays valid, that no partial key can
+escape, that legitimate numeric titles survive, and that the version cannot drift from the
+rules.
 """
 
 from __future__ import annotations
@@ -14,12 +14,24 @@ import pathlib
 import pytest
 import yaml
 
-from normalization import Status, aggressive, fold, load_rules, normalize
+from normalization import (
+    KeyStatus,
+    NormalizationStatus,
+    aggressive,
+    fold,
+    load_rules,
+    normalize,
+    normalized_unicode,
+)
 
 RULES = load_rules()
-# Anchored to the repo root, not the working directory, so the suite does not depend
-# on where pytest was invoked from.
+# Anchored to the repo root, not the working directory.
 RULES_PATH = pathlib.Path(__file__).parents[2] / "config/normalization_rules.yml"
+
+#: Golden pin. Editing config/normalization_rules.yml changes the digest and fails this
+#: test, which is the mechanism that forces a rule change to be acknowledged rather than
+#: slipped in. Update it deliberately, in the same commit as the rule change.
+EXPECTED_VERSION = "1.0.0+0bc0dd643e06"
 
 
 def _raw_rules() -> dict:
@@ -27,25 +39,121 @@ def _raw_rules() -> dict:
         return yaml.safe_load(fh)
 
 
+# --- the separation this module exists to enforce ---------------------------------------
+
+NON_LATIN = [
+    pytest.param("Кино", "Группа крови", id="cyrillic"),
+    pytest.param("Ελευθερία Αρβανιτάκη", "Δυναμίτης", id="greek"),
+    pytest.param("فيروز", "زهرة المدائن", id="arabic"),
+    pytest.param("椎名林檎", "丸ノ内サディスティック", id="cjk-japanese"),
+    pytest.param("周杰倫", "七里香", id="cjk-chinese"),
+    pytest.param("아이유", "좋은 날", id="hangul"),
+]
+
+
+@pytest.mark.parametrize(("artist", "recording"), NON_LATIN)
+def test_non_latin_content_is_valid_and_keeps_its_script(artist, recording):
+    """A missing ASCII key is a missing KEY, never an invalid record."""
+    n = normalize(artist, recording)
+    assert n.normalization_status is NormalizationStatus.VALID
+    assert n.artist_normalized_unicode, "unicode normalization must not empty valid content"
+    assert n.recording_normalized_unicode
+    assert not n.artist_normalized_unicode.isascii(), "script was not preserved"
+    assert n.lookup_exact == ""
+    assert n.exact_key_status is KeyStatus.EMPTY
+
+
+@pytest.mark.parametrize(("artist", "recording", "expected"), [
+    pytest.param("Radiohead", "丸ノ内サディスティック", KeyStatus.PARTIAL, id="latin-artist-cjk-track"),
+    pytest.param("椎名林檎", "Tokyo", KeyStatus.PARTIAL, id="cjk-artist-latin-track"),
+    pytest.param("椎名林檎", "丸ノ内サディスティック", KeyStatus.EMPTY, id="both-cjk"),
+    pytest.param("Radiohead", "Creep", KeyStatus.AVAILABLE, id="both-latin"),
+])
+def test_key_status_distinguishes_partial_from_empty(artist, recording, expected):
+    n = normalize(artist, recording)
+    assert n.exact_key_status is expected
+    assert n.normalization_status is NormalizationStatus.VALID
+
+
+@pytest.mark.parametrize(("artist", "recording"), [
+    ("Radiohead", "丸ノ内サディスティック"),
+    ("椎名林檎", "Tokyo"),
+    ("Various Artists", "乡愁四韵"),
+])
+def test_no_partial_key_is_ever_emitted(artist, recording):
+    """Half a key would collapse every such recording by that artist into one bucket."""
+    n = normalize(artist, recording)
+    assert n.lookup_exact == ""
+    assert n.lookup_fallback == ""
+    assert not n.exact_key_usable
+    assert not n.fallback_key_usable
+
+
+def test_punctuation_only_is_a_content_error():
+    n = normalize("!!!", "???")
+    assert n.normalization_status is NormalizationStatus.NO_ALPHANUMERIC_CONTENT
+    assert n.artist_normalized_unicode == ""
+    assert n.status_detail
+
+
+@pytest.mark.parametrize(("artist", "recording", "status"), [
+    ("", "Some Track", NormalizationStatus.MISSING_ARTIST),
+    (None, "Some Track", NormalizationStatus.MISSING_ARTIST),
+    ("   ", "Some Track", NormalizationStatus.MISSING_ARTIST),
+    ("Some Artist", "", NormalizationStatus.MISSING_RECORDING),
+    ("Some Artist", None, NormalizationStatus.MISSING_RECORDING),
+])
+def test_absent_fields_are_classified_not_dropped(artist, recording, status):
+    n = normalize(artist, recording)
+    assert n.normalization_status is status
+    assert n.status_detail
+
+
+def test_composed_and_decomposed_unicode_converge():
+    """U+00E9 and 'e' + U+0301 must normalize identically, or one title indexes twice."""
+    composed, decomposed = "Beyoncé", "Beyoncé"
+    assert composed != decomposed
+    a, b = normalize(composed, "Halo"), normalize(decomposed, "Halo")
+    assert a.artist_normalized_unicode == b.artist_normalized_unicode
+    assert a.lookup_exact == b.lookup_exact == "beyoncehalo"
+
+
+def test_casefold_handles_sharp_s_and_final_sigma():
+    assert normalized_unicode("STRASSE", RULES) == normalized_unicode("Straße", RULES)
+    assert normalized_unicode("ΟΔΟΣ", RULES) == \
+        normalized_unicode("οδός", RULES)
+
+
+def test_unicode_punctuation_becomes_a_space_not_a_join():
+    assert normalized_unicode("Rock—Roll", RULES) == "rock roll"
+    assert normalized_unicode("Don’t Stop", RULES) == "don t stop"
+
+
 # --- stage 1: exact ---------------------------------------------------------------------
 
 @pytest.mark.parametrize(("artist", "recording", "expected"), [
-    # Values measured in Phase 0A; the library must reproduce them.
     ("Radiohead", "Paranoid Android", "radioheadparanoidandroid"),
     ("Radiohead", "Paranoid Android - Remastered 2017",
      "radioheadparanoidandroidremastered2017"),
     ("Radiohead", "Paranoid Android (Live)", "radioheadparanoidandroidlive"),
-    # NFKD + diacritic stripping.
     ("Beyoncé", "Déjà Vu", "beyoncedejavu"),
     ("Sigur Rós", "Untitled #3", "sigurrosuntitled3"),
-    # Punctuation and whitespace disappear as a consequence of keeping only alphanumerics.
     ("A  Tribe   Called Quest", "Can I Kick It?", "atribecalledquestcanikickit"),
     ("AC/DC", "T.N.T.", "acdctnt"),
-    # The exact stage preserves articles and featuring credits on purpose.
     ("The Beatles", "Let It Be", "thebeatlesletitbe"),
 ])
-def test_exact_key_is_conservative(artist, recording, expected):
-    assert normalize(artist, recording).exact_key == expected
+def test_exact_lookup_is_conservative(artist, recording, expected):
+    assert normalize(artist, recording).lookup_exact == expected
+
+
+def test_exact_never_applies_fallback_rules():
+    """If the exact stage starts stripping, the 73.64% measurement stops describing it."""
+    for recording, marker in [("Song - Live", "live"),
+                              ("Song (Remastered 2017)", "remastered"),
+                              ("Song feat. X", "feat")]:
+        n = normalize("The Artist", recording)
+        assert marker in n.lookup_exact, f"exact stage stripped {marker!r}"
+        assert n.lookup_exact.startswith("theartist"), "exact stripped a leading article"
 
 
 # --- stage 2: fallback ------------------------------------------------------------------
@@ -53,144 +161,160 @@ def test_exact_key_is_conservative(artist, recording, expected):
 @pytest.mark.parametrize(("recording", "expected"), [
     ("Paranoid Android", "paranoidandroid"),
     ("Paranoid Android - Remastered 2017", "paranoidandroid"),
-    ("Paranoid Android (Live)", "paranoidandroid"),
     ("Paranoid Android - 2017 Remaster", "paranoidandroid"),
+    ("Paranoid Android (Live)", "paranoidandroid"),
     ("Paranoid Android [Deluxe Edition]", "paranoidandroid"),
     ("Paranoid Android - Radio Edit", "paranoidandroid"),
-    ("Paranoid Android (Mono)", "paranoidandroid"),
-    ("Paranoid Android - Bonus Track", "paranoidandroid"),
     ("Paranoid Android (feat. Someone)", "paranoidandroid"),
+    ("Paranoid Android - Anniversary Edition 2017", "paranoidandroid"),
 ])
 def test_fallback_collapses_version_markers(recording, expected):
     assert aggressive(recording, RULES) == expected
 
 
-def test_fallback_strips_leading_article_but_exact_does_not():
-    n = normalize("The Beatles", "Let It Be")
-    assert n.exact_key == "thebeatlesletitbe"
-    assert n.fallback_key == "beatlesletitbe"
-
-
-# --- the property the staged design depends on ------------------------------------------
-
-VERSION_VARIANTS = [
-    "Paranoid Android",
-    "Paranoid Android - Remastered 2017",
-    "Paranoid Android (Live)",
-    "Paranoid Android - 2017 Remaster",
-    "Paranoid Android [Deluxe Edition]",
-]
-
-
 def test_variants_stay_distinct_at_exact_and_merge_at_fallback():
-    """This is the whole reason the stages are split.
-
-    Phase 0A measured that merging these costs more than it gains: listens with exactly one
-    candidate fall from 73.64% to 51.93%. So the exact stage must keep them apart, and only
-    the fallback stage may merge them.
-    """
-    exact = {normalize("Radiohead", v).exact_key for v in VERSION_VARIANTS}
-    fallback = {normalize("Radiohead", v).fallback_key for v in VERSION_VARIANTS}
-    assert len(exact) == len(VERSION_VARIANTS), "exact stage merged variants it must keep apart"
-    assert len(fallback) == 1, "fallback stage failed to merge equivalent variants"
+    variants = ["Paranoid Android", "Paranoid Android - Remastered 2017",
+                "Paranoid Android (Live)", "Paranoid Android - 2017 Remaster",
+                "Paranoid Android [Deluxe Edition]"]
+    exact = {normalize("Radiohead", v).lookup_exact for v in variants}
+    fallback = {normalize("Radiohead", v).lookup_fallback for v in variants}
+    assert len(exact) == len(variants), "exact stage merged variants it must keep apart"
     assert fallback == {"radioheadparanoidandroid"}
 
 
-# --- word boundaries: a wrong match silently truncates a real name ----------------------
+# --- years: only inside recognised structures -------------------------------------------
+
+@pytest.mark.parametrize("title", [
+    "1999", "1984", "2001", "Class of 1984", "Live 2000", "Summer of 69",
+    "1969", "2112", "Nineteen 1985",
+])
+def test_legitimate_numeric_titles_are_preserved(title):
+    """A bare four-digit strip would destroy every one of these."""
+    digits = "".join(c for c in title if c.isdigit())
+    assert digits and digits in aggressive(title, RULES), \
+        f"fallback removed the year from the legitimate title {title!r}"
+
+
+@pytest.mark.parametrize(("title", "must_not_contain"), [
+    ("Song - Remastered 2017", "2017"),
+    ("Song - 2017 Remaster", "2017"),
+    ("Song - Remastered in 1998", "1998"),
+    ("Song - Anniversary Edition 2017", "2017"),
+    ("Song - 2011 Remastered Version", "2011"),
+])
+def test_year_is_removed_only_inside_a_recognised_structure(title, must_not_contain):
+    assert must_not_contain not in aggressive(title, RULES)
+
+
+def test_leading_version_word_is_not_treated_as_a_suffix():
+    """'Live 2000' is a title; 'Song - Live' is a version. Position separates them."""
+    assert aggressive("Live 2000", RULES) == "live2000"
+    assert aggressive("Live at Leeds", RULES) == "liveatleeds"
+    assert aggressive("Mono", RULES) == "mono"
+    assert aggressive("Song - Live", RULES) == "song"
+
+
+def test_transformations_applied_is_recorded():
+    n = normalize("The Beatles", "Let It Be - Remastered 2009 (Live)")
+    assert n.transformations_applied, "no audit trail of what was applied"
+    joined = " ".join(n.transformations_applied)
+    assert "strip_bracketed" in joined
+    assert "year_structure" in joined
+    assert "leading_article:the" in joined
+
+
+def test_fallback_never_destroys_a_title_entirely():
+    n = normalize("Radiohead", "(Live)")
+    assert n.lookup_fallback, "fallback emptied the title instead of reverting"
+    assert "reverted:would_empty_title" in n.transformations_applied
+
+
+# --- word boundaries --------------------------------------------------------------------
 
 @pytest.mark.parametrize(("text", "expected"), [
-    # 'ft' inside a word must not trigger the featuring rule.
-    ("Ftisha", "ftisha"),
-    ("Aftermath", "aftermath"),
-    ("Drift", "drift"),
-    # 'with' inside a word.
-    ("Withered Hand", "witheredhand"),
-    ("Within Temptation", "withintemptation"),
-    # 'live' inside a word must not be treated as a version marker.
-    ("Deliverance", "deliverance"),
-    ("Oliver", "oliver"),
-    ("Alive", "alive"),
-    # 'mix' and 'mono' inside words.
-    ("Monolith", "monolith"),
-    ("Mixtape Vol 1", "mixtapevol1"),
+    ("Ftisha", "ftisha"), ("Aftermath", "aftermath"), ("Drift", "drift"),
+    ("Withered Hand", "witheredhand"), ("Within Temptation", "withintemptation"),
+    ("Deliverance", "deliverance"), ("Oliver", "oliver"), ("Alive", "alive"),
+    ("Monolith", "monolith"), ("Mixtape Vol 1", "mixtapevol1"),
 ])
 def test_markers_are_word_boundary_anchored(text, expected):
     assert aggressive(text, RULES) == expected
 
 
 def test_featuring_marker_at_a_boundary_is_stripped():
-    assert aggressive("Song feat. Someone", RULES) == "song"
-    assert aggressive("Song ft Someone", RULES) == "song"
-    assert aggressive("Song with Someone", RULES) == "song"
+    for title in ["Song feat. Someone", "Song ft Someone", "Song with Someone"]:
+        assert aggressive(title, RULES) == "song"
 
 
-# --- unusable input is classified, never dropped ----------------------------------------
+# --- invariants over a deterministic corpus ---------------------------------------------
 
-@pytest.mark.parametrize(("artist", "recording", "status"), [
-    ("Various Artists", "乡愁四韵", Status.UNSUPPORTED_SCRIPT),
-    ("椎名林檎", "丸ノ内サディスティック", Status.UNSUPPORTED_SCRIPT),
-    ("", "Some Track", Status.MISSING_FIELD),
-    ("Some Artist", "", Status.MISSING_FIELD),
-    ("   ", "Some Track", Status.MISSING_FIELD),
-    (None, "Some Track", Status.MISSING_FIELD),
-    ("Some Artist", None, Status.MISSING_FIELD),
-    ("Radiohead", "Paranoid Android", Status.OK),
-])
-def test_unusable_input_is_classified(artist, recording, status):
+CORPUS = [
+    ("Radiohead", "Paranoid Android"), ("Radiohead", "Paranoid Android - Remastered 2017"),
+    ("Beyoncé", "Déjà Vu"), ("The Beatles", "Let It Be"),
+    ("Кино", "Группа крови"),
+    ("椎名林檎", "丸ノ内"), ("فيروز", "زهرة"),
+    ("Ελευθερία", "Δυναμίτης"),
+    ("AC/DC", "T.N.T."), ("Prince", "1999"), ("Various", "Live 2000"),
+    ("!!!", "???"), ("", "Orphan"), ("Orphan", ""),
+    ("Sigur Rós", "Untitled #3"), ("Withered Hand", "Drift"),
+    ("아이유", "좋은 날"),
+]
+
+
+@pytest.mark.parametrize(("artist", "recording"), CORPUS)
+def test_invariant_normalization_is_idempotent(artist, recording):
     n = normalize(artist, recording)
-    assert n.status is status
-    if status is not Status.OK:
-        assert not n.has_exact_key
-        assert n.status_detail, "a non-OK status must carry a reason"
+    again = normalize(n.artist_normalized_unicode, n.recording_normalized_unicode)
+    assert again.artist_normalized_unicode == n.artist_normalized_unicode
+    assert again.recording_normalized_unicode == n.recording_normalized_unicode
+    assert fold(n.lookup_exact, RULES) == n.lookup_exact
 
 
-def test_no_key_is_built_from_only_one_half():
-    """A romanisable artist with an unromanisable title must not produce a key equal to the
-    artist alone; that would collapse every such track by that artist into one bucket."""
-    n = normalize("Various Artists", "乡愁四韵")
-    assert n.artist_exact == "variousartists"
-    assert n.recording_exact == ""
-    assert n.exact_key == ""
-    assert n.fallback_key == ""
+@pytest.mark.parametrize(("artist", "recording"), CORPUS)
+def test_invariant_valid_content_never_normalizes_to_empty(artist, recording):
+    n = normalize(artist, recording)
+    if n.normalization_status is NormalizationStatus.VALID:
+        assert n.artist_normalized_unicode and n.recording_normalized_unicode
 
 
-def test_a_title_that_is_only_version_markers_does_not_vanish_into_a_partial_key():
-    n = normalize("Radiohead", "(Live)")
-    assert n.exact_key == "radioheadlive"
-    assert n.fallback_key == "", "fallback emptied the title, so no key may be formed"
+@pytest.mark.parametrize(("artist", "recording"), CORPUS)
+def test_invariant_combined_key_is_never_partial(artist, recording):
+    n = normalize(artist, recording)
+    for key, status in ((n.lookup_exact, n.exact_key_status),
+                        (n.lookup_fallback, n.fallback_key_status)):
+        assert bool(key) == (status is KeyStatus.AVAILABLE)
 
 
-# --- determinism, purity, idempotency ---------------------------------------------------
-
-@pytest.mark.parametrize("text", [
-    "Paranoid Android - Remastered 2017", "Déjà Vu", "AC/DC", "乡愁四韵", "",
-])
-def test_fold_is_idempotent(text):
-    once = fold(text, RULES)
-    assert fold(once, RULES) == once
+@pytest.mark.parametrize(("artist", "recording"), CORPUS)
+def test_invariant_repeated_calls_are_identical(artist, recording):
+    assert normalize(artist, recording) == normalize(artist, recording)
 
 
-def test_repeated_calls_are_identical():
-    a = normalize("Björk", "Jóga (Remastered 2017)")
-    b = normalize("Björk", "Jóga (Remastered 2017)")
-    assert a == b
+@pytest.mark.parametrize(("artist", "recording"), CORPUS)
+def test_invariant_every_result_carries_the_version(artist, recording):
+    assert normalize(artist, recording).normalization_version == RULES.version
 
 
-def test_every_result_carries_the_normalization_version():
-    for artist, recording in [("Radiohead", "Karma Police"), ("", ""), ("A", "乡愁")]:
-        assert normalize(artist, recording).normalization_version == RULES.version
+# --- versioning cannot drift from the rules ---------------------------------------------
 
+def test_version_matches_the_pinned_value():
+    """Fails if the rules changed without updating EXPECTED_VERSION.
 
-# --- versioning tracks the rules --------------------------------------------------------
+    This is the demonstrated link between rules and version: proven by mutation, not
+    asserted. See docs/schema_notes.md.
+    """
+    assert RULES.version == EXPECTED_VERSION, (
+        "normalization rules changed without updating EXPECTED_VERSION. If the change was "
+        f"intended, set EXPECTED_VERSION to {RULES.version!r} in the same commit."
+    )
+
 
 def test_version_is_semantic_plus_rules_digest():
     assert RULES.version.startswith(RULES.semantic_version + "+")
     assert len(RULES.rules_digest) == 12
 
 
-def test_version_changes_when_a_rule_changes(tmp_path):
-    """A rule edit must change the version even if nobody bumps it by hand, because a
-    payout computed under different rules has to be distinguishable."""
+def test_version_changes_when_any_rule_changes(tmp_path):
     raw = _raw_rules()
     raw["fallback"]["version_suffixes"].append("acoustic")
     p = tmp_path / "changed.yml"
@@ -199,7 +323,6 @@ def test_version_changes_when_a_rule_changes(tmp_path):
 
 
 def test_version_is_stable_under_reordering_and_reformatting(tmp_path):
-    """Reordering a YAML list is not a behavioural change and must not look like one."""
     raw = _raw_rules()
     raw["fallback"]["version_suffixes"].reverse()
     raw["fallback"]["featuring_markers"].reverse()

@@ -9,8 +9,9 @@
 # ambiguous tie, aggressive normalization therefore turns "no match" into "unresolvable
 # tie" and both land in the black box.
 #
-#   stage 1, `exact`    -- conservative. Reproduces MusicBrainz's own combined_lookup
-#                          convention (measured: identical for 90.84% of canonical rows).
+#   stage 1, `exact`    -- conservative. Matches the observed MusicBrainz combined_lookup
+#                          key on 90.84% of the measured canonical rows. Parity is NOT
+#                          total and must not be described as such.
 #                          Version information is PRESERVED, because that is what keeps
 #                          distinct recordings distinct.
 #   stage 2, `fallback` -- aggressive. Applied ONLY to listens that found zero candidates
@@ -20,6 +21,18 @@
 # Article, featuring and version-suffix handling live in `fallback` and NOT in `exact`,
 # deliberately. The exact stage is the one that was measured at 73.64%; adding steps to it
 # would change the thing the measurement described, with no evidence that the change helps.
+#
+# THREE OUTPUTS PER FIELD, and they are not interchangeable:
+#
+#   *_normalized_unicode -- the real normalized value. Script-preserving: NFKD, combining
+#                           marks removed, casefolded, Unicode punctuation to space,
+#                           whitespace collapsed. Cyrillic stays Cyrillic, CJK stays CJK.
+#   *_lookup_exact       -- an ASCII-only blocking key, ASCII purely because that is what
+#                           matches the observed MusicBrainz combined_lookup convention.
+#   *_lookup_fallback    -- the aggressive key, usable only after the exact key fails.
+#
+# The ASCII key is a lookup artefact, NOT the normalized value. A Cyrillic title normalizes
+# perfectly well and is VALID; it merely has no ASCII lookup key.
 #
 # Editing this file changes `normalization_version` automatically (the version embeds a
 # hash of the effective rules), which is what makes a rule change traceable and what would
@@ -49,8 +62,20 @@ fallback:
   # "Song (Live)" -> "Song". Bracketed segments are where version information usually hides.
   strip_bracketed_segments: true
 
-  # Four-digit years, which appear in reissue titles such as "- Remastered 2017".
-  strip_four_digit_years: true
+  # Years are NEVER removed as bare four-digit sequences. Doing so destroys legitimate
+  # titles: "1999", "1984", "2001", "Class of 1984", "Live 2000". A year is only removed
+  # when it appears inside one of the recognised reissue structures below, as a unit.
+  #
+  # These are applied BEFORE bare version-suffix removal, otherwise the suffix would be
+  # stripped first and the year left orphaned with nothing to match it.
+  year_structures:
+    - "remaster(?:ed)?\\s+(?:in\\s+)?(?:19|20)\\d{2}"
+    - "(?:19|20)\\d{2}\\s+remaster(?:ed)?"
+    - "(?:19|20)\\d{2}\\s+(?:digital\\s+)?remaster(?:ed)?\\s+version"
+    - "anniversary\\s+edition\\s+(?:19|20)\\d{2}"
+    - "(?:19|20)\\d{2}\\s+anniversary\\s+edition"
+    - "(?:19|20)\\d{2}\\s+(?:re)?issue"
+    - "(?:re)?issue\\s+(?:19|20)\\d{2}"
 
   # Everything from a featuring marker onward is dropped, because the listen side and the
   # canonical side disagree on how credits are written far more often than on who they are.
@@ -71,6 +96,10 @@ fallback:
 
   # Version markers removed in the fallback stage. Each one collapses recordings that
   # MusicBrainz keeps separate, which is exactly the trade this stage exists to make.
+  #
+  # Removed ONLY when something precedes them, because a version marker is by definition a
+  # SUFFIX. "Song - Live" loses "live"; the album title "Live 2000" keeps it, as do
+  # "Live at Leeds" and a track actually called "Mono".
   version_suffixes:
     - remaster
     - remastered

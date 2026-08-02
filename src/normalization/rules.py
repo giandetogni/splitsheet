@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import re
 from dataclasses import dataclass, field
 
 DEFAULT_RULES_PATH = pathlib.Path(__file__).parents[2] / "config/normalization_rules.yml"
@@ -26,7 +27,7 @@ class NormalizationRules:
     strip_diacritics: bool
     lowercase: bool
     strip_bracketed_segments: bool
-    strip_four_digit_years: bool
+    year_structures: tuple[re.Pattern, ...]
     featuring_markers: tuple[str, ...]
     leading_articles: tuple[str, ...]
     version_suffixes: tuple[str, ...]
@@ -65,7 +66,7 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
                    ("unicode_form", "strip_diacritics", "lowercase", "keep")},
         "fallback": {
             "strip_bracketed_segments": fallback["strip_bracketed_segments"],
-            "strip_four_digit_years": fallback["strip_four_digit_years"],
+            "year_structures": sorted(fallback["year_structures"]),
             # Sorted so a reordering of the YAML lists is not treated as a rule change,
             # while adding or removing an entry is.
             "featuring_markers": sorted(fallback["featuring_markers"]),
@@ -75,13 +76,19 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
     }
     digest = hashlib.sha256(_canonical(effective).encode()).hexdigest()[:12]
 
+
     return NormalizationRules(
         semantic_version=str(raw["version"]),
         unicode_form=common["unicode_form"],
         strip_diacritics=bool(common["strip_diacritics"]),
         lowercase=bool(common["lowercase"]),
         strip_bracketed_segments=bool(fallback["strip_bracketed_segments"]),
-        strip_four_digit_years=bool(fallback["strip_four_digit_years"]),
+        # Compiled once at load. Longest pattern first so the most specific structure
+        # ("2017 digital remastered version") is consumed before a shorter prefix of it.
+        year_structures=tuple(
+            re.compile(pat, re.IGNORECASE)
+            for pat in sorted(fallback["year_structures"], key=len, reverse=True)
+        ),
         # Longest first, so "feat." is consumed before "feat" and "deluxe edition" before
         # "deluxe". Matching the shorter form first would leave debris behind.
         featuring_markers=tuple(sorted(fallback["featuring_markers"], key=len, reverse=True)),
