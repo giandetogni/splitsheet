@@ -212,7 +212,7 @@ def main() -> None:
     print()
     for d in dist:
         print(f"  tier {d['match_tier']} {d['match_status']:<11} "
-              f"{str(d['failure_reason'] or '-'):<26} {d['listens']:>10,}  {d['pct']:>8}%")
+              f"{d['failure_reason'] or '-':<26} {d['listens']:>10,}  {d['pct']:>8}%")
 
 
 if __name__ == "__main__":
