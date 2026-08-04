@@ -204,3 +204,60 @@ deletion; require **no** second reviewer, since the repository has a single auth
 integration workflow must **never** be a required pull-request check, because that would
 put `id-token` in reach of unreviewed code. This configuration has never been applied and
 is therefore unverified.
+
+## Phase 4B — scored matching
+
+Order is not optional. Canonical texts feed the feature table, the feature table feeds
+calibration, and `config/scoring_rules.yml` must be frozen before validation is opened.
+
+```
+make phase4b-baseline                       # reclassified cardinality baseline (not the result)
+make phase4b-texts GCS_BUCKET=splitsheet-raw-944054e7
+make phase4b-features                       # matcher identity, label-blind
+make phase4b-analyse                        # evaluation identity, calibration ONLY
+make phase4b-calibrate                      # chooses weights/thresholds, calibration ONLY
+#   -> update config/scoring_rules.yml, recompute rules_sha256, bump EXPECTED_SCORING_VERSION
+make verify                                 # ruff + unit + terraform, exit codes printed
+make phase4b-match                          # publishes silver_listen_matches
+make phase4b-validate                       # ONE RUN PER scoring_version
+make phase4b-unmatched
+```
+
+### The validation partition is consumed
+
+`make phase4b-validate` has been run once, under `scoring_version 1.0.0+cb21f9704ff0`. Running
+it again does not make the partition blind. If a rule changes:
+
+1. bump `scoring_version` and recompute `rules_sha256` (the loader refuses a stale digest);
+2. update `EXPECTED_SCORING_VERSION` in `tests/unit/test_scoring.py` in the same commit;
+3. do **not** reuse the existing validation number — establish a new validation strategy or
+   wait for new data.
+
+`validate_scoring.py` enforces part of this itself: it compares the `scoring_version` stored on
+the published rows with the config on disk and refuses to report if they differ.
+
+### Replacing a published table's schema
+
+`silver_listen_matches` had to lose `tier_confidence` and gain six scoring columns, which
+BigQuery cannot do in place. `deletion_protection = true` blocks the destroy, and flipping the
+flag in the same apply does not help — the provider evaluates it before the replacement. The
+sequence that works, and the order matters:
+
+```
+terraform state rm google_bigquery_table.silver_listen_matches
+# DROP TABLE via SQL (the content was reproducible from the candidate run)
+terraform apply            # recreates with the new schema, deletion_protection = false
+# set deletion_protection back to true
+terraform apply
+terraform plan             # must report No changes
+```
+
+Only do this when the table's content is reproducible from a recorded run id. Here the previous
+content was the cardinality baseline, which `make phase4b-baseline` republishes into
+`baseline_cardinality_matches` from the same `candidate_run_id`.
+
+### Cost note
+
+The evaluation stages cost about 4× the pipeline they measure (275 GB of 389 GB), because each
+metric query re-joins the label table to the candidate table. If evaluation is ever run
+repeatedly rather than once, materialise the joined evaluation set first.

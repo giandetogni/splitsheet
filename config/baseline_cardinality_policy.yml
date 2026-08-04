@@ -1,4 +1,12 @@
-# Tier policy and failure taxonomy for SplitSheet.
+# BASELINE CARDINALITY POLICY — not a matcher.
+#
+# THIS IS NOT SCORING. Every decision below is made purely on how many candidates blocking
+# produced. There is no similarity computation, no threshold, no top-1/top-2 margin, and
+# therefore no evidence on which to call anything a tie or to accept a lone weak candidate.
+# It is a baseline that establishes the one-row-per-listen contract and the failure
+# taxonomy's shape; the scorer replaces its decisions.
+#
+# Renamed from match_tiers.yml because calling it a tier policy overstated it.
 #
 # LABEL-BLIND. Nothing in this file is derived from the mapper reference label, and the
 # process that applies it cannot read splitsheet_eval. Confidence values come from
@@ -53,12 +61,14 @@ tiers:
     implemented: true
     block_method: EXACT
     requires_candidate_count: 1
-    confidence: 0.95
+    # No confidence number. 0.95 was hand-picked, not calibrated and not computed, so it
+    # had no business sitting in a NUMERIC column implying otherwise.
+    confidence: null
+    decision_basis: structural
     rationale: >-
-      One canonical recording matched on the conservative key, which preserves version
-      information. This is the tier PROJECT_SPEC.md assigns 0.95 and the value is kept.
-      Corroboration measured on dev only: unique-candidate agreement with the mapper
-      reference label 99.9853%.
+      Exactly one canonical recording carries the conservative key, which preserves version
+      information. The decision is structural -- there is nothing to choose between -- so
+      match_score is NULL by design rather than by omission.
 
   # --- Tier D: deliberately low confidence -----------------------------------------------
   - id: D
@@ -66,25 +76,23 @@ tiers:
     implemented: true
     block_method: FALLBACK
     requires_candidate_count: 1
-    confidence: 0.60
+    confidence: null
+    decision_basis: none_yet
+    # A single survivor of the aggressive key is NOT a match. Measured disagreement with the
+    # mapper reference label is 22.96% (dev) and 23.68% (holdout, now an observed partition),
+    # so auto-accepting it was wrong. It cannot be resolved without an absolute score
+    # against a fallback threshold, which does not exist yet.
+    status_until_scored: UNRESOLVED
+    failure_reason_until_scored: FALLBACK_REQUIRES_SCORING
     rationale: >-
-      One canonical recording matched, but only after the aggressive key discarded version
-      markers, bracketed segments, featuring clauses and reissue years. The information
-      that would distinguish the survivors is precisely what was removed, so a single
-      survivor is weak evidence rather than strong. Structural reasoning sets this tier
-      below C; corroboration measured on dev only puts false-unique disagreement with the
-      mapper reference label at 22.96%, about 1,500x the corpus rate, which is consistent
-      with the low value chosen.
-    policy_note: >-
-      0.60 is below any plausible payout threshold. This tier is retained because it is
-      real recall (1.31% incremental on dev) but it must not be treated as confident, and
-      no downstream stage may accept it without an explicit, separately justified decision.
+      The aggressive key removed precisely the text that would distinguish the survivor, so
+      uniqueness here carries no evidential weight. Pending scoring it is unresolved.
 
   # --- Tier E: everything unresolved -----------------------------------------------------
   - id: E
-    name: BLACK_BOX
+    name: UNRESOLVED
     implemented: true
-    confidence: 0.0
+    confidence: null
     rationale: >-
       No acceptable single candidate. Every listen here carries exactly one failure reason.
 
@@ -95,6 +103,10 @@ tiers:
 ambiguity:
   break_ties: false
   select_among_multiple: never
+  # AMBIGUOUS_TIE is deliberately NOT emitted by this baseline. It requires computed
+  # evidence that does not exist here, and using it for merely-unranked candidates was a
+  # conceptual error in the first version of this file.
+  emit_ambiguous_tie: false
 
 # Exactly one reason per unmatched listen, assigned by the first matching rule in order.
 # Order matters: a listen with no usable key must not be reported as having no candidates,
@@ -119,16 +131,25 @@ failure_reasons:
     when: exact_key_status = EMPTY
     operational_meaning: >-
       Neither half produced an ASCII key. Same cause, same fix. Measured 1.12%.
-  - id: AMBIGUOUS_TIE_EXACT
+  # NOT called AMBIGUOUS_TIE. A tie requires computed evidence -- top-1 and top-2 scores
+  # within tie_epsilon, or a margin below minimum_score_margin. Blocking returns candidates
+  # without scores, so "several candidates" means UNSCORED, not tied.
+  - id: MULTIPLE_CANDIDATES_UNSCORED_EXACT
     when: block_method = EXACT and candidate_count > 1
     operational_meaning: >-
       Several canonical recordings share the conservative key. Genuine homonyms or
       destructive normalization; needs evidence blocking cannot supply.
-  - id: AMBIGUOUS_TIE_FALLBACK
+  - id: MULTIPLE_CANDIDATES_UNSCORED_FALLBACK
     when: block_method = FALLBACK and candidate_count > 1
     operational_meaning: >-
       Several recordings collapsed under the aggressive key. Often episodic content or
       version proliferation.
+  - id: FALLBACK_REQUIRES_SCORING
+    when: block_method = FALLBACK and candidate_count = 1
+    operational_meaning: >-
+      A single survivor of the aggressive key. Measured 22.96%/23.68% disagreement with the
+      reference, so it must not be accepted without an absolute score above a fallback
+      threshold. Real recall held in suspense, not discarded.
   - id: NO_BLOCK_CANDIDATES
     when: a usable key existed but matched no canonical recording
     operational_meaning: >-

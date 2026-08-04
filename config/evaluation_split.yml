@@ -45,6 +45,48 @@ buckets:
     lower_inclusive: 80
     upper_exclusive: 100
 
+# ---------------------------------------------------------------------------------------
+# SECOND DIVISION — added 2026-08-04, frozen before any scoring metric was computed.
+#
+# HONEST STATUS OF THE ORIGINAL HOLDOUT:
+#
+#   The original holdout partition has been inspected in prior blocking and diagnostic
+#   analyses. It is an observed evaluation partition, not a pristine blind test set.
+#
+#   It was read in the Phase 3B fallback trade-off analysis and again in the Phase 4
+#   low-information preflight, where it was used to confirm the direction of a dev-side
+#   finding. That is enough contact to disqualify it as a blind test. It may still be
+#   reported, labelled "previously observed evaluation partition", and it may never again
+#   be described as untouched.
+#
+# WHAT REPLACES IT: the old dev partition is divided in two, by the same kind of stable
+# recording-keyed hash but under a DIFFERENT salt, so the division is independent of the
+# dev/holdout assignment rather than a re-cut of it.
+#
+#   sub_bucket = first 8 hex chars of sha256(calibration_salt + ":" + mapper_recording_mbid)
+#                mod 100, evaluated ONLY for recordings whose bucket is dev
+#   sub_bucket <  75 -> calibration
+#   sub_bucket >= 75 -> validation
+#
+#   * calibration carries feature analysis, weights, thresholds and margins;
+#   * validation is opened EXACTLY ONCE, after config/scoring_rules.yml is frozen;
+#   * a recording cannot appear in both, because the assignment is a function of the
+#     recording, and neither partition includes anything outside dev.
+#
+# The 75/25 split is chosen so calibration still has usable counts in its smallest cells --
+# fallback multi-candidate, non-Latin script, POTENTIAL_LOW_INFORMATION -- while validation
+# stays large enough to bound the disagreement rate of accepted decisions rather than merely
+# suggest it.
+#
+# The dev/holdout rule above is UNCHANGED and split_version stays 1.0.0: this section adds a
+# division inside dev, it does not recut dev. Its own version is tracked separately.
+
+calibration_split_version: "1.0.0"
+calibration_frozen_at: "2026-08-04"
+calibration_salt: "splitsheet-eval-calibration-v1"
+calibration_upper_exclusive: 75
+holdout_status: "previously observed evaluation partition"
+
 # Rows whose label is absent are in neither bucket. They cannot be evaluated for
 # correctness and must be reported as their own class, never folded into a failure count.
 unlabelled_bucket: "NOT_EVALUABLE"

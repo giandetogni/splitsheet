@@ -1,0 +1,24 @@
+{
+ "artifact": "canonical_match_texts",
+ "source_universe": "blk:c005e9a56b1ec542",
+ "snapshot_date": "2026-07-17",
+ "recordings": 368795,
+ "object": "gs://splitsheet-raw-944054e7/derived/canonical_texts/version=1.0.0+0bc0dd643e06/universe=blk_c005e9a56b1ec542/canonical_match_texts.tsv.gz",
+ "bytes": 20937568,
+ "sha256": "7c88845f4804446df275caba00198d5087a9d548c1c13e52f8557fafd9034d37",
+ "ingestion_run_id": "cantext:8a38e905f9d3577d",
+ "normalization_version": "1.0.0+0bc0dd643e06",
+ "normalization_rules_sha256": "0bc0dd643e06",
+ "empty_artist_unicode": 0,
+ "empty_recording_unicode": 0,
+ "recordings_without_release": 0,
+ "published": {
+  "n": 368795,
+  "distinct_mbid": 368795,
+  "empty_artist": 0,
+  "empty_recording": 0,
+  "no_release": 0
+ },
+ "bytes_billed": 8144289792,
+ "wall_seconds": 171.8
+}

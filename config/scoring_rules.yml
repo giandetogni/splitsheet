@@ -1,0 +1,168 @@
+# SCORING RULES — FROZEN 2026-08-04, before the validation partition was opened.
+#
+# WHAT match_score IS: a weighted mean of text-comparison features, in [0,1]. It is NOT a
+# probability, NOT calibrated against an outcome, and NOT comparable across scoring versions.
+# The thresholds below are operating points measured on the calibration partition, not
+# confidence levels.
+#
+# WHERE THESE NUMBERS COME FROM: every value was selected by src/evaluation/calibrate.py from
+# a 1,008-cell grid (6 weight sets x 7 exact thresholds x 6 fallback thresholds x 4 margins)
+# evaluated on the calibration partition only, under a selection rule fixed before the table
+# was read. None of them is an intuition.
+#
+# THE MEASUREMENT THAT DECIDED THE WEIGHTS: on both fallback stages the artist features
+# separate in the WRONG direction (AUC 0.32-0.34) while the recording features hold 0.66-0.98.
+# Dropping the artist side entirely scored the same as keeping it at 0.1, and 0.1 was kept
+# because the artist comparison is the only thing that distinguishes a cover from the original
+# when the titles are identical. The equal-weight set was measurably worse: removing any one
+# artist feature from it RAISED overall AUC.
+#
+# THE OUTCOME, on calibration, evaluable accepted decisions:
+#
+#   stage            accepted  evaluable  disagreement  ranking errors
+#   EXACT_MULTI        67,104     62,725      0.0080 %        4
+#   FALLBACK_UNIQUE     3,447      3,115      2.3756 %        0 (one candidate: none possible)
+#   FALLBACK_MULTI      1,299      1,126      3.1083 %       19
+#
+# The 2.0 % bound in the selection rule was NOT met by any cell in the grid: the chosen
+# configuration is the lowest worst-stage disagreement, and FALLBACK_MULTI sits at 3.11 % on
+# 35 error listens out of 1,126, so its confidence interval is roughly 2.2-4.3 %. That is
+# reported, not smoothed over. Raising the fallback threshold to 0.95 does bring the rate
+# down, but accepts under 1,000 evaluable listens per stage, which is below the floor at which
+# a 2 % rate can be measured at all.
+#
+# EVALUABLE excludes accepted decisions whose reference recording is absent from the canonical
+# snapshot: 4,379 of 67,104 on EXACT_MULTI. Counting those as errors would have reported
+# 6.53 % disagreement for a stage whose actual ranking error is 4 listens in 62,725.
+#
+# THE LABEL IS NOT GROUND TRUTH. The ListenBrainz mapper output is a correlated reference
+# label, not independent ground truth. Agreement metrics must not be presented as absolute
+# matching accuracy.
+#
+# BINDING CONSTRAINTS
+#
+#   * Changing any value below changes rules_sha256, and the loader refuses to run when the
+#     recorded digest and the recomputed digest disagree. Bump scoring_version in the same
+#     commit.
+#   * The validation partition has been opened once, under this exact version. Any change
+#     here requires a NEW scoring_version and a new validation strategy; the existing
+#     validation result may not be reused to justify a changed rule.
+#   * No rule here may read a mapper label, popularity, candidate order, MBID lexical value,
+#     artist_credit_id or any derived identifier.
+
+scoring_version: "1.0.0"
+frozen_at: "2026-08-04"
+feature_version: "1.0.0"
+calibrated_on:
+  partition: "calibration"
+  split_version: "1.0.0"
+  calibration_split_version: "1.0.0"
+  grid_cells_evaluated: 1008
+  selection_rule: >-
+    highest accepted coverage with worst-stage disagreement over evaluable accepted decisions
+    <= 2.0%; no cell qualified, so the lowest worst-stage disagreement was taken and the
+    bound was NOT relaxed
+
+# Weighted mean over the features that are AVAILABLE for a pair. A NULL feature drops out of
+# both the numerator and the denominator: a listen that carried no release is scored on what
+# it did carry instead of being penalised for a field it never sent.
+features:
+  artist_unicode_exact:
+    weight: 0.1
+    kind: bool
+    source: "listen artist_normalized_unicode = canonical artist_normalized_unicode"
+    calibration_auc: 0.7935
+  recording_unicode_exact:
+    weight: 1.0
+    kind: bool
+    source: "listen recording_normalized_unicode = canonical recording_normalized_unicode"
+    calibration_auc: 0.9350
+  artist_token_similarity:
+    weight: 0.1
+    kind: unit_interval
+    source: "Jaccard over whitespace tokens of the normalized Unicode artist values"
+    calibration_auc: 0.8196
+  recording_token_similarity:
+    weight: 1.0
+    kind: unit_interval
+    source: "Jaccard over whitespace tokens of the normalized Unicode recording values"
+    calibration_auc: 0.9588
+  artist_string_similarity:
+    weight: 0.1
+    kind: unit_interval
+    source: "1 - editDistance/max(len) over the normalized Unicode artist values"
+    calibration_auc: 0.8065
+  recording_string_similarity:
+    weight: 1.0
+    kind: unit_interval
+    source: "1 - editDistance/max(len) over the normalized Unicode recording values"
+    calibration_auc: 0.9451
+  # Included on measurement, not on principle: AUC 0.9278 with a 1.4% null rate, ahead of
+  # every artist feature. Compared casefolded rather than through the normalization rules,
+  # which makes it a LOWER bound on the available signal. Canonical carries one representative
+  # release per recording, so a mismatch is weak evidence while a match is strong; the weight
+  # is halved for exactly that asymmetry.
+  release_lower_exact:
+    weight: 0.5
+    kind: bool
+    nullable: true
+    source: "casefolded submitted release = casefolded canonical release"
+    calibration_auc: 0.9278
+
+thresholds:
+  # EXACT blocks already agree on the full ASCII lookup key, so the score's job there is only
+  # to rank within the block. Raising this threshold from 0.55 to 0.99 changed disagreement by
+  # 0.002 percentage points and cost 376 listens, so the lower operating point was measured to
+  # be free rather than assumed to be safe.
+  exact: 0.55
+  # FALLBACK discards Unicode content to build its key, so an absolute bar is the only
+  # protection. At 0.85 the accepted fallback-unique disagreement is 2.38%, against 22.96%
+  # for accepting every fallback-unique candidate unscored, which is what the Phase 4A
+  # baseline would have done.
+  fallback: 0.85
+
+minimum_score_margin: 0.02
+tie_epsilon: 0.01
+
+decision_policy:
+  exact_unique:
+    status: MATCHED
+    method: STRUCTURAL_EXACT_UNIQUE
+    scored: false
+    reason: >-
+      the exact key produced exactly one candidate; that is a structural fact and no score
+      participates, so match_score and score_margin are NULL
+  exact_multiple:
+    method: SCORED_EXACT_MULTIPLE
+    requires: ["top1 >= thresholds.exact", "margin >= minimum_score_margin"]
+    otherwise: ["AMBIGUOUS_TIE when the margin fails", "BELOW_THRESHOLD when the score fails"]
+  fallback_unique:
+    method: SCORED_FALLBACK_UNIQUE
+    requires: ["top1 >= thresholds.fallback"]
+    margin: >-
+      none exists: there is no top-2 to be close to, so a single candidate can never be an
+      AMBIGUOUS_TIE. Insufficient score is BELOW_THRESHOLD.
+    otherwise: ["BELOW_THRESHOLD"]
+  fallback_multiple:
+    method: SCORED_FALLBACK_MULTIPLE
+    requires: ["top1 >= thresholds.fallback", "margin >= minimum_score_margin"]
+    otherwise: ["AMBIGUOUS_TIE when the margin fails", "BELOW_THRESHOLD when the score fails"]
+  no_candidates:
+    method: NO_CANDIDATES
+    status: UNRESOLVED
+
+# POTENTIAL_LOW_INFORMATION is a cost and routing signal, never a validity flag.
+low_information_policy:
+  suppress_candidates: false
+  score_on_full_unicode_text: true
+  use_ascii_key_as_score_evidence: false
+  separate_threshold: false
+  measured: >-
+    calibration disagreement 0.0000% on 403 evaluable POTENTIAL_LOW_INFORMATION exact-multi
+    acceptances and 0.0000% on 25 fallback-unique, against 0.0080% and 2.3948% for NORMAL
+    keys. These keys generate ambiguity and cost, not wrong answers, so nothing about them is
+    suppressed and no separate threshold is justified.
+
+# Recomputed from the semantic content above on every load. A mismatch is a hard failure, so
+# editing a weight or a threshold without updating this line stops the pipeline.
+rules_sha256: "cb21f9704ff0"

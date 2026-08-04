@@ -167,3 +167,76 @@ test-integration:
 # The subset CI is allowed to run: reads only, no GCS object access.
 test-integration-readonly:
 	uv run pytest tests/integration -v -m "integration_readonly and not requires_gcs"
+
+# ---------------------------------------------------------------------------
+# One command, run before every commit. Fails immediately, suppresses nothing,
+# and prints each exit code so a killed process (137), a timeout or missing
+# output can never be mistaken for success.
+# ---------------------------------------------------------------------------
+.PHONY: verify
+
+verify:
+	@set -e; \
+	fail=0; \
+	printf '\n== ruff ==\n';            uv run ruff check src tests; rc=$$?; echo "exit=$$rc"; [ $$rc -eq 0 ] || fail=1; \
+	printf '\n== unit tests ==\n';      uv run pytest tests/unit -q;  rc=$$?; echo "exit=$$rc"; [ $$rc -eq 0 ] || fail=1; \
+	printf '\n== terraform fmt ==\n';   $(MAKE) --no-print-directory tf-fmt;      rc=$$?; echo "exit=$$rc"; [ $$rc -eq 0 ] || fail=1; \
+	printf '\n== terraform validate ==\n'; $(MAKE) --no-print-directory tf-validate; rc=$$?; echo "exit=$$rc"; [ $$rc -eq 0 ] || fail=1; \
+	printf '\n'; \
+	if [ $$fail -ne 0 ]; then echo "VERIFY FAILED"; exit 1; fi; \
+	echo "VERIFY OK (all four steps exited 0)"
+
+# ---------------------------------------------------------------------------
+# Phase 4B: scored matching. Order matters -- canonical texts feed the feature
+# table, the feature table feeds calibration, and the config must be frozen
+# before validation is opened. `phase4b-validate` consumes the validation
+# partition and may only be run once per scoring_version.
+# ---------------------------------------------------------------------------
+NORM_VERSION      ?= 1.0.0+0bc0dd643e06
+BLOCKING_VERSION  ?= staged-1.0.0
+CANDIDATE_RUN_ID  ?= blk:c005e9a56b1ec542
+DERIVED_DIR       ?= $(HOME)/splitsheet-data/derived
+
+.PHONY: phase4b-baseline phase4b-texts phase4b-features phase4b-analyse \
+        phase4b-calibrate phase4b-match phase4b-validate phase4b-unmatched
+
+# The Phase 4A artifact, reclassified: cardinality only, no score, no confidence.
+phase4b-baseline:
+	uv run python src/matching/build_baseline_cardinality.py --project ss-de-944054e7 \
+	  --norm-version "$(NORM_VERSION)" --blocking-version "$(BLOCKING_VERSION)" \
+	  --candidate-run-id "$(CANDIDATE_RUN_ID)" \
+	  --out $(OUT_DIR)/baseline_cardinality_run.json
+
+phase4b-texts:
+	uv run python src/normalization/build_canonical_texts.py \
+	  --candidate-run-id "$(CANDIDATE_RUN_ID)" --bucket $(GCS_BUCKET) \
+	  --work-dir $(DERIVED_DIR) --out $(OUT_DIR)/canonical_texts_run.json
+
+phase4b-features:
+	uv run python src/matching/build_candidate_features.py \
+	  --norm-version "$(NORM_VERSION)" --candidate-run-id "$(CANDIDATE_RUN_ID)" \
+	  --out $(OUT_DIR)/candidate_features_run.json
+
+# Evaluation identity, calibration partition only.
+phase4b-analyse:
+	uv run python src/evaluation/analyze_features.py \
+	  --out $(OUT_DIR)/feature_analysis_calibration.json
+
+phase4b-calibrate:
+	uv run python src/evaluation/calibrate.py \
+	  --out $(OUT_DIR)/calibration_tradeoff.json
+
+phase4b-match:
+	uv run python src/matching/build_match_results.py \
+	  --norm-version "$(NORM_VERSION)" --blocking-version "$(BLOCKING_VERSION)" \
+	  --candidate-run-id "$(CANDIDATE_RUN_ID)" \
+	  --out $(OUT_DIR)/match_results_scored_run.json
+
+# ONE RUN PER scoring_version. Re-running it does not make the partition blind again.
+phase4b-validate:
+	uv run python src/evaluation/validate_scoring.py \
+	  --candidate-run-id "$(CANDIDATE_RUN_ID)" \
+	  --out $(OUT_DIR)/validation_run_once.json
+
+phase4b-unmatched:
+	uv run python src/evaluation/top_unmatched.py --out $(OUT_DIR)/top_unmatched.json

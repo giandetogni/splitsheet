@@ -251,3 +251,39 @@ bytes against actuals in the same range. Every query ran under `maximum_bytes_bi
 
 **List-price equivalent ≈ $0.27.** A conversion of consumption, not a known charge.
 **Actual monetary cost UNKNOWN without billing evidence.**
+
+## Phase 4B — features, calibration, validation, publication
+
+Eight scripted stages, 41 query jobs plus one load job.
+
+| stage | bytes billed | slot-ms |
+|---|---|---|
+| baseline reclassification and republication | 22,139,633,664 | 1,860,403 |
+| canonical match texts (query + load + insert) | 8,144,289,792 | — |
+| candidate feature table (3,045,208 pairs) | 12,382,633,984 | 1,149,858 |
+| per-feature analysis on calibration | 144,589,193,216 | 5,867,725 |
+| threshold/weight grid (1,008 cells, run twice) | 28,893,511,680 | 1,684,439 |
+| scored match results | 30,855,397,376 | 2,948,011 |
+| validation (three partitions × three cuts) | 130,572,877,824 | 9,399,873 |
+| top-20 unmatched | 11,220,811,776 | — |
+| **total** | **388,798,349,312 = 0.3536 TiB** | **22,910,309** |
+
+**List-price equivalent ≈ $2.21.** A conversion of processing consumption at the published
+on-demand rate, **not** a known charge. **Actual monetary cost remains UNKNOWN without billing
+evidence.**
+
+Two observations worth carrying forward:
+
+- **The evaluation queries cost 4× the pipeline they evaluate.** Feature analysis and validation
+  together are 275 GB of the 389 GB, because each of the 34 AUC and metric queries re-reads the
+  label table joined to the candidate table. Materialising a single joined evaluation table once
+  would cut that by roughly two thirds. It was not done because the analysis ran once.
+- **One avoidable cost was incurred**: the calibration grid ran twice (once before the error
+  decomposition existed, once after), and the second run of the extended grid re-read the same
+  8.2 GB input three times for the chosen-cell breakdowns. Roughly 20 GB, about $0.12
+  list-price equivalent, spent learning that the first selection rule had a 0/0 degeneracy.
+
+Free-tier context: the monthly on-demand query allowance is 1 TiB. This phase consumed
+**0.3536 TiB** of it. Cumulative project consumption is now roughly 0.94 TiB across all phases,
+so the free allowance has probably absorbed all of it — **probably, on arithmetic, not on
+billing evidence**.

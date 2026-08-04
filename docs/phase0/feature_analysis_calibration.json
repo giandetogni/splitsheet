@@ -1,0 +1,862 @@
+{
+ "partition_analysed": "calibration",
+ "split_version": "1.0.0",
+ "calibration_split_version": "1.0.0",
+ "label_status": "correlated reference label, not independent ground truth; agreement is not absolute matching accuracy",
+ "partitions": [
+  {
+   "eval_partition": "calibration",
+   "labelled_listens": 21262387,
+   "distinct_reference_recordings": 1629283
+  },
+  {
+   "eval_partition": "holdout",
+   "labelled_listens": 6164815,
+   "distinct_reference_recordings": 543539
+  },
+  {
+   "eval_partition": "validation",
+   "labelled_listens": 5372001,
+   "distinct_reference_recordings": 543254
+  }
+ ],
+ "overlap_check": [
+  {
+   "recordings_in_both_partitions": 0
+  }
+ ],
+ "universe": [
+  {
+   "stage": "EXACT_MULTI",
+   "blocking_key_information_class": "NORMAL",
+   "pairs": 323053,
+   "listens": 66894,
+   "reference_pairs": 62407
+  },
+  {
+   "stage": "EXACT_MULTI",
+   "blocking_key_information_class": "POTENTIAL_LOW_INFORMATION",
+   "pairs": 215497,
+   "listens": 406,
+   "reference_pairs": 403
+  },
+  {
+   "stage": "FALLBACK_MULTI",
+   "blocking_key_information_class": "NORMAL",
+   "pairs": 93839,
+   "listens": 12333,
+   "reference_pairs": 4758
+  },
+  {
+   "stage": "FALLBACK_MULTI",
+   "blocking_key_information_class": "POTENTIAL_LOW_INFORMATION",
+   "pairs": 541,
+   "listens": 83,
+   "reference_pairs": 57
+  },
+  {
+   "stage": "FALLBACK_UNIQUE",
+   "blocking_key_information_class": "NORMAL",
+   "pairs": 11792,
+   "listens": 11792,
+   "reference_pairs": 6899
+  },
+  {
+   "stage": "FALLBACK_UNIQUE",
+   "blocking_key_information_class": "POTENTIAL_LOW_INFORMATION",
+   "pairs": 54,
+   "listens": 54,
+   "reference_pairs": 45
+  }
+ ],
+ "features": {
+  "artist_unicode_exact": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 0,
+     "mean": 0.308353,
+     "p10": 0.0,
+     "p50": 0.0,
+     "p90": 1.0
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 0,
+     "mean": 0.895385,
+     "p10": 0.0,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 0,
+     "auc": 0.7935162752116988
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 0,
+     "auc": 0.8896186844976331
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 0,
+     "auc": 0.33635559061598
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 0,
+     "auc": 0.3177073344933978
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 0,
+     "auc": 0.7005087708312066
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 0,
+     "auc": 0.9159897956704621
+    }
+   ]
+  },
+  "recording_unicode_exact": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 0,
+     "mean": 0.046171,
+     "p10": 0.0,
+     "p50": 0.0,
+     "p90": 0.0
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 0,
+     "mean": 0.916198,
+     "p10": 1.0,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 0,
+     "auc": 0.9350137341512647
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 0,
+     "auc": 0.9759520237477244
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 0,
+     "auc": 0.6637309821979651
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 0,
+     "auc": 0.6686963975486353
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 0,
+     "auc": 0.9209732733058948
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 0,
+     "auc": 0.9691909682278
+    }
+   ]
+  },
+  "artist_token_similarity": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 0,
+     "mean": 0.454039,
+     "p10": 0.142857,
+     "p50": 0.2,
+     "p90": 1.0
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 0,
+     "mean": 0.938948,
+     "p10": 0.75,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 0,
+     "auc": 0.8195772196829177
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 0,
+     "auc": 0.8895565590417106
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 0,
+     "auc": 0.3422370904392576
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 0,
+     "auc": 0.3353960846884653
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 0,
+     "auc": 0.7155920038073122
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 0,
+     "auc": 0.9598250725729848
+    }
+   ]
+  },
+  "recording_token_similarity": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 0,
+     "mean": 0.278703,
+     "p10": 0.0,
+     "p50": 0.2,
+     "p90": 0.666667
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 0,
+     "mean": 0.958135,
+     "p10": 1.0,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 0,
+     "auc": 0.9588078236381004
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 0,
+     "auc": 0.975958133586699
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 0,
+     "auc": 0.8053135476135115
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 0,
+     "auc": 0.6574580234579321
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 0,
+     "auc": 0.9360415735450405
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 0,
+     "auc": 0.9864901982783638
+    }
+   ]
+  },
+  "artist_string_similarity": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 0,
+     "mean": 0.51307,
+     "p10": 0.1875,
+     "p50": 0.307692,
+     "p90": 1.0
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 0,
+     "mean": 0.939413,
+     "p10": 0.823529,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 0,
+     "auc": 0.8065267701030224
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 0,
+     "auc": 0.8897083678893077
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 0,
+     "auc": 0.33811525059478953
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 0,
+     "auc": 0.3307427832051998
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 0,
+     "auc": 0.7060021980145692
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 0,
+     "auc": 0.9076335082751504
+    }
+   ]
+  },
+  "recording_string_similarity": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 0,
+     "mean": 0.425456,
+     "p10": 0.176471,
+     "p50": 0.352941,
+     "p90": 0.736842
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 0,
+     "mean": 0.956658,
+     "p10": 1.0,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 0,
+     "auc": 0.9451102601926108
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 0,
+     "auc": 0.9760003864332302
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 0,
+     "auc": 0.6920393845434658
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 0,
+     "auc": 0.6618559450717942
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 0,
+     "auc": 0.9206581794471237
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 0,
+     "auc": 0.9536626250953705
+    }
+   ]
+  },
+  "release_lower_exact": {
+   "distribution": [
+    {
+     "is_ref": false,
+     "pairs": 570207,
+     "null_count": 8757,
+     "mean": 0.087196,
+     "p10": 0.0,
+     "p50": 0.0,
+     "p90": 0.0
+    },
+    {
+     "is_ref": true,
+     "pairs": 74569,
+     "null_count": 264,
+     "mean": 0.947271,
+     "p10": 1.0,
+     "p50": 1.0,
+     "p90": 1.0
+    }
+   ],
+   "auc_overall": [
+    {
+     "stratum": "ALL",
+     "reference_pairs": 74569,
+     "other_pairs": 570207,
+     "null_values": 9021,
+     "auc": 0.9278430394076472
+    }
+   ],
+   "auc_by_stage": [
+    {
+     "stratum": "EXACT_MULTI",
+     "reference_pairs": 62810,
+     "other_pairs": 475740,
+     "null_values": 5892,
+     "auc": 0.9560803281239827
+    },
+    {
+     "stratum": "FALLBACK_MULTI",
+     "reference_pairs": 4815,
+     "other_pairs": 89565,
+     "null_values": 2689,
+     "auc": 0.7294618833534809
+    },
+    {
+     "stratum": "FALLBACK_UNIQUE",
+     "reference_pairs": 6944,
+     "other_pairs": 4902,
+     "null_values": 440,
+     "auc": 0.7778076450503604
+    }
+   ],
+   "auc_by_information_class": [
+    {
+     "stratum": "NORMAL",
+     "reference_pairs": 74064,
+     "other_pairs": 354620,
+     "null_values": 8932,
+     "auc": 0.9024858215603961
+    },
+    {
+     "stratum": "POTENTIAL_LOW_INFORMATION",
+     "reference_pairs": 505,
+     "other_pairs": 215587,
+     "null_values": 89,
+     "auc": 0.9696606460638643
+    }
+   ]
+  }
+ },
+ "combined": {
+  "all_features": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.9578697232801735
+   }
+  ],
+  "without_artist_unicode_exact": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.9697833481596062
+   }
+  ],
+  "without_recording_unicode_exact": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.950379860256814
+   }
+  ],
+  "without_artist_token_similarity": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.967023008695391
+   }
+  ],
+  "without_recording_token_similarity": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.9490037683634904
+   }
+  ],
+  "without_artist_string_similarity": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.967888681714096
+   }
+  ],
+  "without_recording_string_similarity": [
+   {
+    "stratum": "ALL",
+    "reference_pairs": 74569,
+    "other_pairs": 570207,
+    "null_values": 0,
+    "auc": 0.9549916395408475
+   }
+  ]
+ },
+ "bytes_billed": 144589193216,
+ "slot_ms": 5867725,
+ "wall_seconds": 108.4,
+ "jobs": [
+  {
+   "step": "partition sizes",
+   "job_id": "a0c4facb-d461-49e6-98b7-168bb9b37543",
+   "bytes_billed": 0,
+   "slot_ms": null
+  },
+  {
+   "step": "calibration/validation disjointness",
+   "job_id": "6cd0810b-f351-455e-a15f-45cee372a794",
+   "bytes_billed": 0,
+   "slot_ms": null
+  },
+  {
+   "step": "calibration universe",
+   "job_id": "2e4dfa47-8150-427c-aaf2-715439ae0a8b",
+   "bytes_billed": 0,
+   "slot_ms": null
+  },
+  {
+   "step": "artist_unicode_exact: distribution",
+   "job_id": "f1b95d46-5745-40c8-ab4c-2443324bdf35",
+   "bytes_billed": 4087349248,
+   "slot_ms": 210346
+  },
+  {
+   "step": "artist_unicode_exact: AUC all",
+   "job_id": "3792268e-f637-4808-a6b2-487b7f7096b4",
+   "bytes_billed": 4087349248,
+   "slot_ms": 150452
+  },
+  {
+   "step": "artist_unicode_exact: AUC by stage",
+   "job_id": "0b214076-0cb7-4e4f-9612-fe431cfa5cc6",
+   "bytes_billed": 4139778048,
+   "slot_ms": 158697
+  },
+  {
+   "step": "artist_unicode_exact: AUC by info class",
+   "job_id": "fd798bf4-cd8c-4f61-bd14-f9ca70b9aa86",
+   "bytes_billed": 4118806528,
+   "slot_ms": 137846
+  },
+  {
+   "step": "recording_unicode_exact: distribution",
+   "job_id": "08039fa4-2781-4148-8745-143f7b9a8c2b",
+   "bytes_billed": 4087349248,
+   "slot_ms": 203888
+  },
+  {
+   "step": "recording_unicode_exact: AUC all",
+   "job_id": "dc5a90e9-5181-4f1f-9eb1-184258860199",
+   "bytes_billed": 4087349248,
+   "slot_ms": 158745
+  },
+  {
+   "step": "recording_unicode_exact: AUC by stage",
+   "job_id": "b4a1d8f9-8cb2-4303-9a14-22bba03c379c",
+   "bytes_billed": 4139778048,
+   "slot_ms": 152709
+  },
+  {
+   "step": "recording_unicode_exact: AUC by info class",
+   "job_id": "9e34cf5e-d487-4cf1-ad55-c454b7a7690a",
+   "bytes_billed": 4118806528,
+   "slot_ms": 157053
+  },
+  {
+   "step": "artist_token_similarity: distribution",
+   "job_id": "b15e7b23-0e3a-46c6-859a-f4114fb7eb54",
+   "bytes_billed": 4109369344,
+   "slot_ms": 199054
+  },
+  {
+   "step": "artist_token_similarity: AUC all",
+   "job_id": "d894965c-782d-4230-ba96-264ff74b4ef7",
+   "bytes_billed": 4109369344,
+   "slot_ms": 150148
+  },
+  {
+   "step": "artist_token_similarity: AUC by stage",
+   "job_id": "94514c7d-ac2d-4dfe-917c-cb0f9769867f",
+   "bytes_billed": 4160749568,
+   "slot_ms": 153092
+  },
+  {
+   "step": "artist_token_similarity: AUC by info class",
+   "job_id": "faae30d5-2765-4980-b9e8-f86b30c7ee04",
+   "bytes_billed": 4139778048,
+   "slot_ms": 226472
+  },
+  {
+   "step": "recording_token_similarity: distribution",
+   "job_id": "786eba17-ca08-46d9-950a-ab7d5abd35a1",
+   "bytes_billed": 4109369344,
+   "slot_ms": 213177
+  },
+  {
+   "step": "recording_token_similarity: AUC all",
+   "job_id": "8505d102-f0a1-44fe-af99-72bc726d5912",
+   "bytes_billed": 4109369344,
+   "slot_ms": 156160
+  },
+  {
+   "step": "recording_token_similarity: AUC by stage",
+   "job_id": "f8ec9834-51ef-4487-83e4-e44533fe4aa8",
+   "bytes_billed": 4160749568,
+   "slot_ms": 161098
+  },
+  {
+   "step": "recording_token_similarity: AUC by info class",
+   "job_id": "ca906857-5c38-4853-87f9-2e96c1b012e3",
+   "bytes_billed": 4139778048,
+   "slot_ms": 171868
+  },
+  {
+   "step": "artist_string_similarity: distribution",
+   "job_id": "0f19cf5b-8eba-40d8-bd25-2d8e5ca68d0f",
+   "bytes_billed": 4109369344,
+   "slot_ms": 207465
+  },
+  {
+   "step": "artist_string_similarity: AUC all",
+   "job_id": "d9104e9f-b823-4402-b54e-6556eb5ea75f",
+   "bytes_billed": 4109369344,
+   "slot_ms": 140916
+  },
+  {
+   "step": "artist_string_similarity: AUC by stage",
+   "job_id": "7664ffdd-7091-46bd-bd17-3a868089ba63",
+   "bytes_billed": 4160749568,
+   "slot_ms": 154411
+  },
+  {
+   "step": "artist_string_similarity: AUC by info class",
+   "job_id": "40a28173-7606-46a8-b839-0f87908c1601",
+   "bytes_billed": 4139778048,
+   "slot_ms": 156512
+  },
+  {
+   "step": "recording_string_similarity: distribution",
+   "job_id": "bdd4608b-90c7-4b27-b6fd-21a132d8f812",
+   "bytes_billed": 4109369344,
+   "slot_ms": 208935
+  },
+  {
+   "step": "recording_string_similarity: AUC all",
+   "job_id": "ee2a801f-61e7-41ab-9d82-92488d0c182a",
+   "bytes_billed": 4109369344,
+   "slot_ms": 156194
+  },
+  {
+   "step": "recording_string_similarity: AUC by stage",
+   "job_id": "78fe4654-4843-46e1-8a6a-4a34c1bc0c27",
+   "bytes_billed": 4160749568,
+   "slot_ms": 151391
+  },
+  {
+   "step": "recording_string_similarity: AUC by info class",
+   "job_id": "cb2496a9-acd2-4ab9-9b75-c1d2cf7b0d58",
+   "bytes_billed": 4139778048,
+   "slot_ms": 158338
+  },
+  {
+   "step": "release_lower_exact: distribution",
+   "job_id": "39f1b17b-911f-4a58-8ca9-645a001544d9",
+   "bytes_billed": 4087349248,
+   "slot_ms": 213639
+  },
+  {
+   "step": "release_lower_exact: AUC all",
+   "job_id": "8ea54300-5103-4984-a98a-48c04c65e4a2",
+   "bytes_billed": 4087349248,
+   "slot_ms": 148628
+  },
+  {
+   "step": "release_lower_exact: AUC by stage",
+   "job_id": "b5d7cd96-edb4-405f-8e90-c07a5a65995c",
+   "bytes_billed": 4139778048,
+   "slot_ms": 164430
+  },
+  {
+   "step": "release_lower_exact: AUC by info class",
+   "job_id": "6c484247-b58f-48a8-8f2f-ff90558b5178",
+   "bytes_billed": 4117757952,
+   "slot_ms": 151312
+  },
+  {
+   "step": "equal-weight sum: AUC",
+   "job_id": "c259b43e-71e8-4245-8b88-9601ce85541c",
+   "bytes_billed": 4188012544,
+   "slot_ms": 150218
+  },
+  {
+   "step": "equal-weight sum without artist_unicode_exact",
+   "job_id": "af641485-c706-4faf-8d46-ebd0c013e8e3",
+   "bytes_billed": 4184866816,
+   "slot_ms": 152573
+  },
+  {
+   "step": "equal-weight sum without recording_unicode_exact",
+   "job_id": "d4942e4b-58a8-4995-8e83-38186493f6c6",
+   "bytes_billed": 4184866816,
+   "slot_ms": 148054
+  },
+  {
+   "step": "equal-weight sum without artist_token_similarity",
+   "job_id": "157fac23-ba8d-4a88-a9fd-05ab5712d7e4",
+   "bytes_billed": 4163895296,
+   "slot_ms": 177013
+  },
+  {
+   "step": "equal-weight sum without recording_token_similarity",
+   "job_id": "a5a80843-153a-48e8-9a33-edffb9509e61",
+   "bytes_billed": 4163895296,
+   "slot_ms": 152267
+  },
+  {
+   "step": "equal-weight sum without artist_string_similarity",
+   "job_id": "da3155dd-ce8c-4109-ba82-e7c67f917129",
+   "bytes_billed": 4163895296,
+   "slot_ms": 158927
+  },
+  {
+   "step": "equal-weight sum without recording_string_similarity",
+   "job_id": "edd805ae-500e-40e2-81dc-fc49a98ecb93",
+   "bytes_billed": 4163895296,
+   "slot_ms": 155697
+  }
+ ]
+}

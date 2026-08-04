@@ -1222,9 +1222,16 @@ same 100 % / 0 % agreement pattern — and was not used to select the cut.
 Given the tiny listen share, the honest framing for Phase 4 is that this is a **precision-of-
 diagnosis** improvement, not a recall or revenue one.
 
-## 20. Phase 4A — label-blind scoring, tier policy, one result per listen
+## 20. Phase 4A — cardinality baseline (SUPERSEDED, kept as the before-picture)
 
-`config/match_tiers.yml` (v1.0.0) is the policy; `silver_listen_matches` is the result.
+**This section describes an artifact that is NOT the matching result.** Phase 4A was rejected
+on review with the correct diagnosis: it decided everything on candidate cardinality, with no
+similarity computed anywhere, so it could not honestly call anything a tie, a confidence or a
+match. Section 21 describes what replaced it.
+
+`config/baseline_cardinality_policy.yml` (renamed from `match_tiers.yml`) is the policy;
+`splitsheet_silver.baseline_cardinality_matches` is the result, preserved rather than
+overwritten. What changed in the reclassification is in section 21.1.
 Built by the matcher service account, which cannot read `splitsheet_eval`.
 
 ### Tiers A and B do not exist, with measured reasons
@@ -1301,3 +1308,282 @@ it is retained as real recall (319,001 listens) that must not be treated as conf
 
 Nothing here is a payout, an attribution, or a matched-revenue figure. There are no rights
 data, no rate cards and no money anywhere in this project.
+
+## 21. Phase 4B — the actual matcher: features, calibration, validation, publication
+
+Phase 4A was a cardinality baseline. This is a scorer: 3,045,208 candidate pairs get six text
+similarity features, a weighted score chosen on a calibration partition, and a decision policy
+with a threshold, a margin and a tie definition that requires computed evidence.
+
+**The ListenBrainz mapper output is a correlated reference label, not independent ground
+truth. Agreement metrics must not be presented as absolute matching accuracy.**
+
+### 21.1 What the reclassified baseline says now
+
+`splitsheet_silver.baseline_cardinality_matches`, run `match:580a58bd52e20c60`, policy
+`1.0.0+d1cf631dad36`, 38,199,641 rows. Three corrections against the rejected version:
+
+| was | is | why |
+|---|---|---|
+| FALLBACK + 1 candidate → `MATCHED`, confidence 0.60 | `UNRESOLVED` / `FALLBACK_REQUIRES_SCORING` | measured 22.96 % disagreement with the reference on dev; accepting it unscored is accepting a guess |
+| multi-candidate → `AMBIGUOUS_TIE_*` | `MULTIPLE_CANDIDATES_UNSCORED_EXACT` / `_FALLBACK` | calling an unranked set a tie asserts the candidates scored equally, which nothing had measured |
+| `tier_confidence` 0.95 / 0.60 / 0 | **column removed from the schema** | they were neither probabilities nor computed scores. The builder now aborts if a confidence column reappears in the target table |
+
+Distribution: 31,421,104 EXACT-unique MATCHED (82.255 %), 319,001 FALLBACK_REQUIRES_SCORING,
+132,852 + 217,545 unscored multiples, 6,105,239 with no usable key or no candidate.
+
+### 21.2 The holdout is consumed. What replaced it
+
+> **The original holdout partition has been inspected in prior blocking and diagnostic
+> analyses. It is an observed evaluation partition, not a pristine blind test set.**
+
+It was read in the Phase 3B fallback trade-off (section 18) and again in the Phase 4 preflight
+(section 19), where it confirmed the direction of a dev-side finding. It is reported from here
+on as a **previously observed evaluation partition** and never again as untouched.
+
+The old dev partition is divided in two under a **different salt**, so the division is
+independent of the dev/holdout assignment rather than a recut of it
+(`config/evaluation_split.yml`, `calibration_split_version` 1.0.0, frozen 2026-08-04, before
+any scoring metric existed):
+
+| partition | labelled listens | distinct reference recordings | role |
+|---|---|---|---|
+| calibration | 21,262,387 | 1,629,283 | features, weights, thresholds, margins |
+| validation | 5,372,001 | 543,254 | opened **exactly once**, after the config was frozen |
+| holdout | 6,164,815 | 543,539 | previously observed; history only |
+
+**Recordings appearing in more than one partition: 0**, measured, not assumed. Disjointness is
+by construction — the partition is a function of the recording MBID — and the unit suite proves
+determinism, order-independence and that the division never touches holdout.
+
+### 21.3 Canonical text, and why coverage is deliberately partial
+
+Scoring compares full Unicode text, never the ASCII lookup key: the key is what discarded the
+information (for `cvver`, 5 ASCII characters out of 26 Unicode alphanumerics). The listen side
+already had normalized Unicode; the canonical side did not.
+
+`splitsheet_bronze.canonical_match_texts` fills the gap using **the same Python library**, so
+the normalization rules keep one implementation and are never re-expressed in SQL. Grain:
+`snapshot_date + recording_mbid`, 368,795 rows — **not** the 31,554,198 of the snapshot. Only
+the recordings that appear as candidates for a listen needing a score are normalized, because
+normalizing the rest would be 85× the work for no consumer. `source_universe` records the
+candidate run that defined the set, so widening the candidate set forces a rebuild instead of
+silently scoring against stale coverage.
+
+### 21.4 The feature table
+
+`splitsheet_silver.silver_candidate_features`, `feat:7411e987640a1051`, 3,045,208 rows,
+grain `listen_hash + candidate_recording_mbid`, built by the matcher identity.
+
+Universe, and the cost decision inside it:
+
+| stage | listens | pairs |
+|---|---|---|
+| EXACT multi-candidate | 132,852 | 933,139 |
+| FALLBACK unique | 319,001 | 319,001 |
+| FALLBACK multi-candidate | 217,545 | 1,793,068 |
+
+EXACT-unique's 31,421,104 pairs are **absent on purpose**: that decision is structural and no
+score participates, so computing similarity there would be 10× the work for an output nothing
+reads. That is a cost decision, recorded rather than implied.
+
+Features, all computed from both sides' normalized Unicode text:
+`artist_unicode_exact`, `recording_unicode_exact`, `artist_token_similarity`,
+`recording_token_similarity` (Jaccard over whitespace tokens), `artist_string_similarity`,
+`recording_string_similarity` (1 − editDistance/max(len)), plus the context columns
+`block_method`, `candidate_count`, `blocking_key_information_class` and
+`ascii_retention_ratio`.
+
+**Deliberately absent**: the mapper label in any form, popularity (the canonical `score`
+column is never read), candidate order or row number, MBID lexical value, `artist_credit_id`,
+any derived identifier, duration and ISRC (the snapshot has neither).
+
+`blocking_key_information_class` is `POTENTIAL_LOW_INFORMATION` when the listen-side ASCII
+retention ratio is below **0.20**, the cut the Phase 4 preflight measured. It is a cost and
+routing signal only: it suppresses no candidate, is not a scoring input, and gets no separate
+threshold.
+
+### 21.5 Per-feature separation, on calibration only
+
+AUC = probability a reference candidate outranks a non-reference one, ties counted as half a
+win. 74,569 reference pairs against 570,207 others. Null rate 0 for all six scored features.
+
+| feature | AUC all | EXACT_MULTI | FALLBACK_UNIQUE | FALLBACK_MULTI | NORMAL | LOW_INFO |
+|---|---|---|---|---|---|---|
+| recording_token_similarity | **0.9588** | 0.9760 | 0.6575 | 0.8053 | 0.9360 | 0.9865 |
+| recording_string_similarity | 0.9451 | 0.9760 | 0.6619 | 0.6920 | 0.9207 | 0.9537 |
+| recording_unicode_exact | 0.9350 | 0.9760 | 0.6687 | 0.6637 | 0.9210 | 0.9692 |
+| release_lower_exact (probe) | 0.9278 | 0.9561 | 0.7778 | 0.7295 | 0.9025 | 0.9697 |
+| artist_token_similarity | 0.8196 | 0.8896 | **0.3354** | **0.3422** | 0.7156 | 0.9598 |
+| artist_string_similarity | 0.8065 | 0.8897 | **0.3307** | **0.3381** | 0.7060 | 0.9076 |
+| artist_unicode_exact | 0.7935 | 0.8896 | **0.3177** | **0.3364** | 0.7005 | 0.9160 |
+
+**Two findings I did not expect.**
+
+1. **On both fallback stages the artist features separate in the wrong direction** (0.32–0.34).
+   Higher artist similarity predicts *disagreement* with the reference there. Leave-one-out on
+   the equal-weight sum confirms it: removing any artist feature *raises* overall AUC
+   (0.9579 → 0.9698 without `artist_unicode_exact`), while removing any recording feature
+   lowers it. An equal-weight scorer would have been measurably worse than a recording-weighted
+   one, and I had no way to know that without measuring.
+2. **The release probe is the third-strongest signal**, ahead of every artist feature, at a
+   1.4 % null rate — and it is a *lower bound*, because it compares casefolded raw strings
+   rather than normalized ones. It was included in the score on that evidence, at half weight
+   for a structural reason: the canonical snapshot carries one representative release per
+   recording, so a match is strong evidence and a mismatch is weak evidence.
+
+### 21.6 Calibration: the decomposition that changed the answer
+
+1,008 cells (6 weight sets × 7 exact thresholds × 6 fallback thresholds × 4 margins), selection
+rule fixed before the table was read: **highest accepted coverage whose disagreement among
+evaluable accepted decisions is ≤ 2.0 % in every scored stage**; if none qualifies, take the
+lowest worst-stage disagreement and say so rather than relax the bound.
+
+The first pass reported 6.5 % disagreement on EXACT_MULTI at every threshold, and tightening
+the margin made it **worse** (7.27 % at margin 0.20, for 25 % less coverage). That is not how a
+margin behaves if the score carries information, which is what prompted decomposing the
+"disagreement" by cause:
+
+| class | meaning | owner |
+|---|---|---|
+| `RANKING_ERROR` | reference was in the block, the score chose another | the scorer |
+| `REF_NOT_RETRIEVED` | reference is in the snapshot, blocking never proposed it | blocking recall |
+| `REF_NOT_IN_SNAPSHOT` | reference absent from the canonical snapshot | not evaluable |
+
+On EXACT_MULTI, **4,379 of 67,104 accepted listens fell in the third class** — the mapper named
+a recording our 2026-07-17 snapshot does not contain. Excluding those (the treatment Phase 3B
+already established for `LABEL_NOT_IN_CANONICAL_SNAPSHOT`), the picture inverts:
+
+| stage | accepted | evaluable | disagreement | ranking errors |
+|---|---|---|---|---|
+| EXACT_MULTI | 67,104 | 62,725 | **0.0080 %** | 4 |
+| FALLBACK_UNIQUE | 3,447 | 3,115 | 2.3756 % | 0 (one candidate: none possible) |
+| FALLBACK_MULTI | 1,299 | 1,126 | 3.1083 % | 19 |
+
+The apparent 6.5 % was a blocking-recall and label-universe artifact; the scoring error on
+exact blocks is **4 listens in 62,725**. A first pass that had not been decomposed would have
+rejected a working ranker.
+
+The selection rule also had to be fixed before it could be trusted: a stage that accepts
+nothing scores 0/0 disagreement, so the first run's "winner" was a configuration that accepted
+zero fallback listens. Requiring ≥ 1,000 evaluable accepted listens per stage closes that
+degeneracy. **That is arithmetic, not a relaxed bound** — the 2.0 % ceiling never moved, and
+no cell met it, which is recorded in the config itself.
+
+Frozen: `config/scoring_rules.yml` **1.0.0+cb21f9704ff0**. Weights 0.1 / 1.0 / 0.1 / 1.0 /
+0.1 / 1.0 / 0.5 (artist / recording × exact, token, string, then release), exact threshold
+0.55, fallback threshold 0.85, minimum margin 0.02, tie epsilon 0.01. Segment checks at the
+chosen cell: `POTENTIAL_LOW_INFORMATION` disagreement 0.0000 % on 403 evaluable exact-multi
+acceptances against 0.0080 % for NORMAL, and NON_LATIN 0.0457 % against LATIN 0.0066 %.
+
+### 21.7 Validation, opened exactly once
+
+Run under `1.0.0+cb21f9704ff0` against the **published** table, not a recomputation. The
+loader refuses to report if the config on disk no longer matches the version that produced the
+rows.
+
+| partition | labelled listens | coverage | evaluable accepted | disagreement | ranking errors |
+|---|---|---|---|---|---|
+| **validation** (blind, once) | 5,372,001 | 96.0119 % | 4,989,788 | **0.0066 %** | 24 |
+| calibration (tuned on) | 21,262,387 | 95.1911 % | 19,574,628 | 0.0040 % | 23 |
+| holdout (previously observed) | 6,164,815 | 96.5505 % | 5,311,847 | 0.0048 % | 3 |
+
+Per method, on the validation partition:
+
+| match_method | listens | matched | evaluable | agreement | disagreement |
+|---|---|---|---|---|---|
+| STRUCTURAL_EXACT_UNIQUE | 5,135,873 | 5,135,873 | 4,969,496 | 99.9945 % | 0.0055 % |
+| SCORED_EXACT_MULTIPLE | 20,547 | 20,453 | 19,068 | 99.8899 % | 0.1101 % |
+| SCORED_FALLBACK_UNIQUE | 3,615 | 893 | 809 | 96.7862 % | **3.2138 %** |
+| SCORED_FALLBACK_MULTIPLE | 3,587 | 542 | 415 | 97.8313 % | 2.1687 % |
+
+**The generalisation gap is real and is not smoothed over.** Exact-multi degrades from 0.008 %
+on calibration to 0.1101 % on validation — a factor of 14, on 21 error listens. Fallback-unique
+goes from 2.38 % to 3.2138 %, above the 2 % bound the calibration rule had already failed to
+meet; the previously observed holdout puts the same stage at 4.9513 %. So the honest statement
+is: **accepting a fallback candidate on text similarity alone carries a 2–5 % disagreement
+rate with the reference label, and no threshold in the grid removed that.**
+
+Per the freeze discipline, **nothing was retuned after seeing this**. Changing a weight or a
+threshold now requires a new `scoring_version` and a new validation strategy or new data; the
+consumed partition cannot be reused to justify a changed rule.
+
+### 21.8 The published result
+
+`splitsheet_silver.silver_listen_matches`, run `match:101eef5c5b5c081e`, scoring
+`1.0.0+cb21f9704ff0`, 38,199,641 rows, 18 columns (the 17 required plus `listened_at`, which
+the table is partitioned on). `tier_confidence` is gone.
+
+| | listens | share |
+|---|---|---|
+| **MATCHED** | **31,598,529** | **82.7194 %** |
+| — STRUCTURAL_EXACT_UNIQUE (no score computed) | 31,421,104 | 82.2550 % |
+| — SCORED_EXACT_MULTIPLE | 130,886 | 0.3426 % |
+| — SCORED_FALLBACK_UNIQUE | 35,007 | 0.0917 % |
+| — SCORED_FALLBACK_MULTIPLE | 11,532 | 0.0302 % |
+| UNRESOLVED / NO_BLOCK_CANDIDATES | 4,493,892 | 11.7642 % |
+| UNRESOLVED / NO_LOOKUP_KEY_PARTIAL | 1,164,629 | 3.0488 % |
+| UNRESOLVED / BELOW_THRESHOLD | 490,883 | 1.2851 % |
+| UNRESOLVED / NO_LOOKUP_KEY_EMPTY | 433,180 | 1.1340 % |
+| UNRESOLVED / NO_ALPHANUMERIC_CONTENT | 17,438 | 0.0456 % |
+| UNRESOLVED / AMBIGUOUS_TIE | 1,090 | 0.0029 % |
+
+Scoring converted **177,425 listens** that the baseline left unresolved into decisions, and
+refused 490,883 more on measured evidence rather than on cardinality. Coverage 82.255 % →
+82.7194 %.
+
+Ten invariants, asserted in staging before publication and again as integration tests against
+the published table: one row per listen; MATCHED has an MBID; UNRESOLVED has none; UNRESOLVED
+has exactly one failure reason; MATCHED has none; `AMBIGUOUS_TIE` has ≥ 2 candidates; a tie
+never carries an MBID; an accepted fallback-unique always scores above the fallback threshold;
+no acceptance with several candidates has a margin below the minimum; no `UNKNOWN` bucket.
+Two more that matter as much: structural acceptance carries **no** score or margin, and
+fallback-unique carries **no** margin at all — which is what makes "a lone candidate can never
+be a tie" visible in the data rather than only in prose.
+
+`ANY_VALUE` is gone. The sole-candidate CTE keeps only groups of exactly one row, so `MIN` over
+that grain returns that row: uniqueness holds **by construction** and is also validated,
+instead of being an arbitrary pick that a later assertion happened to bless.
+
+Two implementations of the same rules are unavoidable here — Python for tests, SQL for 3M rows
+— so they are generated from one definition **and compared on real data**: integration tests
+recompute published features and published scores in Python from the same inputs and assert
+agreement, and replay the decision policy over published top-1/top-2 to confirm every published
+outcome is what `decide()` returns.
+
+### 21.9 What is still unmatched, by cause
+
+| failure_reason | listens | % of all | top-20 concentration |
+|---|---|---|---|
+| NO_BLOCK_CANDIDATES | 4,493,892 | 11.7642 % | 6.10 % |
+| NO_LOOKUP_KEY_PARTIAL | 1,164,629 | 3.0488 % | 35.34 % |
+| BELOW_THRESHOLD | 490,883 | 1.2851 % | 17.91 % |
+| NO_LOOKUP_KEY_EMPTY | 433,180 | 1.1340 % | 2.69 % |
+| NO_ALPHANUMERIC_CONTENT | 17,438 | 0.0456 % | 24.96 % |
+| AMBIGUOUS_TIE | 1,090 | 0.0029 % | 36.79 % |
+
+The shape of the remaining work is legible in those numbers, and the concentration is where
+the next unit of work is.
+
+**`NO_LOOKUP_KEY_PARTIAL` is the most concentrated failure in the pipeline: 35.34 % of it comes
+from 20 combinations, and a single one — `Agust D` / `해금` — is 384,926 listens, 33.05 % of the
+whole reason and 1.01 % of the entire corpus.** The pattern is a Latin artist with a non-Latin
+title: the artist half of the key survives, the title half does not, and the combined key is
+never emitted because emitting half a key would collide every unromanisable title by that
+artist into one bucket. That rule is correct and is not being relaxed here — but it means one
+transliteration path for Korean and Japanese titles would recover more listens than any scoring
+change now available.
+
+`BELOW_THRESHOLD` is next: 20 combinations account for 17.91 % of it, led by titles carrying
+version markers the fallback rules do not strip (`NORMAL (Explicit Ver.)` 18,186 listens,
+`NORMAL (Clean Ver.)` 4,212) and collaboration credits the artist comparison splits
+(`Closer (with Paul Blanco, Mahalia)`, `NEURON (with Gaeko & YOON MIRAE)`). Those are
+normalization gaps presenting as scoring failures.
+
+`NO_LOOKUP_KEY_EMPTY` and `NO_BLOCK_CANDIDATES` are dominated by non-Latin content
+(Japanese, Korean, Cyrillic), which is the same finding as section 19 seen from the other end.
+`NO_ALPHANUMERIC_CONTENT` is genuinely untitled content: `??????`, `( ╥﹏╥ )`, `&`, `.`, `💰`,
+Morse code. No amount of matching fixes a track whose title is an emoji.
+
+The output carries only submitted artist and recording strings plus counts. **No `user_id`, no
+`recording_msid`, no `listen_hash`** — asserted in the script, not assumed.

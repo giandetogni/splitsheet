@@ -1,0 +1,142 @@
+{
+ "feature_version": "1.0.0",
+ "feature_run_id": "feat:7411e987640a1051",
+ "candidate_run_id": "blk:c005e9a56b1ec542",
+ "validation": {
+  "pair_count_matches_candidate_table": true,
+  "listen_count_matches_universe": true,
+  "one_row_per_listen_candidate": true,
+  "no_null_scored_features": true,
+  "all_features_in_unit_range": true,
+  "no_exact_unique_leaked_in": true
+ },
+ "counts": {
+  "pairs": 3045208,
+  "listens": 669398,
+  "distinct_grain": 3045208,
+  "null_features": 0,
+  "out_of_range": 0,
+  "exact_unique_leaked": 0,
+  "release_null": 209472
+ },
+ "profile_by_stage": [
+  {
+   "block_method": "EXACT",
+   "multi": true,
+   "blocking_key_information_class": "NORMAL",
+   "pairs": 619137,
+   "listens": 132136,
+   "avg_artist_token": 0.6197,
+   "avg_recording_token": 0.4996,
+   "avg_artist_string": 0.6746,
+   "avg_recording_string": 0.6049,
+   "rate_artist_exact": 0.5103,
+   "rate_recording_exact": 0.276
+  },
+  {
+   "block_method": "EXACT",
+   "multi": true,
+   "blocking_key_information_class": "POTENTIAL_LOW_INFORMATION",
+   "pairs": 314002,
+   "listens": 716,
+   "avg_artist_token": 0.1812,
+   "avg_recording_token": 0.0758,
+   "avg_artist_string": 0.2605,
+   "avg_recording_string": 0.2564,
+   "rate_artist_exact": 0.0033,
+   "rate_recording_exact": 0.0019
+  },
+  {
+   "block_method": "FALLBACK",
+   "multi": false,
+   "blocking_key_information_class": "NORMAL",
+   "pairs": 317189,
+   "listens": 317189,
+   "avg_artist_token": 0.705,
+   "avg_recording_token": 0.5408,
+   "avg_artist_string": 0.694,
+   "avg_recording_string": 0.5274,
+   "rate_artist_exact": 0.5377,
+   "rate_recording_exact": 0.1867
+  },
+  {
+   "block_method": "FALLBACK",
+   "multi": false,
+   "blocking_key_information_class": "POTENTIAL_LOW_INFORMATION",
+   "pairs": 1812,
+   "listens": 1812,
+   "avg_artist_token": 0.4237,
+   "avg_recording_token": 0.2369,
+   "avg_artist_string": 0.4052,
+   "avg_recording_string": 0.1999,
+   "rate_artist_exact": 0.3217,
+   "rate_recording_exact": 0.0491
+  },
+  {
+   "block_method": "FALLBACK",
+   "multi": true,
+   "blocking_key_information_class": "NORMAL",
+   "pairs": 1777111,
+   "listens": 215672,
+   "avg_artist_token": 0.8464,
+   "avg_recording_token": 0.387,
+   "avg_artist_string": 0.8545,
+   "avg_recording_string": 0.523,
+   "rate_artist_exact": 0.7527,
+   "rate_recording_exact": 0.0209
+  },
+  {
+   "block_method": "FALLBACK",
+   "multi": true,
+   "blocking_key_information_class": "POTENTIAL_LOW_INFORMATION",
+   "pairs": 15957,
+   "listens": 1873,
+   "avg_artist_token": 0.8378,
+   "avg_recording_token": 0.2443,
+   "avg_artist_string": 0.8287,
+   "avg_recording_string": 0.3356,
+   "rate_artist_exact": 0.7746,
+   "rate_recording_exact": 0.0135
+  }
+ ],
+ "total_bytes_billed": 12382633984,
+ "total_slot_ms": 1149858,
+ "wall_seconds": 25.3,
+ "jobs": [
+  {
+   "step": "stage_features",
+   "job_id": "8b3c1404-4b00-4ea1-9ab5-55ca26b9d504",
+   "bytes_billed": 10751049728,
+   "slot_ms": 1001799,
+   "duration_ms": 7888
+  },
+  {
+   "step": "validate_features",
+   "job_id": "73181df5-edf6-4d4a-bfa8-63b0f0368394",
+   "bytes_billed": 469762048,
+   "slot_ms": 30475,
+   "duration_ms": 3762
+  },
+  {
+   "step": "publish_atomic",
+   "job_id": "8d13585c-0dd8-41d1-89ae-7854b500e522",
+   "bytes_billed": 773849088,
+   "slot_ms": 111439,
+   "duration_ms": 7443
+  },
+  {
+   "step": "drop_staging",
+   "job_id": "5e385db4-8930-41d0-beeb-24b204c1a930",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 156
+  },
+  {
+   "step": "profile",
+   "job_id": "e5a151fe-1799-4695-89de-e7fcc1eaf888",
+   "bytes_billed": 387973120,
+   "slot_ms": 6145,
+   "duration_ms": 691
+  }
+ ]
+}
