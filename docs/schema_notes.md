@@ -1221,3 +1221,83 @@ same 100 % / 0 % agreement pattern — and was not used to select the cut.
 
 Given the tiny listen share, the honest framing for Phase 4 is that this is a **precision-of-
 diagnosis** improvement, not a recall or revenue one.
+
+## 20. Phase 4A — label-blind scoring, tier policy, one result per listen
+
+`config/match_tiers.yml` (v1.0.0) is the policy; `silver_listen_matches` is the result.
+Built by the matcher service account, which cannot read `splitsheet_eval`.
+
+### Tiers A and B do not exist, with measured reasons
+
+`PROJECT_SPEC.md` defines Tier A as a client-supplied `recording_mbid` and Tier B as an
+exact ISRC. Both are **not implemented**, and the numbering is kept so the absence stays
+visible rather than being renamed away:
+
+- **A**: the corpus has no client-supplied MBID distinct from the ListenBrainz mapper
+  output, and that output is the reference label. Building Tier A would mean feeding the
+  label into matching.
+- **B**: the canonical snapshot has **no ISRC column**. ISRC is on 17.4 % of listens and
+  0 % of canonical rows, so the tier has no right-hand side.
+
+### Confidence is a convention, and it was set structurally
+
+| tier | rule | confidence | basis |
+|---|---|---|---|
+| C | EXACT stage, exactly one candidate | **0.95** | conservative key preserves version information; the value `PROJECT_SPEC.md` assigns |
+| D | FALLBACK stage, exactly one candidate | **0.60** | the aggressive key *discarded* the information that would distinguish survivors, so one survivor is weak evidence |
+| E | anything else | 0.0 | unresolved |
+
+The 0.60 was chosen from that structural argument, not from the label. Dev-set measurement
+is recorded as corroboration only, and the holdout took no part in setting it.
+
+### Result distribution — exactly one row per listen
+
+| tier | status | reason | listens | % |
+|---|---|---|---|---|
+| C | MATCHED | — | 31,421,104 | 82.2550 |
+| E | UNRESOLVED | `NO_BLOCK_CANDIDATES` | 4,493,892 | 11.7642 |
+| E | UNRESOLVED | `NO_LOOKUP_KEY_PARTIAL` | 1,164,629 | 3.0488 |
+| E | UNRESOLVED | `NO_LOOKUP_KEY_EMPTY` | 433,180 | 1.1340 |
+| D | MATCHED | — | 319,001 | 0.8351 |
+| E | UNRESOLVED | `AMBIGUOUS_TIE_FALLBACK` | 217,545 | 0.5695 |
+| E | UNRESOLVED | `AMBIGUOUS_TIE_EXACT` | 132,852 | 0.3478 |
+| E | UNRESOLVED | `NO_ALPHANUMERIC_CONTENT` | 17,438 | 0.0456 |
+| | | **total** | **38,199,641** | **100** |
+
+The rows sum to exactly 38,199,641. `MISSING_ARTIST` and `MISSING_RECORDING` are defined
+but empty, consistent with the measured 0 % null rate. **No `UNKNOWN` bucket exists.**
+
+Black box rate: **6,459,536 listens = 16.9099 %**, every one carrying exactly one reason.
+
+Six invariants validated before publication, all true: one row per listen; MATCHED always
+carries an MBID; UNRESOLVED always carries a reason; MATCHED never carries a reason;
+**no tie was ever resolved**; no `UNKNOWN`.
+
+### Ties are never broken
+
+350,397 listens are ambiguous (132,852 exact + 217,545 fallback) and every one has
+`matched_recording_mbid = NULL`. Blocking returns candidates without ranking, so any pick
+among them would be arbitrary by construction — there is no epsilon here because there is no
+score to compare. `PROJECT_SPEC.md` is explicit that paying the wrong rights holder is worse
+than suspending payment.
+
+### Agreement with the mapper reference label, by tier
+
+Correlated reference label, not ground truth. These are agreement rates, not accuracy.
+
+| bucket | tier | evaluable | agrees | disagrees | agreement |
+|---|---|---|---|---|---|
+| dev | C | 24,477,158 | 24,476,224 | 934 | **99.9962 %** |
+| dev | D | 11,601 | 8,937 | 2,664 | **77.0365 %** |
+| dev | E | 1,238,526 | — | — | not matched, by design |
+| holdout | C | 5,269,143 | 5,268,959 | 184 | **99.9965 %** |
+| holdout | D | 3,268 | 2,494 | 774 | **76.3158 %** |
+| holdout | E | 232,442 | — | — | not matched, by design |
+
+The structural confidence ordering is corroborated: C and D differ by **23 percentage
+points** of agreement, and dev and holdout agree to within 0.7 pp on D and 0.0003 pp on C.
+Tier D at 0.60 sits below any plausible payout threshold, which is the intended consequence —
+it is retained as real recall (319,001 listens) that must not be treated as confident.
+
+Nothing here is a payout, an attribution, or a matched-revenue figure. There are no rights
+data, no rate cards and no money anywhere in this project.

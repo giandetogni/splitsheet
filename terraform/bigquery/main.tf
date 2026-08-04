@@ -521,3 +521,41 @@ resource "google_bigquery_table" "silver_match_candidates" {
     { name = "created_at", type = "TIMESTAMP", mode = "REQUIRED" },
   ])
 }
+
+# Exactly one row per listen. This is the table PROJECT_SPEC.md requires: every listen
+# appears once, matched rows carry a recording MBID, unmatched rows carry exactly one
+# failure reason, and an ambiguous tie is never resolved into a winner.
+#
+# Label-blind: produced by the matcher identity, which cannot read splitsheet_eval.
+resource "google_bigquery_table" "silver_listen_matches" {
+  dataset_id          = google_bigquery_dataset.silver.dataset_id
+  table_id            = "silver_listen_matches"
+  project             = var.project_id
+  deletion_protection = true
+
+  description = "Exactly one row per listen for 2026-06: 38,199,641 rows. Tier assignment and failure reason. No score is a probability; confidence is a documented convention. Nothing here is a payout decision."
+
+  time_partitioning {
+    type  = "DAY"
+    field = "listened_at"
+  }
+  require_partition_filter = true
+
+  schema = jsonencode([
+    { name = "listen_hash", type = "STRING", mode = "REQUIRED" },
+    { name = "listened_at", type = "TIMESTAMP", mode = "REQUIRED" },
+    { name = "match_status", type = "STRING", mode = "REQUIRED", description = "MATCHED or UNRESOLVED. UNRESOLVED covers every listen without a single accepted candidate, including ambiguous ties." },
+    { name = "match_tier", type = "STRING", mode = "REQUIRED", description = "C, D or E. A and B are not implemented; see config/match_tiers.yml for the measured reason." },
+    { name = "matched_recording_mbid", type = "STRING", mode = "NULLABLE", description = "Populated only when match_status = MATCHED. NULL for every ambiguous tie, by policy." },
+    { name = "tier_confidence", type = "NUMERIC", mode = "REQUIRED", description = "A convention, NOT a probability. 0.95 for tier C, 0.60 for tier D, 0 for tier E." },
+    { name = "block_method", type = "STRING", mode = "NULLABLE", description = "EXACT or FALLBACK; NULL when no candidate was ever produced." },
+    { name = "candidate_count", type = "INT64", mode = "REQUIRED", description = "How many candidates blocking produced. >1 always means UNRESOLVED." },
+    { name = "failure_reason", type = "STRING", mode = "NULLABLE", description = "Exactly one reason when UNRESOLVED, NULL when MATCHED. No UNKNOWN bucket exists." },
+    { name = "normalization_version", type = "STRING", mode = "REQUIRED" },
+    { name = "blocking_version", type = "STRING", mode = "REQUIRED" },
+    { name = "tier_policy_version", type = "STRING", mode = "REQUIRED" },
+    { name = "candidate_run_id", type = "STRING", mode = "REQUIRED" },
+    { name = "match_run_id", type = "STRING", mode = "REQUIRED", description = "Deterministic from inputs and config." },
+    { name = "created_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}

@@ -1,0 +1,110 @@
+{
+ "match_run_id": "match:e976118deb08e798",
+ "tier_policy_version": "1.0.0+ea950e71bc88",
+ "validation": {
+  "one_row_per_listen": true,
+  "matched_always_has_mbid": true,
+  "unresolved_always_has_reason": true,
+  "matched_never_has_reason": true,
+  "no_tie_was_resolved": true,
+  "no_unknown_bucket": true
+ },
+ "distribution": [
+  {
+   "match_tier": "C",
+   "match_status": "MATCHED",
+   "failure_reason": null,
+   "listens": 31421104,
+   "pct": 82.255
+  },
+  {
+   "match_tier": "E",
+   "match_status": "UNRESOLVED",
+   "failure_reason": "NO_BLOCK_CANDIDATES",
+   "listens": 4493892,
+   "pct": 11.7642
+  },
+  {
+   "match_tier": "E",
+   "match_status": "UNRESOLVED",
+   "failure_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "listens": 1164629,
+   "pct": 3.0488
+  },
+  {
+   "match_tier": "E",
+   "match_status": "UNRESOLVED",
+   "failure_reason": "NO_LOOKUP_KEY_EMPTY",
+   "listens": 433180,
+   "pct": 1.134
+  },
+  {
+   "match_tier": "D",
+   "match_status": "MATCHED",
+   "failure_reason": null,
+   "listens": 319001,
+   "pct": 0.8351
+  },
+  {
+   "match_tier": "E",
+   "match_status": "UNRESOLVED",
+   "failure_reason": "AMBIGUOUS_TIE_FALLBACK",
+   "listens": 217545,
+   "pct": 0.5695
+  },
+  {
+   "match_tier": "E",
+   "match_status": "UNRESOLVED",
+   "failure_reason": "AMBIGUOUS_TIE_EXACT",
+   "listens": 132852,
+   "pct": 0.3478
+  },
+  {
+   "match_tier": "E",
+   "match_status": "UNRESOLVED",
+   "failure_reason": "NO_ALPHANUMERIC_CONTENT",
+   "listens": 17438,
+   "pct": 0.0456
+  }
+ ],
+ "total_bytes_billed": 22719496192,
+ "total_slot_ms": 1857828,
+ "wall_seconds": 39.5,
+ "jobs": [
+  {
+   "step": "stage_matches",
+   "job_id": "5353e039-929c-440f-83f5-5244c70ee393",
+   "bytes_billed": 7343177728,
+   "slot_ms": 959723,
+   "duration_ms": 12581
+  },
+  {
+   "step": "validate_matches",
+   "job_id": "f2b65d5c-10f4-481c-a231-472e09b9c19c",
+   "bytes_billed": 4535091200,
+   "slot_ms": 222041,
+   "duration_ms": 5501
+  },
+  {
+   "step": "publish_atomic",
+   "job_id": "05209ed1-1e0f-466f-8c20-aff0743b1c1d",
+   "bytes_billed": 9918480384,
+   "slot_ms": 669457,
+   "duration_ms": 12749
+  },
+  {
+   "step": "drop_staging",
+   "job_id": "e953ff1f-0946-42bd-9208-a0bc9a5eaba9",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 150
+  },
+  {
+   "step": "tier_distribution",
+   "job_id": "3dee0193-4076-48cb-8d93-5c54bd24f299",
+   "bytes_billed": 922746880,
+   "slot_ms": 6607,
+   "duration_ms": 367
+  }
+ ]
+}

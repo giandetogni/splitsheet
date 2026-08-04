@@ -1,0 +1,140 @@
+# Tier policy and failure taxonomy for SplitSheet.
+#
+# LABEL-BLIND. Nothing in this file is derived from the mapper reference label, and the
+# process that applies it cannot read splitsheet_eval. Confidence values come from
+# structural reasoning about how much information each tier had available; the dev-set
+# measurements quoted below are corroboration recorded after the fact, never the source of
+# a number, and the holdout played no part at all.
+#
+# CONFIDENCE IS A CONVENTION, NOT A PROBABILITY. A tier confidence of 0.95 does not mean
+# "95% of these are correct". It is an ordering device that says one tier had more
+# information than another, and it exists so that a later policy change is explicit and
+# versioned rather than buried in code.
+#
+# WHY TIERS A AND B DO NOT EXIST HERE
+#
+# PROJECT_SPEC.md defines Tier A as a client-supplied recording_mbid and Tier B as an exact
+# ISRC. Both were measured absent from this corpus and are therefore not implemented:
+#
+#   * the Parquet export carries only ListenBrainz-DERIVED identifiers (recording_mbid at
+#     85.7%, clustered with release_mbid, artist_credit_id and artist_credit_mbids). Those
+#     are the reference label, excluded from matcher input by policy. There is no separate
+#     client-supplied MBID column to build Tier A from.
+#   * the MusicBrainz canonical dump has no ISRC column at all, so Tier B has no
+#     right-hand side to join to. ISRC covers 17.4% of the JSONL listens and 0% of the
+#     canonical snapshot.
+#
+# Numbering is kept aligned with the spec so the absence is visible rather than renamed
+# away.
+
+version: "1.0.0"
+
+tiers:
+  # --- Tier A: not implemented -----------------------------------------------------------
+  - id: A
+    name: CLIENT_SUPPLIED_MBID
+    implemented: false
+    reason_not_implemented: >-
+      The corpus exposes no client-supplied recording_mbid distinct from the ListenBrainz
+      mapper output, and the mapper output is the reference label. Implementing this tier
+      would mean feeding the label into matching.
+
+  # --- Tier B: not implemented -----------------------------------------------------------
+  - id: B
+    name: EXACT_ISRC
+    implemented: false
+    reason_not_implemented: >-
+      The canonical snapshot has no ISRC column, so there is nothing to join against.
+      Measured: ISRC present on 17.4% of listens, 0% of canonical rows.
+
+  # --- Tier C: the workhorse -------------------------------------------------------------
+  - id: C
+    name: EXACT_KEY_UNIQUE
+    implemented: true
+    block_method: EXACT
+    requires_candidate_count: 1
+    confidence: 0.95
+    rationale: >-
+      One canonical recording matched on the conservative key, which preserves version
+      information. This is the tier PROJECT_SPEC.md assigns 0.95 and the value is kept.
+      Corroboration measured on dev only: unique-candidate agreement with the mapper
+      reference label 99.9853%.
+
+  # --- Tier D: deliberately low confidence -----------------------------------------------
+  - id: D
+    name: FALLBACK_KEY_UNIQUE
+    implemented: true
+    block_method: FALLBACK
+    requires_candidate_count: 1
+    confidence: 0.60
+    rationale: >-
+      One canonical recording matched, but only after the aggressive key discarded version
+      markers, bracketed segments, featuring clauses and reissue years. The information
+      that would distinguish the survivors is precisely what was removed, so a single
+      survivor is weak evidence rather than strong. Structural reasoning sets this tier
+      below C; corroboration measured on dev only puts false-unique disagreement with the
+      mapper reference label at 22.96%, about 1,500x the corpus rate, which is consistent
+      with the low value chosen.
+    policy_note: >-
+      0.60 is below any plausible payout threshold. This tier is retained because it is
+      real recall (1.31% incremental on dev) but it must not be treated as confident, and
+      no downstream stage may accept it without an explicit, separately justified decision.
+
+  # --- Tier E: everything unresolved -----------------------------------------------------
+  - id: E
+    name: BLACK_BOX
+    implemented: true
+    confidence: 0.0
+    rationale: >-
+      No acceptable single candidate. Every listen here carries exactly one failure reason.
+
+# A tie is never broken. PROJECT_SPEC.md is explicit that paying the wrong rights holder is
+# worse than suspending payment, so more than one candidate means unresolved, full stop.
+# There is no epsilon here because there is no score to compare: blocking returns candidates
+# without ranking, so any choice among them would be arbitrary by construction.
+ambiguity:
+  break_ties: false
+  select_among_multiple: never
+
+# Exactly one reason per unmatched listen, assigned by the first matching rule in order.
+# Order matters: a listen with no usable key must not be reported as having no candidates,
+# because those are different operational problems with different fixes.
+failure_reasons:
+  - id: MISSING_ARTIST
+    when: normalization_status = MISSING_ARTIST
+    operational_meaning: source data absent; nothing to match
+  - id: MISSING_RECORDING
+    when: normalization_status = MISSING_RECORDING
+    operational_meaning: source data absent; nothing to match
+  - id: NO_ALPHANUMERIC_CONTENT
+    when: normalization_status = NO_ALPHANUMERIC_CONTENT
+    operational_meaning: title carries no letters or digits in any script
+  - id: NO_LOOKUP_KEY_PARTIAL
+    when: exact_key_status = PARTIAL
+    operational_meaning: >-
+      One half of the pair produced a key and the other did not, typically a Latin artist
+      with a non-Latin title. Fixing this needs transliteration, not a threshold change.
+      Measured 2.19% of listens.
+  - id: NO_LOOKUP_KEY_EMPTY
+    when: exact_key_status = EMPTY
+    operational_meaning: >-
+      Neither half produced an ASCII key. Same cause, same fix. Measured 1.12%.
+  - id: AMBIGUOUS_TIE_EXACT
+    when: block_method = EXACT and candidate_count > 1
+    operational_meaning: >-
+      Several canonical recordings share the conservative key. Genuine homonyms or
+      destructive normalization; needs evidence blocking cannot supply.
+  - id: AMBIGUOUS_TIE_FALLBACK
+    when: block_method = FALLBACK and candidate_count > 1
+    operational_meaning: >-
+      Several recordings collapsed under the aggressive key. Often episodic content or
+      version proliferation.
+  - id: NO_BLOCK_CANDIDATES
+    when: a usable key existed but matched no canonical recording
+    operational_meaning: >-
+      The recording is plausibly absent from the canonical snapshot, or the strings differ
+      beyond what conservative normalization bridges.
+
+# UNKNOWN is deliberately absent. PROJECT_SPEC.md forbids it as a generic bucket, and every
+# listen in this corpus is covered by a reason above; a listen that fell through would be a
+# bug to investigate, not a category to file it under.
