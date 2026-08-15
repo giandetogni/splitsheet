@@ -1,0 +1,152 @@
+# MODELED RIGHTS DATA — generation contract. Frozen by digest, reproducible from the seed.
+#
+# ==========================================================================================
+# EVERYTHING THIS FILE DESCRIBES IS MODELED. IT IS NOT INDUSTRY DATA.
+#
+#   ListenBrainz listens      REAL      (2026-06 slice, preserved and checksummed)
+#   MusicBrainz recordings    REAL      (canonical snapshot 2026-07-17)
+#   rights holders            MODELED   (generated from the seed below; no real entity)
+#   ownership splits          MODELED   (generated; no real agreement, contract or share)
+#   rate cards                MODELED   (illustrative rate; not a DSP rate, not an industry
+#                                        average, not observed)
+#   any royalty amount        ILLUSTRATIVE MODELED AMOUNT, not an observed industry payout
+#
+# No real company, label, publisher, writer or performer appears anywhere in the generated
+# data. Holder display names are of the form "Modeled Rights Holder NNNNNN" precisely so that
+# no generated string can coincide with a real organisation, and every generated table carries
+# an `is_modeled` column that is always TRUE, so the declaration travels with the rows rather
+# than living only in documentation.
+# ==========================================================================================
+#
+# DETERMINISM: every value is derived from sha256(seed | kind | key). No wall-clock time, no
+# RNG state, no read order. Re-running the generator with the same seed over the same recording
+# universe produces byte-identical output and identical deterministic ids.
+#
+# DEFECTS ARE DELIBERATE, AND THE SOURCE DOES NOT LABEL THEM. There is no `defect_class` column
+# anywhere in the generated tables. If the source announced its own defects, "detecting" them
+# downstream would be a lookup, not a check. The intended counts are recorded in the generation
+# report (docs/phase0/rights_generation.json) and the quality models have to find them
+# independently; the report is then compared against what they found. Nothing is ever silently
+# corrected.
+
+seed: "splitsheet-rights-v1"
+rights_version: "1.0.0"
+rule_version_id: "rc-1.0.0"
+
+# The universe is the frozen Phase 4B result, so regeneration is tied to a specific match run.
+# If that run id changes, the rights data was generated against a different catalogue and the
+# generator says so instead of quietly producing different rows.
+universe:
+  source: "splitsheet_silver.silver_listen_matches"
+  match_run_id: "match:101eef5c5b5c081e"
+  scope: "every distinctly matched recording, payout-eligible or risk-held"
+  expected_recordings: 2471846
+
+identifiers:
+  holder_id_prefix: "MRH-"
+  holder_id_digits: 6
+  split_version_id_prefix: "sv:"
+  digest_chars: 12
+
+# --- rights holders ----------------------------------------------------------------------
+#
+# 60,000 holders for 2,471,846 recordings is about 41 recordings per holder, concentrated by
+# the assignment power below. The first sizing pass assumed 3 recordings per holder and
+# estimated 1.6M holders, i.e. a world where nearly every recording has its own publisher.
+# That was rejected on inspection and the estimate was redone against this figure.
+holders:
+  count: 60000
+  # Assignment: rank = floor(assignable * u ** assignment_power), u uniform in [0,1) from the
+  # hash. A power above 1 concentrates draws on low ranks; at 3.0, half of all assignments land
+  # in the first 12.5% of holders, which is the shape catalogue ownership actually has. Stated
+  # as a formula because "skew" without one is not reproducible.
+  assignment_power: 3.0
+  types: ["PUBLISHER", "LABEL", "INDIE_ARTIST", "ADMINISTRATOR"]
+  type_weights: [0.34, 0.26, 0.30, 0.10]
+  # Tracked by the dbt snapshot for SCD Type 2. `payee_status` is what the controlled revision
+  # changes between the two snapshot runs.
+  payee_statuses: ["ACTIVE", "PENDING_VERIFICATION"]
+  payee_status_weights: [0.93, 0.07]
+  # DEFECT: the LAST N holder ids are reserved and never assigned to any recording, so exactly
+  # N holders provably have no ownership row. Reserving a known block matters because a skewed
+  # assignment leaves an unknown number of unlucky holders unassigned anyway; the reserved
+  # block is the deterministic part, and the naturally-unassigned total is reported separately
+  # rather than confused with it.
+  reserved_without_split: 1000
+
+# --- ownership splits --------------------------------------------------------------------
+ownership:
+  holders_per_recording: [1, 2, 3, 4]
+  holders_per_recording_weights: [0.42, 0.34, 0.18, 0.06]
+  # NUMERIC with 4 decimal places. Healthy sets sum to exactly 100.0000 -- exactly, not
+  # approximately, which is achievable because these are decimals and not floats.
+  share_decimal_places: 4
+  minimum_share_pct: "1.0000"
+  base_valid_from: "2025-01-01"
+  # Half-open upper bound sentinel. An explicit far date rather than NULL: `listen_date <
+  # valid_to` then needs no COALESCE, and a NULL upper bound in a half-open interval is the
+  # kind of thing that silently becomes "always true".
+  open_ended_valid_to: "9999-12-31"
+  # Ownership change INSIDE the project's real period, so the temporal test exercises 2026-06
+  # instead of a synthetic date. The holder set after the change is disjoint from the one
+  # before it, so a wrong interval predicate produces a visibly wrong holder rather than a
+  # slightly wrong share.
+  mid_period_change:
+    change_date: "2026-06-15"
+    share_of_recordings: 0.02
+    # The boundary test needs a fixed subject. It is resolved deterministically at generation
+    # time (the eligible recording with the lowest assignment hash) and recorded in the
+    # generation report, rather than pinned here: hard-coding an MBID in a digest-frozen config
+    # would make the config depend on the catalogue.
+    pin_lowest_hash_recording: true
+
+# --- deliberate defects -------------------------------------------------------------------
+#
+# Exact counts, not rates, so the quality report can be compared against an expected number.
+# Defect recordings are chosen by hash rank and are disjoint from each other. Every temporal
+# defect is placed INSIDE 2026-06 so it is visible in the period the project actually joins.
+defects:
+  shares_do_not_sum_to_100: 500
+  temporal_overlap: 400        # [base, 2026-06-20) and [2026-06-10, open) -> 10 days overlap
+  temporal_gap: 400            # [base, 2026-06-05) and [2026-06-20, open) -> 15 days missing
+  invalid_interval: 200        # valid_to <= valid_from
+  orphan_recording_mbid: 300   # split for a recording outside the matched universe
+  missing_rights_holder: 250   # split for a holder id absent from rights_holders
+  overlap_start: "2026-06-10"
+  overlap_end: "2026-06-20"
+  gap_start: "2026-06-05"
+  gap_end: "2026-06-20"
+  invalid_from: "2026-06-15"
+  invalid_to: "2026-06-01"
+
+# Shares are NUMERIC, so exact equality with 100 is achievable and is what is required. The
+# tolerance is documented as zero to say that no drift is permitted, not to permit some.
+share_sum_tolerance: "0.0000"
+
+# --- rate card ----------------------------------------------------------------------------
+#
+# ListenBrainz carries no listener territory and none is invented here. One clearly modeled
+# scope is used instead, per the geography decision already recorded in the project.
+rate_card:
+  model_scope: "MODELED_GLOBAL_SINGLE_SCOPE"
+  currency: "USD"
+  # ILLUSTRATIVE MODELED RATES. Not a Spotify, Apple, Amazon or any other DSP rate, and not an
+  # industry average. They exist so an arithmetic pipeline can be demonstrated at all. The
+  # per-interval values below are the only rates; there is deliberately no single top-level
+  # rate to drift out of step with them.
+  #
+  # Nine decimal places, not ten: BigQuery NUMERIC is DECIMAL(38, 9), so a tenth decimal would
+  # have to be rounded on load or stored as BIGNUMERIC. A rate that changes value between the
+  # config and the warehouse is worse than a rate with one less decimal.
+  intervals:
+    - valid_from: "2025-01-01"
+      valid_to: "2026-06-10"
+      rate_per_stream: "0.003500000"
+    # DELIBERATE GAP: 2026-06-10, 06-11 and 06-12 have no rate card row at all. Streams on
+    # those days must be classified RATE_CARD_GAP -- not priced at zero, not silently dropped.
+    - valid_from: "2026-06-13"
+      valid_to: "9999-12-31"
+      rate_per_stream: "0.003700000"
+  expected_gap_days: 3
+
+rules_sha256: "47f801102e17"

@@ -1,0 +1,77 @@
+# FROZEN MANIFEST — Phase 4B, closed 2026-08-04. Nothing listed here may change in Phase 5.
+#
+# WHY A SEPARATE FILE: the individual configs already carry their own digests, but a digest
+# only proves a file is internally consistent. This manifest is the cross-file statement that
+# the PUBLISHED result was produced by exactly these versions, and tests/unit/test_frozen.py
+# fails if the live configs stop matching it. An accidental edit to a weight, a threshold or a
+# normalization rule now breaks the suite instead of silently invalidating every metric in
+# docs/schema_notes.md sections 17-21.
+#
+# WHAT IS FROZEN, in the words of the Phase 5A instruction: normalization_version,
+# scoring_version, weights, thresholds, candidate generation, fallback decisions, calibration,
+# validation.
+#
+# TO CHANGE ANYTHING HERE: it is a restatement, not an edit. That means a new version for the
+# component, a re-publication under a new run id, a new validation strategy (the current
+# validation partition is CONSUMED and cannot be reused for tuning), and a documented
+# comparison against the frozen numbers below. See docs/restatement_candidates.md.
+
+frozen_at: "2026-08-04"
+phase: "4B"
+
+pipeline:
+  normalization_version: "1.0.0+0bc0dd643e06"
+  blocking_version: "staged-1.0.0"
+  candidate_run_id: "blk:c005e9a56b1ec542"
+  canonical_snapshot_date: "2026-07-17"
+  canonical_texts_run_id: "cantext:8a38e905f9d3577d"
+  feature_version: "1.0.0"
+  feature_run_id: "feat:7411e987640a1051"
+  scoring_version: "1.0.0+cb21f9704ff0"
+  match_run_id: "match:101eef5c5b5c081e"
+
+# The Phase 4A artifact, kept as the before-picture. Not the matching result.
+baseline:
+  policy_version: "1.0.0+d1cf631dad36"
+  match_run_id: "match:580a58bd52e20c60"
+  table: "splitsheet_silver.baseline_cardinality_matches"
+
+evaluation:
+  split_version: "1.0.0"
+  calibration_split_version: "1.0.0"
+  validation_partition: "CONSUMED"
+  validation_consumed_under: "1.0.0+cb21f9704ff0"
+  holdout_status: "previously observed evaluation partition"
+  reuse_for_tuning: "FORBIDDEN"
+
+# Published counts. Any future run that changes one of these numbers is a restatement and must
+# say so, with both figures side by side.
+published_result:
+  table: "splitsheet_silver.silver_listen_matches"
+  rows: 38199641
+  matched: 31598529
+  matched_pct: 82.7194
+  structural_exact_unique: 31421104
+  scored_exact_multiple: 130886
+  scored_fallback_unique: 35007
+  scored_fallback_multiple: 11532
+  below_threshold: 490883
+  ambiguous_tie: 1090
+  no_block_candidates: 4493892
+  no_lookup_key_partial: 1164629
+  no_lookup_key_empty: 433180
+  no_alphanumeric_content: 17438
+
+# Measured on the validation partition, opened once. Not absolute matching accuracy: the
+# mapper output is a correlated reference label.
+validation_result:
+  labelled_listens: 5372001
+  coverage: 0.960119
+  evaluable_accepted: 4989788
+  disagreement: 0.000066
+  ranking_errors: 24
+  by_method:
+    STRUCTURAL_EXACT_UNIQUE: 0.000055
+    SCORED_EXACT_MULTIPLE: 0.001101
+    SCORED_FALLBACK_UNIQUE: 0.032138
+    SCORED_FALLBACK_MULTIPLE: 0.021687

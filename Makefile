@@ -240,3 +240,54 @@ phase4b-validate:
 
 phase4b-unmatched:
 	uv run python src/evaluation/top_unmatched.py --out $(OUT_DIR)/top_unmatched.json
+
+# ---------------------------------------------------------------------------
+# Phase 5A: MODELED rights, temporal validity and the dbt foundation.
+#
+# Rights holders, ownership splits and rate cards are MODELED, generated from a
+# versioned seed. ListenBrainz listens and MusicBrainz recordings are REAL. Any
+# royalty amount derived from this data is an illustrative modeled amount.
+#
+# Order: size -> generate -> snapshot -> build. The first snapshot must run
+# BEFORE the revision, or there is no earlier state for SCD2 to detect.
+# ---------------------------------------------------------------------------
+DBT_DIR ?= dbt
+DBT     := DBT_PROFILES_DIR=$(abspath $(DBT_DIR)) uv run dbt
+
+.PHONY: phase5a-size phase5a-generate phase5a-snapshot phase5a-revise phase5a-build \
+        phase5a-verify dbt-build dbt-test dbt-parse
+
+# Read-only. Measures the payout universe and estimates the rights volume BEFORE generating.
+phase5a-size:
+	uv run python src/rights/size_rights.py --out $(OUT_DIR)/rights_sizing.json
+
+phase5a-generate:
+	uv run python src/rights/build_rights.py --bucket $(GCS_BUCKET) \
+	  --work-dir $(DERIVED_DIR)/rights --out $(OUT_DIR)/rights_generation.json
+
+# Baseline state for SCD Type 2. Run this before any revision.
+phase5a-snapshot:
+	cd $(DBT_DIR) && $(DBT) snapshot
+
+# Controlled change for the SCD2 proof: re-lands ONLY rights_holders with N payee_status
+# values flipped. Run phase5a-snapshot again afterwards to capture the second version.
+phase5a-revise:
+	uv run python src/rights/build_rights.py --bucket $(GCS_BUCKET) \
+	  --work-dir $(DERIVED_DIR)/rights --revise-payee-status 250 \
+	  --out $(OUT_DIR)/rights_revision_run.json
+	cd $(DBT_DIR) && $(DBT) snapshot
+
+phase5a-build dbt-build:
+	cd $(DBT_DIR) && $(DBT) build
+
+dbt-test:
+	cd $(DBT_DIR) && $(DBT) test
+
+# Credential-free: parses every ref, source, macro and YAML contract without a warehouse
+# connection. This is the dbt check public CI runs.
+dbt-parse:
+	cd $(DBT_DIR) && $(DBT) parse
+
+# Records what was built, at what cost, and reconciles injected against detected defects.
+phase5a-verify:
+	uv run python src/rights/verify_rights.py --out $(OUT_DIR)/rights_verification.json

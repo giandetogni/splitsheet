@@ -261,3 +261,55 @@ content was the cardinality baseline, which `make phase4b-baseline` republishes 
 The evaluation stages cost about 4× the pipeline they measure (275 GB of 389 GB), because each
 metric query re-joins the label table to the candidate table. If evaluation is ever run
 repeatedly rather than once, materialise the joined evaluation set first.
+
+## Phase 5A — modeled rights and the dbt foundation
+
+```
+make phase5a-size                                    # read-only; estimate BEFORE generating
+make phase5a-generate GCS_BUCKET=splitsheet-raw-944054e7
+make phase5a-snapshot                                # SCD2 baseline -- must precede any revision
+make phase5a-build                                   # dbt build: models, tests, quality report
+make phase5a-revise  GCS_BUCKET=splitsheet-raw-944054e7   # controlled change + second snapshot
+make phase5a-build                                   # refresh dimension and quality report
+make phase5a-verify                                  # reproducibility, reconciliation, cost
+uv run pytest tests/integration/test_rights_contract.py -m integration_readonly
+```
+
+### Order that matters
+
+- **`phase5a-snapshot` before `phase5a-revise`.** The snapshot needs an earlier state to compare
+  against; running the revision first means there is no history and SCD2 is unproven.
+- **`phase5a-size` before `phase5a-generate`.** Generating millions of rows should be a costed
+  decision. The sizing step is read-only and its output is committed.
+- The generator refuses to run if the recording universe no longer matches
+  `universe.match_run_id` in `config/rights_model.yml`: rights generated against a different
+  catalogue would be a different dataset wearing the same version.
+
+### The deliberate defects must survive
+
+`ownership_splits` contains intentional share-sum, overlap, gap, invalid-interval, orphan-recording
+and missing-holder defects, and 1,000 holders with no ownership. **Never fix them.** If a staging
+model starts filtering or repairing them, the quality layer will report a clean pipeline over
+silently corrected data, and `assert_deliberate_defects_survive_into_the_source` will fail — which
+is the intended alarm.
+
+### dbt invocation note
+
+Use `../.venv/bin/dbt` rather than `uv run dbt` for long dbt commands on a loaded machine. Two
+`dbt snapshot` runs stalled in the parse phase for 10 minutes and 2.5 minutes with no BigQuery job
+issued and no log progress past "Partial parsing not enabled"; `vm_stat` showed ~235 MB free. The
+same command through the venv binary completed in 15 seconds. It is a local memory-pressure
+symptom, not a dbt or profile problem, but it looks exactly like a hung warehouse call, so: check
+`ps` and the dbt log before assuming the warehouse is at fault, and never read a timeout as a pass.
+
+### dbt profiles
+
+`dbt/profiles.yml` is committed and contains **no secrets**: `method: oauth` uses the same ADC
+identity as every other operational script, and `maximum_bytes_billed` is a hard cap so a runaway
+model fails instead of billing. Run with `DBT_PROFILES_DIR` pointing at `dbt/`.
+
+### What Phase 5A deliberately does not do
+
+No payout amount is computed. No gold layer. Streams, share and rate are joined and classified but
+never multiplied — that waits until ownership validity is fully proven, which is what this phase
+measures.

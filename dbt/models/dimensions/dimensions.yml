@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: dim_rights_holders
+    description: >-
+      MODELED rights holders as an SCD TYPE 2 dimension, built from the dbt snapshot. This is the
+      only place SCD Type 2 is claimed in the project: version_valid_from / version_valid_to come
+      from dbt detecting a real change between two runs. The ownership splits are temporal
+      ownership modeling with validity intervals, which is a different thing and is not called
+      SCD Type 2.
+    columns:
+      - name: holder_version_id
+        description: One version of one holder.
+        data_tests: [not_null, unique]
+      - name: holder_id
+        data_tests: [not_null]
+      - name: is_current
+        data_tests: [not_null]

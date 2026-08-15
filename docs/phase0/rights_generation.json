@@ -1,0 +1,95 @@
+{
+ "artifact": "modeled_rights",
+ "declaration": {
+  "listenbrainz_listens": "REAL",
+  "musicbrainz_recordings": "REAL",
+  "rights_holders": "MODELED",
+  "ownership_splits": "MODELED",
+  "rate_cards": "MODELED",
+  "royalty_amounts": "illustrative modeled amounts, not observed industry payouts",
+  "real_entities_used": "none"
+ },
+ "rights_version": "1.0.0+47f801102e17",
+ "rule_version_id": "rc-1.0.0",
+ "seed": "splitsheet-rights-v1",
+ "generation_run_id": "rights:d2b8a2dc146673e9",
+ "universe_match_run_id": "match:101eef5c5b5c081e",
+ "recordings_in_universe": 2471846,
+ "revision": null,
+ "tables_published": [
+  "rights_holders",
+  "ownership_splits",
+  "rate_card"
+ ],
+ "files": {
+  "rights_holders": {
+   "rows": 60000,
+   "bytes": 347536,
+   "sha256": "0c2cf926a2fa7da85a68937448c08f575089446c0f3f14b7fb8ff52bc6462192",
+   "object": "gs://splitsheet-raw-944054e7/derived/rights/version=1.0.0+47f801102e17/run=rights_d2b8a2dc146673e9/rights_holders.tsv.gz"
+  },
+  "ownership_splits": {
+   "rows": 4741031,
+   "bytes": 116335786,
+   "sha256": "078b3b41a720e1157a3d0e47d712e7b9136cf71b32b608c259aebfca40711937",
+   "object": "gs://splitsheet-raw-944054e7/derived/rights/version=1.0.0+47f801102e17/run=rights_d2b8a2dc146673e9/ownership_splits.tsv.gz"
+  },
+  "rate_card": {
+   "rows": 2,
+   "bytes": 144,
+   "sha256": "517b53be429b7a5236bc5a89d51016c499ce3d9be17b3fec309f6f8ac1c8c885",
+   "object": "gs://splitsheet-raw-944054e7/derived/rights/version=1.0.0+47f801102e17/run=rights_d2b8a2dc146673e9/rate_card.tsv.gz"
+  }
+ },
+ "defects_injected": {
+  "shares_do_not_sum_to_100": 500,
+  "temporal_overlap": 400,
+  "temporal_gap": 400,
+  "invalid_interval": 200,
+  "missing_rights_holder": 250,
+  "orphan_recording_mbid": 300,
+  "holder_without_split_reserved": 1000
+ },
+ "defects_are_labelled_in_the_data": false,
+ "landed": {
+  "holders": 60000,
+  "distinct_holders": 60000,
+  "pending_holders": 4156,
+  "splits": 4741031,
+  "split_recordings": 2472146,
+  "rate_rows": 2,
+  "splits_not_declared_modeled": 0
+ },
+ "bytes_billed": 3485466624,
+ "wall_seconds": 404.7,
+ "jobs": [
+  {
+   "step": "universe",
+   "job_id": "3fd5b5e7-672c-434b-8c6a-c0b6c2a49306",
+   "bytes_billed": 2787115008
+  },
+  {
+   "step": "publish_rights_holders",
+   "job_id": "691cdfcf-f3a2-42ff-87e8-5654d7cf0b1d",
+   "bytes_billed": 20971520,
+   "load_job_id": "a5543e49-2240-40e6-9d51-d0db7776db1c"
+  },
+  {
+   "step": "publish_ownership_splits",
+   "job_id": "539194bb-a438-4023-9fbb-e0adc829394a",
+   "bytes_billed": 469762048,
+   "load_job_id": "aa955278-5162-4172-be86-8f32e31e9815"
+  },
+  {
+   "step": "publish_rate_card",
+   "job_id": "29737e09-29e8-4b30-a832-bd69e5e16711",
+   "bytes_billed": 20971520,
+   "load_job_id": "c2d02f11-f20a-4db3-84d7-b907650a1fda"
+  },
+  {
+   "step": "verify",
+   "job_id": "8eeb0967-e5f9-4065-a9a1-2152ae724aba",
+   "bytes_billed": 186646528
+  }
+ ]
+}

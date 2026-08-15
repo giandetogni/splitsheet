@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: stg_rights__holders
+    description: MODELED holders, typed. No row filtered -- a staging filter is a silent correction.
+    columns:
+      - name: holder_id
+        data_tests: [not_null, unique]
+
+  - name: stg_rights__ownership_splits
+    description: >-
+      MODELED ownership splits, passed through with their deliberate defects intact. share_pct
+      stays NUMERIC; casting it to FLOAT64 to make a sum work is the bug this project demonstrates
+      awareness of.
+    columns:
+      - name: recording_mbid
+        data_tests: [not_null]
+      - name: share_pct
+        data_tests: [not_null]
+
+  - name: stg_rights__rate_card
+    description: >-
+      MODELED rate card, ILLUSTRATIVE rates. The deliberate 2026-06-10..12 gap is preserved: a
+      pipeline that interpolates a rate for an uncovered day is inventing money.
+    columns:
+      - name: rate_card_id
+        data_tests: [not_null, unique]
+
+  - name: stg_silver__listen_matches
+    description: >-
+      REAL matching output for 2026-06, narrowed. Carries the technical match forward unchanged;
+      it decides nothing about payability. The source table requires a partition filter, so the
+      contract tests that would normally sit on the source live here, after the filter.
+    columns:
+      - name: listen_hash
+        data_tests: [not_null, unique]
+      - name: match_method
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["STRUCTURAL_EXACT_UNIQUE", "SCORED_EXACT_MULTIPLE",
+                         "SCORED_FALLBACK_UNIQUE", "SCORED_FALLBACK_MULTIPLE", "NO_CANDIDATES"]
+      - name: match_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["MATCHED", "UNRESOLVED"]
+      - name: scoring_version
+        description: Must stay 1.0.0+cb21f9704ff0 while Phase 4B is frozen.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["1.0.0+cb21f9704ff0"]

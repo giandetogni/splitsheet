@@ -17,6 +17,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "dbt-bigquery>=1.8,<2.0",
     "pytest>=8,<9",
     "ruff>=0.6,<1.0",
 ]

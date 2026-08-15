@@ -1,0 +1,394 @@
+{
+ "artifact": "rights_verification",
+ "declaration": {
+  "listenbrainz_listens": "REAL",
+  "musicbrainz_recordings": "REAL",
+  "rights_holders": "MODELED",
+  "ownership_splits": "MODELED",
+  "rate_cards": "MODELED",
+  "royalty_amounts": "illustrative modeled amounts, not observed industry payouts",
+  "monetary_arithmetic_performed": false
+ },
+ "versions": {
+  "rights_version": "1.0.0+47f801102e17",
+  "rule_version_id": "rc-1.0.0",
+  "seed": "splitsheet-rights-v1",
+  "generation_run_id": "rights:d2b8a2dc146673e9",
+  "universe_match_run_id": "match:101eef5c5b5c081e",
+  "split_version_id_scheme": "sv:<sha256(seed|rights_version|recording|valid_from)[:12]>"
+ },
+ "reproducibility": {
+  "seed": "splitsheet-rights-v1",
+  "rights_version": "1.0.0+47f801102e17",
+  "generation_run_id_recorded": "rights:d2b8a2dc146673e9",
+  "row_counts_match": true,
+  "row_counts_regenerated": {
+   "ownership_splits": 4741031,
+   "rate_card": 2,
+   "rights_holders": 60000
+  },
+  "row_counts_landed": {
+   "rights_holders": 60000,
+   "ownership_splits": 4741031,
+   "rate_card": 2
+  },
+  "content_digests_regenerated": {
+   "ownership_splits": "2b39f9908b04f02e6eb020b13e901d3afbabe1451f73ab5abbedf61ab10e831a",
+   "rate_card": "9a838cc68647e18d85c3337e458895405033072f61c9c4bfcbf719db9644ce7c",
+   "rights_holders_base": "a2e7f7eb016dc30820dfdec592f05749d3110bb01d5ce4752e607480980c33ee"
+  },
+  "note": "digests are over the uncompressed payload; the gzip header carries a timestamp, so file-level digests are not a content comparison",
+  "second_pass_identical": true
+ },
+ "reconciliation_injected_vs_detected": {
+  "shares_do_not_sum_to_100": {
+   "injected": 500,
+   "detected": 500,
+   "agrees": true
+  },
+  "temporal_overlap": {
+   "injected": 400,
+   "detected": 400,
+   "agrees": true
+  },
+  "temporal_gap": {
+   "injected": 400,
+   "detected": 400,
+   "agrees": true
+  },
+  "invalid_interval": {
+   "injected": 200,
+   "detected": 200,
+   "agrees": true
+  },
+  "missing_rights_holder": {
+   "injected": 250,
+   "detected": 250,
+   "agrees": true
+  },
+  "orphan_recording_mbid": {
+   "injected": 300,
+   "detected": 300,
+   "agrees": true
+  },
+  "holder_without_split": {
+   "injected": 1000,
+   "detected": 1000,
+   "agrees": true
+  },
+  "all_agree": true
+ },
+ "temporal_proof": {
+  "change_date": "2026-06-15",
+  "probe_dates": [
+   "2026-06-14",
+   "2026-06-15"
+  ],
+  "recordings_probed": 200,
+  "holders_changed": 200,
+  "holders_unchanged": 0,
+  "half_open_semantics": "listen_date >= valid_from AND listen_date < valid_to"
+ },
+ "resolution_status": [
+  {
+   "resolution_status": "RESOLVED",
+   "recording_days": 7953823,
+   "streams": 28386887,
+   "attributable": 7953823,
+   "priced": 7953823
+  },
+  {
+   "resolution_status": "RATE_CARD_GAP",
+   "recording_days": 929346,
+   "streams": 3164839,
+   "attributable": 0,
+   "priced": 0
+  },
+  {
+   "resolution_status": "DEFECTIVE_OWNERSHIP",
+   "recording_days": 5909,
+   "streams": 11796,
+   "attributable": 0,
+   "priced": 5296
+  }
+ ],
+ "payout_eligibility": [
+  {
+   "payout_eligible": true,
+   "hold_reason": null,
+   "listens": 31563522
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "NOT_MATCHED_NO_BLOCK_CANDIDATES",
+   "listens": 4493892
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "NOT_MATCHED_NO_LOOKUP_KEY_PARTIAL",
+   "listens": 1164629
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "NOT_MATCHED_BELOW_THRESHOLD",
+   "listens": 490883
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "NOT_MATCHED_NO_LOOKUP_KEY_EMPTY",
+   "listens": 433180
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "MATCH_RISK_POLICY",
+   "listens": 35007
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "NOT_MATCHED_NO_ALPHANUMERIC_CONTENT",
+   "listens": 17438
+  },
+  {
+   "payout_eligible": false,
+   "hold_reason": "NOT_MATCHED_AMBIGUOUS_TIE",
+   "listens": 1090
+  }
+ ],
+ "scd2": {
+  "versions": 60250,
+  "holders": 60000,
+  "current_versions": 60000,
+  "closed_versions": 250,
+  "holders_with_history": 250
+ },
+ "quality_report": [
+  {
+   "rule": "eligible_recording_day_resolves_to_an_owner",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 935255,
+   "total_records": 8889078,
+   "failure_rate": 0.10521395,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "rate_card_covers_the_day",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 929959,
+   "total_records": 8889078,
+   "failure_rate": 0.10461816,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "no_temporal_gap",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 800,
+   "total_records": 2522403,
+   "failure_rate": 0.00031716,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "no_temporal_overlap",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 800,
+   "total_records": 2522403,
+   "failure_rate": 0.00031716,
+   "business_impact": "wrong_rights_holder_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "valid_set_shares_sum_to_exactly_100",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 500,
+   "total_records": 2522403,
+   "failure_rate": 0.00019822,
+   "business_impact": "ownership_allocation_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "recording_exists_in_catalogue",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 303,
+   "total_records": 2522403,
+   "failure_rate": 0.00012012,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "rights_holder_exists",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 250,
+   "total_records": 2522403,
+   "failure_rate": 9.911e-05,
+   "business_impact": "wrong_rights_holder_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "interval_is_valid",
+   "severity": "ERROR",
+   "status": "FAIL",
+   "failed_records": 200,
+   "total_records": 2522403,
+   "failure_rate": 7.929e-05,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "rate_card_does_not_double_cover_the_day",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 8889078,
+   "failure_rate": 0.0,
+   "business_impact": "ownership_allocation_at_risk",
+   "expectation": "must_be_zero"
+  },
+  {
+   "rule": "split_set_has_one_interval",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 2522403,
+   "failure_rate": 0.0,
+   "business_impact": "ownership_allocation_at_risk",
+   "expectation": "must_be_zero"
+  },
+  {
+   "rule": "exactly_one_valid_ownership_set_per_recording_day",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 8889078,
+   "failure_rate": 0.0,
+   "business_impact": "wrong_rights_holder_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "eligible_listens_carry_a_recording",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 38199641,
+   "failure_rate": 0.0,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "must_be_zero"
+  },
+  {
+   "rule": "share_pct_not_negative",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 4741031,
+   "failure_rate": 0.0,
+   "business_impact": "ownership_allocation_at_risk",
+   "expectation": "must_be_zero"
+  },
+  {
+   "rule": "share_pct_at_most_100",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 4741031,
+   "failure_rate": 0.0,
+   "business_impact": "ownership_allocation_at_risk",
+   "expectation": "must_be_zero"
+  },
+  {
+   "rule": "held_listens_carry_a_hold_reason",
+   "severity": "ERROR",
+   "status": "PASS",
+   "failed_records": 0,
+   "total_records": 38199641,
+   "failure_rate": 0.0,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "must_be_zero"
+  },
+  {
+   "rule": "match_risk_policy_holds_fallback_unique",
+   "severity": "WARN",
+   "status": "FAIL",
+   "failed_records": 35007,
+   "total_records": 38199641,
+   "failure_rate": 0.00091642,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  },
+  {
+   "rule": "holder_has_at_least_one_split",
+   "severity": "WARN",
+   "status": "FAIL",
+   "failed_records": 1000,
+   "total_records": 60000,
+   "failure_rate": 0.01666667,
+   "business_impact": "royalty_attribution_at_risk",
+   "expectation": "expected_to_find_injected_defects"
+  }
+ ],
+ "cost": {
+  "phase_bytes_billed": 18799919104,
+  "phase_tib": 0.017098,
+  "list_price_equivalent_usd": 0.1069,
+  "caveat": "list-price equivalent of processing consumption; actual monetary cost UNKNOWN without billing evidence"
+ },
+ "verification_bytes_billed": 4040163328,
+ "wall_seconds": 402.4,
+ "jobs": [
+  {
+   "step": "universe for regeneration",
+   "job_id": "860e7ec7-a31c-4933-9e65-37b36ce9f003",
+   "bytes_billed": 2787115008,
+   "slot_ms": 44419
+  },
+  {
+   "step": "defects detected by the quality layer",
+   "job_id": "c797e1bb-80b9-4250-b0e1-bf3a97b051ef",
+   "bytes_billed": 114294784,
+   "slot_ms": 2015
+  },
+  {
+   "step": "holders without ownership",
+   "job_id": "63965322-bb9a-4571-9d93-d32f0f878d4a",
+   "bytes_billed": 57671680,
+   "slot_ms": 685
+  },
+  {
+   "step": "mid-June ownership change",
+   "job_id": "4f4a07ca-408c-4495-8c38-0b14461be006",
+   "bytes_billed": 500170752,
+   "slot_ms": 14349
+  },
+  {
+   "step": "resolution status distribution",
+   "job_id": "991d7966-1432-4928-9ad8-d43251b87b0c",
+   "bytes_billed": 301989888,
+   "slot_ms": 667
+  },
+  {
+   "step": "payout eligibility",
+   "job_id": "77f6b695-a972-42b3-9350-362110469964",
+   "bytes_billed": 257949696,
+   "slot_ms": 5871
+  },
+  {
+   "step": "SCD2 state",
+   "job_id": "d7fb0c7a-5a5a-41c0-b6cb-e27af43360c2",
+   "bytes_billed": 10485760,
+   "slot_ms": 216
+  },
+  {
+   "step": "quality report",
+   "job_id": "0fb0f1c3-edbe-481b-a941-5759925f60da",
+   "bytes_billed": 10485760,
+   "slot_ms": 19
+  }
+ ]
+}

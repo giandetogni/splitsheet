@@ -1,0 +1,18 @@
+# No secrets here. `oauth` uses the developer's Application Default Credentials, the same
+# identity every other operational script in this project uses; there is no service-account key
+# anywhere in the repository and none is created for dbt.
+#
+# maximum_bytes_billed is a hard cap, not a warning: a runaway model fails instead of billing.
+splitsheet:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: ss-de-944054e7
+      dataset: splitsheet_dbt
+      location: us-central1
+      threads: 4
+      timeout_seconds: 1200
+      priority: interactive
+      maximum_bytes_billed: 107374182400 # 100 GiB

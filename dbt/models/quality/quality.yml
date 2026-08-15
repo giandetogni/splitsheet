@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: quality_report
+    description: >-
+      Queryable data quality report, one row per rule per run: run_id, model, rule, severity,
+      status, failed_records, total_records, failure_rate and business_impact. The MODELED source
+      contains deliberate defects, so several rules are EXPECTED to report failures; the
+      `expectation` column separates "must be zero" from "expected to find injected defects", and
+      the counts are compared against docs/phase0/rights_generation.json.
+    columns:
+      - name: run_id
+        data_tests: [not_null]
+      - name: rule
+        data_tests: [not_null]
+      - name: severity
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["ERROR", "WARN"]
+      - name: business_impact
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["royalty_attribution_at_risk", "wrong_rights_holder_risk",
+                         "ownership_allocation_at_risk"]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["PASS", "FAIL"]

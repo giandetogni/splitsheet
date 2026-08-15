@@ -1,0 +1,148 @@
+{
+ "artifact": "rights_sizing",
+ "read_only": true,
+ "source": "splitsheet_silver.silver_listen_matches (frozen Phase 4B result)",
+ "policy": {
+  "principle": "a technical match is not an authorisation to pay",
+  "risk_held_methods": [
+   "SCORED_FALLBACK_UNIQUE"
+  ],
+  "hold_reason": "MATCH_RISK_POLICY",
+  "basis": "validation-partition disagreement 3.2138% for SCORED_FALLBACK_UNIQUE against 0.0055% for STRUCTURAL_EXACT_UNIQUE, and no approved business risk policy for paying on it",
+  "not_validated_by": "the consumed validation partition; this is a business rule applied downstream of an unchanged matcher",
+  "matcher_modified": false,
+  "new_threshold_chosen": false
+ },
+ "universe": {
+  "listens": 38199641,
+  "matched": 31598529,
+  "unmatched": 6601112,
+  "payout_eligible_matches": 31563522,
+  "risk_held_matches": 35007,
+  "distinct_matched_recordings": 2471846,
+  "distinct_eligible_recordings": 2465963,
+  "distinct_risk_held_recordings": 11673
+ },
+ "by_method": [
+  {
+   "match_method": "STRUCTURAL_EXACT_UNIQUE",
+   "match_status": "MATCHED",
+   "risk_held": false,
+   "listens": 31421104,
+   "distinct_recordings": 2457296
+  },
+  {
+   "match_method": "NO_CANDIDATES",
+   "match_status": "UNRESOLVED",
+   "risk_held": false,
+   "listens": 6109139,
+   "distinct_recordings": 0
+  },
+  {
+   "match_method": "SCORED_FALLBACK_UNIQUE",
+   "match_status": "UNRESOLVED",
+   "risk_held": true,
+   "listens": 283994,
+   "distinct_recordings": 0
+  },
+  {
+   "match_method": "SCORED_FALLBACK_MULTIPLE",
+   "match_status": "UNRESOLVED",
+   "risk_held": false,
+   "listens": 206013,
+   "distinct_recordings": 0
+  },
+  {
+   "match_method": "SCORED_EXACT_MULTIPLE",
+   "match_status": "MATCHED",
+   "risk_held": false,
+   "listens": 130886,
+   "distinct_recordings": 7113
+  },
+  {
+   "match_method": "SCORED_FALLBACK_UNIQUE",
+   "match_status": "MATCHED",
+   "risk_held": true,
+   "listens": 35007,
+   "distinct_recordings": 11673
+  },
+  {
+   "match_method": "SCORED_FALLBACK_MULTIPLE",
+   "match_status": "MATCHED",
+   "risk_held": false,
+   "listens": 11532,
+   "distinct_recordings": 4184
+  },
+  {
+   "match_method": "SCORED_EXACT_MULTIPLE",
+   "match_status": "UNRESOLVED",
+   "risk_held": false,
+   "listens": 1966,
+   "distinct_recordings": 0
+  }
+ ],
+ "eligible_recording_days": {
+  "recording_days": 8889078,
+  "streams": 31563522,
+  "median_streams_per_recording_day": 1,
+  "max_streams_per_recording_day": 100117
+ },
+ "recordings_in_both_groups": 5790,
+ "estimate_before_generation": {
+  "rights_model_version": "1.0.0+b4bdc4264aa1",
+  "rights_generated_for": "every distinctly matched recording, eligible or risk-held",
+  "why": "a recording held for match risk today becomes eligible under a future policy with no rights regeneration, and 5,790 recordings already appear in both groups",
+  "expected_rights_holders": 60000,
+  "expected_ownership_split_rows": 4740012,
+  "expected_defect_recordings": 2050,
+  "expected_rate_card_rows": 2,
+  "recordings_per_holder_mean": 41.9,
+  "estimated_ownership_bytes": 568801440,
+  "estimated_holder_bytes": 13200000,
+  "estimated_total_source_bytes": 582001440,
+  "estimated_temporal_join_input_bytes": 1102146120,
+  "assumptions": {
+   "holders_per_recording_mean": 1.88,
+   "intervals_per_ownership_mean": 1.02,
+   "holder_count_source": "config/rights_model.yml holders.count",
+   "bytes_per_split_row": 120,
+   "bytes_per_holder_row": 220
+  },
+  "rejected_first_hypothesis": {
+   "expected_rights_holders": 1647897,
+   "assumed_recordings_per_holder": 3.0,
+   "why_rejected": "1.6M holders for 2.47M recordings models a catalogue where almost every recording has its own publisher; real catalogues concentrate, so the holder count was set explicitly to 60,000 with a documented skew and the estimate redone"
+  },
+  "estimated_materialisation_and_query_tib": 0.004539,
+  "estimated_list_price_equivalent_usd": 0.0284,
+  "cost_caveat": "list-price equivalent of processing consumption; actual monetary cost UNKNOWN without billing evidence"
+ },
+ "bytes_billed": 11056185344,
+ "wall_seconds": 9.5,
+ "jobs": [
+  {
+   "step": "payout universe",
+   "job_id": "c9aaf0e7-c0a8-450d-8dc0-47083afa2e7e",
+   "bytes_billed": 2764046336,
+   "slot_ms": 137218
+  },
+  {
+   "step": "by match_method",
+   "job_id": "37f37d93-8af0-4f2e-8ba7-af0742caeef5",
+   "bytes_billed": 2764046336,
+   "slot_ms": 57673
+  },
+  {
+   "step": "eligible recording-days",
+   "job_id": "ba376a81-0e3a-4699-b82c-1d77706351f6",
+   "bytes_billed": 2764046336,
+   "slot_ms": 98699
+  },
+  {
+   "step": "recordings in both groups",
+   "job_id": "8f03158a-8c69-41bd-b172-8cc85f80a0b4",
+   "bytes_billed": 2764046336,
+   "slot_ms": 44098
+  }
+ ]
+}

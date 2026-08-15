@@ -1,0 +1,49 @@
+# SplitSheet dbt project — Phase 5A.
+#
+# WHAT IS IN THE WAREHOUSE AND WHY: the financial joins live here, in SQL, not in Python. The
+# temporal ownership join, the validity classification and the quality rules are the parts a
+# reviewer needs to be able to read and re-run, so they are models rather than scripts.
+#
+# DATA PROVENANCE, repeated in every source and model description because it matters more than
+# any other property of this project:
+#   ListenBrainz listens / MusicBrainz recordings -> REAL
+#   rights holders / ownership splits / rate cards -> MODELED, generated from a versioned seed
+#   any royalty amount -> illustrative modeled amount, never an observed industry payout
+#
+# NOT BUILT YET, on purpose: there is no payout model, no gold layer and no monetary arithmetic
+# anywhere. Ownership temporal validity has to be proven first, which is what this phase does.
+name: "splitsheet"
+version: "1.0.0"
+config-version: 2
+profile: "splitsheet"
+
+model-paths: ["models"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+# Fail on the first error rather than building on top of a broken upstream model.
+flags:
+  send_anonymous_usage_stats: false
+  require_explicit_package_overrides_for_builtin_materializations: true
+  source_freshness_run_project_hooks: false
+
+models:
+  splitsheet:
+    +materialized: view
+    staging:
+      +materialized: view
+    intermediate:
+      # Tables, not views: these are joined repeatedly by the quality models and by tests, and
+      # re-scanning 38M listens per reference is the kind of cost that adds up quietly.
+      +materialized: table
+    dimensions:
+      +materialized: table
+    quality:
+      +materialized: table
+
+snapshots:
+  splitsheet:
+    +target_schema: splitsheet_dbt

@@ -693,3 +693,135 @@ resource "google_bigquery_table" "silver_candidate_features" {
     { name = "created_at", type = "TIMESTAMP", mode = "REQUIRED" },
   ])
 }
+
+# ---------------------------------------------------------------------------
+# Phase 5A: MODELED rights data and the dbt working dataset
+#
+# EVERY TABLE IN splitsheet_rights IS MODELED. ListenBrainz listens and MusicBrainz recordings
+# are real; rights holders, ownership splits and rate cards are generated from a versioned seed
+# (config/rights_model.yml) and represent no real entity, agreement, share or rate. Each table
+# also carries an is_modeled column that is always TRUE, so the declaration travels with the
+# rows rather than living only in documentation.
+#
+# Shares and rates are NUMERIC with declared precision and scale. Never FLOAT: a share is
+# money's denominator and 0.1 + 0.2 != 0.3 is not an acceptable property for one.
+# ---------------------------------------------------------------------------
+
+resource "google_bigquery_dataset" "rights" {
+  dataset_id  = "splitsheet_rights"
+  project     = var.project_id
+  location    = var.region
+  description = "MODELED rights data: holders, ownership splits with validity intervals, and rate cards. Generated from a versioned seed. No real rights holder, agreement, share or rate appears here. Not industry data."
+
+  delete_contents_on_destroy = false
+
+  labels = {
+    project = "splitsheet"
+    layer   = "rights"
+    phase   = "5a"
+    content = "modeled"
+  }
+}
+
+# dbt owns the CONTENTS of this dataset; Terraform owns only the dataset itself. That boundary
+# is deliberate: models are code and belong in version-controlled SQL, while the container they
+# land in is infrastructure. `terraform plan` therefore stays clean while dbt creates and
+# replaces models inside it.
+resource "google_bigquery_dataset" "dbt" {
+  dataset_id  = "splitsheet_dbt"
+  project     = var.project_id
+  location    = var.region
+  description = "dbt-managed models, snapshots and quality reports. Contents are created by dbt, not Terraform. Rights inputs are MODELED; listen and recording inputs are real."
+
+  delete_contents_on_destroy = false
+
+  labels = {
+    project = "splitsheet"
+    layer   = "dbt"
+    phase   = "5a"
+  }
+}
+
+# GRAIN: holder_id. The dbt snapshot over this table is where SCD Type 2 is actually
+# demonstrated -- this table itself holds only the current generated state.
+resource "google_bigquery_table" "rights_holders" {
+  dataset_id          = google_bigquery_dataset.rights.dataset_id
+  table_id            = "rights_holders"
+  project             = var.project_id
+  deletion_protection = true
+
+  description = "MODELED rights holders, one row per holder_id. Display names are 'Modeled Rights Holder NNNNNN' by construction so no generated string can coincide with a real organisation. Source for the dbt snapshot that demonstrates SCD Type 2."
+
+  schema = jsonencode([
+    { name = "holder_id", type = "STRING", mode = "REQUIRED", description = "MRH-NNNNNN. Deterministic from the generator index." },
+    { name = "display_name", type = "STRING", mode = "REQUIRED", description = "MODELED name. Never a real company, label, publisher, writer or performer." },
+    { name = "holder_type", type = "STRING", mode = "REQUIRED", description = "PUBLISHER, LABEL, INDIE_ARTIST or ADMINISTRATOR. Modeled." },
+    { name = "payee_status", type = "STRING", mode = "REQUIRED", description = "ACTIVE or PENDING_VERIFICATION. The attribute the controlled SCD2 revision changes." },
+    { name = "model_scope", type = "STRING", mode = "REQUIRED", description = "MODELED_GLOBAL_SINGLE_SCOPE. There is no real territory in the source data and none is invented." },
+    { name = "is_modeled", type = "BOOL", mode = "REQUIRED", description = "Always TRUE. The declaration travels with the row." },
+    { name = "rights_version", type = "STRING", mode = "REQUIRED", description = "rights_version + digest of config/rights_model.yml." },
+    { name = "generation_run_id", type = "STRING", mode = "REQUIRED", description = "Deterministic from the model and the universe, not from wall-clock time." },
+    { name = "generated_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# TEMPORAL OWNERSHIP MODELING WITH VALIDITY INTERVALS, half-open [valid_from, valid_to).
+#
+# This is NOT SCD Type 2 and is deliberately not called that: no process detects a change and
+# closes a row here; the intervals come straight from the generator. SCD Type 2 is demonstrated
+# separately by a dbt snapshot over rights_holders.
+#
+# GRAIN: recording_mbid + rights_holder_id + valid_from. Deliberate defects (sums that miss
+# 100, overlaps, gaps, invalid intervals, orphan recordings, absent holders) are PRESENT in this
+# table by design and are never silently corrected. The table does not label them: detection is
+# the quality layer's job, and a source that announced its own defects would make that a lookup
+# instead of a check.
+resource "google_bigquery_table" "ownership_splits" {
+  dataset_id          = google_bigquery_dataset.rights.dataset_id
+  table_id            = "ownership_splits"
+  project             = var.project_id
+  deletion_protection = true
+
+  description = "MODELED ownership splits with half-open validity intervals [valid_from, valid_to). Temporal ownership modeling, NOT SCD Type 2. Contains deliberate defects for the quality layer to detect; nothing here is corrected silently."
+
+  clustering = ["recording_mbid"]
+
+  schema = jsonencode([
+    { name = "recording_mbid", type = "STRING", mode = "REQUIRED", description = "MusicBrainz recording MBID (real identifier) carrying MODELED ownership. Some rows deliberately reference MBIDs outside the catalogue." },
+    { name = "rights_holder_id", type = "STRING", mode = "REQUIRED", description = "Joins rights_holders.holder_id. Some rows deliberately reference a holder that does not exist." },
+    { name = "share_pct", type = "NUMERIC", precision = "9", scale = "4", mode = "REQUIRED", description = "Percentage share, DECIMAL(9,4). Healthy sets sum to exactly 100.0000. Never FLOAT." },
+    { name = "valid_from", type = "DATE", mode = "REQUIRED", description = "Inclusive lower bound." },
+    { name = "valid_to", type = "DATE", mode = "REQUIRED", description = "EXCLUSIVE upper bound. 9999-12-31 is the open-ended sentinel; an explicit date rather than NULL, because a NULL upper bound in a half-open predicate silently becomes 'always true'." },
+    { name = "split_version_id", type = "STRING", mode = "REQUIRED", description = "Identifies one split SET: recording plus the date its ownership took effect. A healthy recording-date resolves to exactly one." },
+    { name = "is_modeled", type = "BOOL", mode = "REQUIRED", description = "Always TRUE." },
+    { name = "rights_version", type = "STRING", mode = "REQUIRED" },
+    { name = "generation_run_id", type = "STRING", mode = "REQUIRED" },
+    { name = "generated_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# GRAIN: rate_card_id. Half-open intervals with a DELIBERATE three-day gap (2026-06-10 to
+# 2026-06-12) so that RATE_CARD_GAP classification has something real to catch. Streams in the
+# gap must be held, never priced at zero and never dropped.
+resource "google_bigquery_table" "rate_card" {
+  dataset_id          = google_bigquery_dataset.rights.dataset_id
+  table_id            = "rate_card"
+  project             = var.project_id
+  deletion_protection = true
+
+  description = "MODELED rate card. ILLUSTRATIVE MODELED RATES: not a Spotify, Apple, Amazon or other DSP rate, not an industry average, not observed. One modeled scope because the source data carries no listener territory and none is invented. Contains a deliberate 3-day gap."
+
+  schema = jsonencode([
+    { name = "rate_card_id", type = "STRING", mode = "REQUIRED" },
+    { name = "model_scope", type = "STRING", mode = "REQUIRED", description = "MODELED_GLOBAL_SINGLE_SCOPE. Stands in for territory, which the listen data does not have." },
+    { name = "valid_from", type = "DATE", mode = "REQUIRED", description = "Inclusive." },
+    { name = "valid_to", type = "DATE", mode = "REQUIRED", description = "EXCLUSIVE." },
+    { name = "rate_per_stream", type = "NUMERIC", precision = "18", scale = "9", mode = "REQUIRED", description = "ILLUSTRATIVE MODELED RATE, DECIMAL(18,9). Never FLOAT." },
+    { name = "currency", type = "STRING", mode = "REQUIRED" },
+    { name = "rule_version_id", type = "STRING", mode = "REQUIRED" },
+    { name = "is_modeled", type = "BOOL", mode = "REQUIRED", description = "Always TRUE." },
+    { name = "rights_version", type = "STRING", mode = "REQUIRED" },
+    { name = "generation_run_id", type = "STRING", mode = "REQUIRED" },
+    { name = "generated_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}

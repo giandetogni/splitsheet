@@ -287,3 +287,34 @@ Free-tier context: the monthly on-demand query allowance is 1 TiB. This phase co
 **0.3536 TiB** of it. Cumulative project consumption is now roughly 0.94 TiB across all phases,
 so the free allowance has probably absorbed all of it — **probably, on arithmetic, not on
 billing evidence**.
+
+## Phase 5A — modeled rights, temporal validity, dbt
+
+| stage | bytes billed |
+|---|---|
+| sizing (read-only, 4 queries) | 11,056,185,344 |
+| generation: universe query + 3 publish transactions + verify | ~2,800,000,000 |
+| controlled revision (holders only) | ~10,000,000 |
+| dbt build (snapshot, 6 tables, 4 views, 53 tests, twice) | ~3,900,000,000 |
+| verification and reconciliation (8 queries) | 4,040,163,328 |
+| **total** | **≈ 18,799,919,104 = 0.0171 TiB** |
+
+**List-price equivalent ≈ $0.11.** Processing consumption converted at the published on-demand
+rate, **not** money known to have been charged. **Actual monetary cost remains UNKNOWN without
+billing evidence.**
+
+Three things worth carrying forward:
+
+- **The sizing step paid for itself.** It cost 11 GB of the 18.8 GB total — the single largest line
+  — and it caught a holder-count assumption that was wrong by a factor of 27 (1,647,897 estimated
+  against 60,000 chosen) before any row was generated. It also predicted the ownership row count to
+  within 0.02% (4,740,012 estimated, 4,741,031 actual).
+- **Aggregating before joining is what kept this cheap.** The temporal ownership join runs at
+  8,889,078 eligible recording-days rather than 31,563,522 listens. Same answer, 3.5× less input.
+- **dbt is cheap here because the models are tables, not views.** `int_ownership_validity` and
+  `int_ownership_resolution` are referenced by the quality report and by six tests; as views, each
+  reference would re-scan 4.7M ownership rows and 8.9M recording-days.
+
+Cumulative project consumption is now roughly **0.96 TiB** across all phases. The monthly on-demand
+allowance is 1 TiB, so the free tier has probably absorbed all of it — **probably, on arithmetic,
+not on billing evidence**.

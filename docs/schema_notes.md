@@ -1587,3 +1587,215 @@ Morse code. No amount of matching fixes a track whose title is an emoji.
 
 The output carries only submitted artist and recording strings plus counts. **No `user_id`, no
 `recording_msid`, no `listen_hash`** — asserted in the script, not assumed.
+
+## 22. Phase 5A — modeled rights, temporal validity, and the dbt foundation
+
+Everything in this section rests on a declaration that has to come first.
+
+| what | status |
+|---|---|
+| ListenBrainz listens, MusicBrainz recordings | **REAL** |
+| rights holders, ownership splits, rate cards | **MODELED**, generated from a versioned seed |
+| any royalty amount | **illustrative modeled amount, never an observed industry payout** |
+
+No real company, label, publisher, writer or performer appears anywhere. Holder display names are
+`Modeled Rights Holder NNNNNN` **by construction**, so no generated string can coincide with a real
+organisation, and every generated row carries `is_modeled = TRUE` so the declaration travels with
+the data rather than living only in documentation.
+
+**No payout amount is computed anywhere in this phase.** Streams, share and rate are brought
+together and classified; they are deliberately not multiplied.
+
+### 22.1 The Phase 4B freeze, enforced by tests
+
+`config/frozen_versions.yml` records the versions that produced the published result, and
+`tests/unit/test_frozen.py` fails if the live configs stop matching it. A change to a normalization
+rule, a scoring weight or a threshold is therefore not an edit — it breaks the suite, which is the
+point. The manifest also asserts internal consistency: the frozen per-method counts must sum to
+31,598,529 matched and 38,199,641 total, so a typo in the freeze is caught too.
+
+Transliteration of Korean and Japanese titles is registered in `docs/restatement_candidates.md`
+with the evidence preserved at freeze time — 1,164,629 `NO_LOOKUP_KEY_PARTIAL` listens, of which
+**`Agust D` / `해금` alone is 384,926 (33.05% of the reason, 1.01% of the corpus)** — and
+deliberately not implemented.
+
+### 22.2 Sizing before generating, and a hypothesis I rejected
+
+Measured on the frozen result before any rights data existed:
+
+| | listens | distinct recordings |
+|---|---|---|
+| total | 38,199,641 | — |
+| matched (technical) | 31,598,529 | 2,471,846 |
+| **payout-eligible** under the policy below | **31,563,522** (82.6278%) | 2,465,963 |
+| **risk-held** (`MATCH_RISK_POLICY`) | **35,007** (0.0916%) | 11,673 |
+| unmatched | 6,601,112 | — |
+
+5,790 recordings appear in **both** the eligible and risk-held groups, which is why rights are
+generated for every matched recording rather than for the eligible subset: a recording held today
+becomes eligible under a future policy with no regeneration. The temporal join runs at
+**8,889,078 eligible recording-days**, not at 31.6M listens — same answer, 3.5× less work.
+
+The first sizing pass assumed ~3 recordings per holder and estimated **1,647,897 rights holders**
+for 2,471,846 recordings. That models a world where nearly every recording has its own publisher,
+which is wrong, so the holder count was set explicitly to 60,000 with a documented skew formula and
+the estimate redone. The corrected estimate predicted **4,740,012** ownership rows; the generator
+produced **4,741,031** — 0.02% out, which is the sizing step doing its job.
+
+### 22.3 The generator: deterministic, versioned, and defective on purpose
+
+`config/rights_model.yml` (`1.0.0+47f801102e17`, digest-sealed) is the contract;
+`src/rights/generator.py` is a pure function of `sha256(seed | kind | key)`. No RNG object, no
+wall-clock, no read order — so ownership for any recording can be generated independently and in
+any order, and a re-run reproduces the same rows and the same ids. Six mutation tests prove that
+changing the seed, holder count, a defect quota, an interval or a rate without updating the digest
+stops the generator.
+
+Landed: **60,000 holders, 4,741,031 ownership rows** over 2,472,146 recordings (2,471,846 real +
+300 deliberately orphaned), **2 rate card rows**, `generation_run_id rights:d2b8a2dc146673e9`.
+
+Shares are `NUMERIC(9,4)` and rates `NUMERIC(18,9)`. Never `FLOAT`: a share is money's denominator,
+and a sum of four floats is not exactly 100. Healthy sets sum to **exactly** `100.0000`, measured
+on 2.5M sets with min = max = 100.0000.
+
+**Deliberate defects, and the honest bit about them: the source does not label them.** There is no
+`defect_class` column anywhere. If the source announced its own defects, "detecting" them
+downstream would be a lookup rather than a check. The injected counts live in
+`docs/phase0/rights_generation.json` and the quality layer has to find them independently:
+
+| defect | injected | detected by dbt | agrees |
+|---|---|---|---|
+| shares do not sum to 100 | 500 | 500 | yes |
+| temporal overlap | 400 | 400 | yes |
+| temporal gap | 400 | 400 | yes |
+| invalid interval (`valid_to <= valid_from`) | 200 | 200 | yes |
+| missing rights holder | 250 | 250 | yes |
+| orphan recording MBID | 300 | 300 | yes |
+| holder with no ownership row | 1,000 | 1,000 | yes |
+
+Every temporal defect is placed **inside 2026-06**, so it is visible in the period the project
+actually joins rather than in a synthetic corner of the calendar.
+
+### 22.4 Temporal ownership modeling with validity intervals — NOT SCD Type 2
+
+`ownership_splits` uses half-open intervals `[valid_from, valid_to)` with `9999-12-31` as the
+open-ended sentinel — an explicit date rather than `NULL`, because a `NULL` upper bound in a
+half-open predicate silently becomes "always true".
+
+This is **not** called SCD Type 2, and the distinction is not pedantry: nothing here detects a
+change and closes a row. The intervals come straight out of the generator. `split_version_id`
+identifies one split *set* — a recording plus the date its ownership took effect — so a healthy
+recording-date resolves to exactly one, and an ownership change produces a **new** set rather than
+a mutated one.
+
+**The join, everywhere:** `listen_date >= valid_from AND listen_date < valid_to`.
+
+Proven at all three boundary positions on real rows, and proven to matter: for **200 of 200**
+probed recordings with a 2026-06-15 ownership change, the holders selected on 06-14 differ from
+those selected on 06-15, with **0** unchanged. The holder sets either side of a change are disjoint
+by construction, so a wrong predicate produces a visibly wrong holder rather than a slightly wrong
+share.
+
+### 22.5 SCD Type 2, demonstrated for real
+
+`dbt snapshot` over `rights_holders`, strategy `check` on the tracked attributes. `timestamp`
+strategy was rejected because the generated source has no reliable last-modified column and
+inventing one would make the snapshot detect wall-clock noise instead of content changes.
+
+The controlled proof: snapshot, then re-land **only** `rights_holders` with 250 `payee_status`
+values flipped (`build_rights.py --revise-payee-status 250`,
+`generation_run_id rights:085bed00fc2cb51e`), then snapshot again. The second run reported
+`MERGE (500.0 rows)` — 250 closed plus 250 inserted:
+
+| property | measured |
+|---|---|
+| versions / holders | 60,250 / 60,000 |
+| current versions | 60,000 — exactly one per holder |
+| closed versions | 250 |
+| holders with history | 250 — exactly the number revised |
+| old values still readable | yes: e.g. `MRH-000000` `ACTIVE` (closed) → `PENDING_VERIFICATION` (current) |
+
+Nothing was overwritten. `dim_rights_holders` exposes both versions with `is_current`.
+
+### 22.6 Payout eligibility: MATCHED != PAYABLE
+
+The layer exists because a technical match is not an authorisation to pay.
+
+| | listens |
+|---|---|
+| payout-eligible | 31,563,522 |
+| held — `NOT_MATCHED_NO_BLOCK_CANDIDATES` | 4,493,892 |
+| held — `NOT_MATCHED_NO_LOOKUP_KEY_PARTIAL` | 1,164,629 |
+| held — `NOT_MATCHED_BELOW_THRESHOLD` | 490,883 |
+| held — `NOT_MATCHED_NO_LOOKUP_KEY_EMPTY` | 433,180 |
+| **held — `MATCH_RISK_POLICY`** | **35,007** |
+| held — `NOT_MATCHED_NO_ALPHANUMERIC_CONTENT` | 17,438 |
+| held — `NOT_MATCHED_AMBIGUOUS_TIE` | 1,090 |
+
+The matcher was **not** modified, no new threshold was chosen, and the policy is **not** presented
+as validated by the consumed validation partition. The partition measured the matcher; the decision
+to hold rather than pay is a risk judgement made outside it, and it is reversible by editing one
+model.
+
+**A test of mine was wrong here, and the correction is instructive.** `match_method` describes how
+a listen was *evaluated*, not what the matcher concluded: `SCORED_FALLBACK_UNIQUE` covers 319,001
+listens, of which the matcher **accepted 35,007** and **refused 283,994** as `BELOW_THRESHOLD`. My
+first assertion demanded `MATCH_RISK_POLICY` for all of them and failed on 283,994 rows. The model
+was right — a refused listen is not matched at all and is held for the ordinary reason.
+
+### 22.7 The temporal join at real scale
+
+8,889,078 eligible recording-days:
+
+| resolution_status | recording-days | streams | attributable |
+|---|---|---|---|
+| `RESOLVED` | 7,953,823 | 28,386,887 | 7,953,823 |
+| `RATE_CARD_GAP` | 929,346 | 3,164,839 | 0 |
+| `DEFECTIVE_OWNERSHIP` | 5,909 | 11,796 | 0 |
+| `MULTIPLE_VALID_SETS` | 0 | — | 0 |
+
+`RATE_CARD_GAP` is the deliberate three-day hole (2026-06-10 to 06-12): 929,346 recording-days
+carrying 3,164,839 streams are **held, not priced at zero and not dropped**. A pipeline that
+interpolates a rate for an uncovered day is inventing money.
+
+`MULTIPLE_VALID_SETS` is zero, and that is the design working rather than the check failing:
+overlapping sets are marked invalid upstream, so they never both qualify as valid. The
+classification exists so that if a future generation produces two *valid* sets covering one day, the
+row is refused instead of silently resolved. Uniqueness holds **by construction** — the
+`sole_valid_set` CTE keeps only groups of exactly one covering set, so the `MIN` inside it returns
+that row rather than picking from a set.
+
+One reading note: 5,296 `DEFECTIVE_OWNERSHIP` recording-days carry a `rate_per_stream`. That is
+correct — a rate is a property of the day, not of the ownership — and `is_attributable` is 0 for all
+of them, because an amount cannot be computed from half of a contract.
+
+### 22.8 Data quality as data
+
+`quality_report` is a table, not a log: one row per rule per run with `run_id` (dbt's invocation
+id), `model`, `rule`, `severity`, `status`, `failed_records`, `total_records`, `failure_rate`,
+`business_impact` and an `expectation` column separating "must be zero" from "expected to find the
+injected defects". 17 rules; the MODELED source contains deliberate defects, so a rule reporting
+zero on those would mean the check is broken.
+
+| business impact | example rule | failed |
+|---|---|---|
+| `wrong_rights_holder_risk` | `no_temporal_overlap` | 800 sets |
+| `wrong_rights_holder_risk` | `rights_holder_exists` | 250 sets |
+| `ownership_allocation_at_risk` | `valid_set_shares_sum_to_exactly_100` | 500 sets |
+| `royalty_attribution_at_risk` | `rate_card_covers_the_day` | 929,959 recording-days |
+| `royalty_attribution_at_risk` | `eligible_recording_day_resolves_to_an_owner` | 935,255 recording-days |
+| `royalty_attribution_at_risk` | `holder_has_at_least_one_split` (WARN) | 1,000 holders |
+
+Six rules that must be zero — share range, one interval per split set, no double-covered rate day,
+eligible listens carrying a recording, held listens carrying a reason — **are** zero.
+
+### 22.9 The warehouse boundary
+
+Terraform owns the datasets; dbt owns their contents. `splitsheet_rights` holds the Terraform-managed
+source tables with declared `NUMERIC` precision and scale, and `splitsheet_dbt` holds models,
+snapshots and the quality report created by dbt. `terraform plan` therefore stays at **No changes**
+while dbt rebuilds freely, and the financial joins live in reviewable SQL rather than inside Python.
+
+`dbt build`: **64 passed, 0 errors** (1 snapshot, 6 tables, 4 views, 53 data tests).
+`dbt parse` runs with **no credentials at all**, so public CI validates every ref, source, macro and
+YAML contract without touching GCP.

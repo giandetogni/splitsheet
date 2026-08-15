@@ -1,0 +1,109 @@
+version: 2
+
+sources:
+  # ---------------------------------------------------------------------------------------
+  # REAL DATA. Frozen at the end of Phase 4B; nothing in Phase 5A may change it.
+  # ---------------------------------------------------------------------------------------
+  - name: silver
+    schema: splitsheet_silver
+    description: >-
+      REAL data. Matching output over the preserved ListenBrainz 2026-06 slice, matched against
+      the real MusicBrainz canonical snapshot 2026-07-17. FROZEN: scoring_version
+      1.0.0+cb21f9704ff0, match_run_id match:101eef5c5b5c081e. See config/frozen_versions.yml.
+    tables:
+      - name: silver_listen_matches
+        description: >-
+          REAL. Exactly one row per listen for 2026-06 (38,199,641). A MATCHED row is a
+          TECHNICAL match and is NOT an authorisation to pay: payout eligibility is decided
+          downstream in int_payout_eligibility, never here.
+        # NO SOURCE-LEVEL TESTS ON THIS TABLE. It is declared with
+        # require_partition_filter = true, so any query without a listened_at predicate is
+        # rejected -- including a generated `select * where listen_hash is null`. That guard is
+        # deliberate (it is what stops an accidental 38M-row full scan), so the tests live on
+        # stg_silver__listen_matches instead, where the partition filter is applied once. Testing
+        # the staging model is not a weaker check here: the staging model selects the whole
+        # period, so the same rows are covered.
+        columns:
+          - name: listen_hash
+            description: Pseudonymous surrogate key. No user_id exists anywhere in this project.
+          - name: match_method
+            description: >-
+              STRUCTURAL_EXACT_UNIQUE, SCORED_EXACT_MULTIPLE, SCORED_FALLBACK_UNIQUE,
+              SCORED_FALLBACK_MULTIPLE or NO_CANDIDATES. SCORED_FALLBACK_UNIQUE showed 3.2138%
+              disagreement with the reference label on the validation partition, which is why
+              the eligibility layer holds it.
+          - name: matched_recording_mbid
+            description: REAL MusicBrainz recording MBID. NULL for every unresolved listen.
+
+  # ---------------------------------------------------------------------------------------
+  # MODELED DATA. Generated from config/rights_model.yml. No real entity, agreement or rate.
+  # ---------------------------------------------------------------------------------------
+  - name: rights
+    schema: splitsheet_rights
+    description: >-
+      MODELED rights data, generated deterministically from a versioned seed
+      (config/rights_model.yml). rights holders, ownership splits and rate cards are ALL
+      MODELED: no real rights holder, label, publisher, writer, performer, agreement, share or
+      rate appears anywhere. Any royalty amount derived from this data is an illustrative
+      modeled amount, never an observed industry payout. DELIBERATE DEFECTS ARE PRESENT and are
+      never corrected silently; the source does not label them, so the quality layer has to
+      detect them.
+    tables:
+      - name: rights_holders
+        description: >-
+          MODELED holders, one row per holder_id. Display names are "Modeled Rights Holder
+          NNNNNN" by construction so no generated string can coincide with a real organisation.
+          This table is the input to the dbt SNAPSHOT, which is where SCD Type 2 is actually
+          demonstrated.
+        columns:
+          - name: holder_id
+            data_tests: [not_null, unique]
+          - name: payee_status
+            description: The attribute the controlled SCD2 revision changes between two runs.
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: ["ACTIVE", "PENDING_VERIFICATION"]
+          - name: is_modeled
+            description: Always TRUE. The modeled declaration travels with the row.
+            data_tests: [not_null]
+
+      - name: ownership_splits
+        description: >-
+          MODELED ownership with half-open validity intervals [valid_from, valid_to). TEMPORAL
+          OWNERSHIP MODELING WITH VALIDITY INTERVALS -- deliberately NOT SCD Type 2: no process
+          detects a change and closes a row, the intervals come straight from the generator.
+          Contains deliberate share-sum, overlap, gap, invalid-interval, orphan-recording and
+          missing-holder defects.
+        columns:
+          - name: recording_mbid
+            data_tests: [not_null]
+          - name: rights_holder_id
+            data_tests: [not_null]
+          - name: share_pct
+            description: DECIMAL(9,4) percentage. Never FLOAT.
+            data_tests: [not_null]
+          - name: valid_from
+            description: Inclusive lower bound.
+            data_tests: [not_null]
+          - name: valid_to
+            description: EXCLUSIVE upper bound; 9999-12-31 is the open-ended sentinel.
+            data_tests: [not_null]
+          - name: split_version_id
+            description: One split SET -- a recording plus the date its ownership took effect.
+            data_tests: [not_null]
+
+      - name: rate_card
+        description: >-
+          MODELED rate card. ILLUSTRATIVE MODELED RATES: not a Spotify, Apple, Amazon or other
+          DSP rate, not an industry average, not observed. One modeled scope, because the listen
+          data carries no listener territory and none is invented. Contains a DELIBERATE 3-day
+          gap (2026-06-10 to 2026-06-12) so gap classification has something real to catch.
+        columns:
+          - name: rate_card_id
+            data_tests: [not_null, unique]
+          - name: rate_per_stream
+            description: DECIMAL(18,9) illustrative modeled rate. Never FLOAT.
+            data_tests: [not_null]
+          - name: currency
+            data_tests: [not_null]

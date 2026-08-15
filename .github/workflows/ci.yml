@@ -48,6 +48,16 @@ jobs:
       - name: Unit tests
         run: make test
 
+      # Parses the dbt project: every ref, source, macro and YAML contract, with NO warehouse
+      # connection. Catches a broken model reference or a malformed schema file here instead of
+      # discovering it during a run that costs bytes. `dbt build` itself needs GCP and stays in
+      # the manual integration workflow.
+      - name: dbt parse (no credentials)
+        working-directory: dbt
+        env:
+          DBT_PROFILES_DIR: ${{ github.workspace }}/dbt
+        run: uv run dbt parse
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.8

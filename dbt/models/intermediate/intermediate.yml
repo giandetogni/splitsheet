@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: int_payout_eligibility
+    description: >-
+      PAYOUT ELIGIBILITY, separate from matching. MATCHED != PAYABLE. One row per listen
+      (38,199,641). SCORED_FALLBACK_UNIQUE is technically matched but held under
+      MATCH_RISK_POLICY, on the basis of 3.2138% validation-partition disagreement against
+      0.0055% for structural acceptance. The matcher is unchanged and no new threshold was
+      chosen; this is a reversible business policy applied downstream.
+    columns:
+      - name: listen_hash
+        data_tests: [not_null, unique]
+      - name: payout_eligible
+        data_tests: [not_null]
+      - name: hold_reason
+        description: NULL exactly when payout_eligible. One reason, never two.
+      - name: payout_policy_version
+        data_tests: [not_null]
+
+  - name: int_ownership_validity
+    description: >-
+      Classification of every MODELED ownership split set, one row per (recording_mbid,
+      split_version_id). Detects the deliberate defects INDEPENDENTLY -- the source carries no
+      defect column. Nothing is corrected and nothing is dropped.
+    columns:
+      - name: split_version_id
+        data_tests: [not_null]
+      - name: is_valid_set
+        description: TRUE only when no defect flag is set. Deliberately strict.
+        data_tests: [not_null]
+      - name: share_sum
+        description: NUMERIC. Exactly 100.0000 for a valid set.
+        data_tests: [not_null]
+
+  - name: int_eligible_recording_days
+    description: >-
+      Streams per recording per day for payout-eligible listens only, 8.9M rows against 31.6M
+      listens. The grain the temporal ownership join runs at. No money is computed.
+    columns:
+      - name: recording_mbid
+        data_tests: [not_null]
+      - name: listen_date
+        data_tests: [not_null]
+      - name: streams
+        data_tests: [not_null]
+
+  - name: int_ownership_resolution
+    description: >-
+      THE TEMPORAL JOIN, half-open [valid_from, valid_to). One row per eligible recording-day
+      with the ownership set in force, or an explicit reason there is none. Ownership uniqueness
+      holds by construction; MULTIPLE_VALID_SETS is refused rather than resolved. No monetary
+      arithmetic anywhere.
+    columns:
+      - name: resolution_status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["RESOLVED", "MULTIPLE_VALID_SETS", "RATE_CARD_GAP",
+                         "RATE_CARD_OVERLAP", "NO_OWNERSHIP_RECORD", "DEFECTIVE_OWNERSHIP",
+                         "COVERED_ONLY_BY_INVALID_SET", "OWNERSHIP_GAP_FOR_DATE"]
+      - name: is_attributable
+        data_tests: [not_null]
