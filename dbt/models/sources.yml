@@ -11,11 +11,20 @@ sources:
       the real MusicBrainz canonical snapshot 2026-07-17. FROZEN: scoring_version
       1.0.0+cb21f9704ff0, match_run_id match:101eef5c5b5c081e. See config/frozen_versions.yml.
     tables:
+      - name: silver_listen_matches_restated
+        description: >-
+          REAL. The SAME 38,199,641 listens under normalization 1.1.0+b3253b155934, produced by the
+          Phase 6 restatement (trigger RT-1, transliteration of hangul and kana). Rows outside the
+          affected cohort are carried over from silver_listen_matches unchanged and proven identical;
+          `recording_cohort` flags which rows were recomputed. Scoring, rights and payout policy are
+          the frozen ones, so any financial difference is attributable to normalization alone.
+
       - name: silver_listen_matches
         description: >-
           REAL. Exactly one row per listen for 2026-06 (38,199,641). A MATCHED row is a
           TECHNICAL match and is NOT an authorisation to pay: payout eligibility is decided
-          downstream in int_payout_eligibility, never here.
+          downstream in int_payout_eligibility, never here. FROZEN: this table produced pub:v1 and
+          Phase 6 does not modify it.
         # NO SOURCE-LEVEL TESTS ON THIS TABLE. It is declared with
         # require_partition_filter = true, so any query without a listened_at predicate is
         # rejected -- including a generated `select * where listen_hash is null`. That guard is

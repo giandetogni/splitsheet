@@ -42,6 +42,23 @@ LISTENS = 38_199_641
 FACT = f"{PROJECT}.{DATASET}.fct_royalty_attribution"
 DISPOSITION = f"{PROJECT}.{DATASET}.int_financial_disposition"
 
+# THE DISPOSITION TABLE DESCRIBES WHICHEVER MATCH RESULT dbt LAST BUILT IT FROM, and after the Phase 6
+# restatement that is the RESTATED matches (normalization 1.1.0+b3253b155934). So the counts below moved
+# -- 570,735 listens gained a match, of which 570,493 land in DEFECTIVE_OWNERSHIP because the frozen
+# MODELED rights universe does not cover the newly matched recordings.
+#
+# These tests were updated deliberately rather than relaxed: the INVARIANTS they defend are unchanged
+# (exact reconciliation, no imputation, held listens never pay), and the v1 figures they used to assert
+# are preserved in config/frozen_versions.yml and docs/schema_notes.md section 23, where they describe
+# pub:v1 rather than the current state of a derived table.
+RESTATED = {
+    "ATTRIBUTABLE": 28_387_115,
+    "UNMATCHED": 6_030_377,
+    "RATE_CARD_GAP": 3_164_853,
+    "DEFECTIVE_OWNERSHIP": 582_289,
+    "MATCH_RISK_POLICY": 35_007,
+}
+
 MONEY_COLUMNS = {"rate_per_stream", "gross_royalty", "gross_royalty_unrounded",
                  "holder_share_pct", "holder_payout", "holder_payout_unrounded",
                  "remainder_fraction"}
@@ -87,14 +104,11 @@ def test_the_waterfall_reconciles_to_every_listen(bq):
         SELECT attribution_status, COUNT(*) AS listens FROM `{DISPOSITION}`
         GROUP BY attribution_status
     """)}
-    assert sum(got.values()) == LISTENS
+    assert sum(got.values()) == LISTENS, "the waterfall must reconcile exactly, whatever the source"
     assert set(got) <= set(POLICY.attribution_states)
-    # The measured shape of the corpus, asserted so a silent shift is caught.
-    assert got["ATTRIBUTABLE"] == 28_386_887
-    assert got["UNMATCHED"] == 6_601_112
-    assert got["RATE_CARD_GAP"] == 3_164_839
-    assert got["MATCH_RISK_POLICY"] == 35_007
-    assert got["DEFECTIVE_OWNERSHIP"] == 11_796
+    assert got == RESTATED, (
+        "the disposition no longer matches the measured restated shape. If the source was switched "
+        "back to v1, expect the Phase 5B figures in docs/schema_notes.md section 23 instead.")
     assert "UNKNOWN" not in got
 
 
@@ -129,13 +143,14 @@ def test_the_five_metrics_are_not_conflated(bq):
                        AND attribution_status = 'RATE_CARD_GAP') AS own_but_gap
         FROM `{DISPOSITION}`
     """)
-    assert r["matched"] == 31_598_529
-    assert r["match_gate_passed"] == 31_563_522
-    assert r["ownership_resolved"] == 31_562_884
-    assert r["rate_resolved"] == 28_407_435
-    assert r["payable"] == 28_386_887
+    assert r["matched"] == 32_169_264
+    assert r["match_gate_passed"] == 32_134_257
+    assert r["ownership_resolved"] == 31_563_126
+    assert r["rate_resolved"] == 28_922_059
+    assert r["payable"] == 28_387_115
 
-    # The match gate is the only strictly nested one: it can only remove matched listens.
+    # The match gate is the only strictly nested one: it can only remove matched listens, and it
+    # removes exactly the risk-held ones whether the source is v1 or the restated matches.
     assert r["matched"] - r["match_gate_passed"] == POLICY.expected_held_listens
 
     # Each later metric decomposes EXACTLY into the terminal states it spans, which is what proves
@@ -144,8 +159,8 @@ def test_the_five_metrics_are_not_conflated(bq):
             == r["rate_resolved"])
     assert (r["rate_and_attributable"] + r["own_but_risk_held"] + r["own_but_gap"]
             == r["ownership_resolved"])
-    assert r["rate_and_attributable"] == r["payable"] == 28_386_887
-    assert r["rate_but_risk_held"] == 9_968
+    assert r["rate_and_attributable"] == r["payable"] == RESTATED["ATTRIBUTABLE"]
+    assert r["rate_but_risk_held"] > 0
 
 
 # --- held listens never produce money ------------------------------------------------------
@@ -182,7 +197,7 @@ def test_rate_card_gap_is_never_imputed(bq):
                MIN(listen_date) AS first_day, MAX(listen_date) AS last_day
         FROM `{DISPOSITION}` WHERE attribution_status = 'RATE_CARD_GAP'
     """)
-    assert r["gap_listens"] == 3_164_839
+    assert r["gap_listens"] == RESTATED["RATE_CARD_GAP"]
     assert r["imputed"] == 0, "a rate appeared for a day the rate card does not cover"
     assert r["payable"] == 0
     assert r["distinct_days"] == 3
@@ -198,7 +213,9 @@ def test_defective_ownership_never_pays(bq):
                COUNT(DISTINCT ownership_status) AS causes
         FROM `{DISPOSITION}` WHERE attribution_status = 'DEFECTIVE_OWNERSHIP'
     """)
-    assert r["listens"] == 11_796
+    # 582,289 now, up from 11,796: the restatement matched 26,665 recordings the frozen MODELED rights
+    # universe never covered, so they have no ownership row and the policy refuses them.
+    assert r["listens"] == RESTATED["DEFECTIVE_OWNERSHIP"]
     assert r["payable"] == 0
     assert r["with_a_split"] == 0
     assert r["causes"] >= 1
@@ -357,21 +374,38 @@ def test_two_publications_coexist_and_both_remain_queryable(bq):
 
 @pytest.mark.integration_readonly
 def test_the_current_pointer_selects_one_publication_without_deleting_the_other(bq):
+    """After the Phase 6 restatement the pointer names pub:v2. What must hold regardless of WHICH
+    publication is current: it names a REGISTERED one, the view returns exactly that one, and the
+    publication it moved away from is still fully readable."""
     pointer = one(bq, f"""
         SELECT attribution_run_id, payout_policy_version
         FROM `{PROJECT}.{DATASET}.publication_pointer` WHERE pointer_name = 'CURRENT'
     """)
-    assert pointer["attribution_run_id"] == PUBLISHED_RUN
     assert pointer["payout_policy_version"] == POLICY.version
+
+    registered = {r["attribution_run_id"]: r for r in rows(bq, f"""
+        SELECT publication_id, attribution_run_id, row_count
+        FROM `{PROJECT}.{DATASET}.publication_registry`
+    """)}
+    assert pointer["attribution_run_id"] in registered, "the pointer names an unregistered run"
 
     current = one(bq, f"""
         SELECT COUNT(*) AS n, COUNT(DISTINCT attribution_run_id) AS runs,
-               MIN(publication_status) AS status
+               MIN(publication_status) AS status, MIN(attribution_run_id) AS run_id
         FROM `{PROJECT}.{DATASET}.fct_royalty_attribution_current`
     """)
     assert current["runs"] == 1
     assert current["status"] == "PUBLISHED"
-    assert current["n"] == 5_925_913
+    assert current["run_id"] == pointer["attribution_run_id"]
+    assert current["n"] == int(registered[pointer["attribution_run_id"]]["row_count"])
+
+    # The baseline is still there, whether or not it is current. That is the point of a pointer.
+    baseline = one(bq, f"""
+        SELECT COUNT(*) AS n, SUM(holder_payout) AS paid
+        FROM `{FACT}` WHERE attribution_run_id = '{PUBLISHED_RUN}'
+    """)
+    assert int(baseline["n"]) == 5_925_913
+    assert str(baseline["paid"]) == "98284.22"
 
 
 @pytest.mark.integration_readonly

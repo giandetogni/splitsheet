@@ -1,0 +1,216 @@
+{
+ "artifact": "baseline_freeze_and_black_box_report",
+ "declaration": {
+  "listens": "REAL ListenBrainz events",
+  "recordings": "REAL MusicBrainz canonical snapshot",
+  "rights_holders_ownership_rate_cards": "MODELED",
+  "all_amounts": "illustrative modeled suspended amount over real listening events",
+  "revenue_claim": "none: no figure here is revenue, observed or otherwise",
+  "rate_card_gap_valuation": "UNKNOWN, never imputed"
+ },
+ "baseline": {
+  "publication_id": "pub:v1",
+  "attribution_run_id": "attr:83c013596d1d3da3",
+  "normalization_version": "1.0.0+0bc0dd643e06",
+  "scoring_version": "1.0.0+cb21f9704ff0",
+  "match_run_id": "match:101eef5c5b5c081e",
+  "payout_policy_version": "1.0.0+84b4b68a37c9",
+  "rights_version": "1.0.0+47f801102e17",
+  "rule_version_id": "rc-1.0.0",
+  "row_count": 5925913,
+  "financial_groups": 3153008,
+  "portfolio_gross": "98284.22",
+  "portfolio_paid": "98284.22",
+  "content_digest": "51193c1f2c4e8fcd8b8fa78ff197350ebe8b5a7c97c4ff1cd3f6a1ce6274b4cc",
+  "published_at": "2026-08-15 23:47:45.331701+00:00",
+  "publication_status": "PUBLISHED",
+  "holders": 59000,
+  "recordings": 2332853
+ },
+ "registry": [
+  {
+   "publication_id": "pub:v1",
+   "attribution_run_id": "attr:83c013596d1d3da3",
+   "content_digest": "51193c1f2c4e8fcd8b8fa78ff197350ebe8b5a7c97c4ff1cd3f6a1ce6274b4cc",
+   "row_count": 5925913,
+   "portfolio_gross": "98284.22",
+   "portfolio_paid": "98284.22",
+   "frozen": true,
+   "published_at": "2026-08-15 23:47:45.331701+00:00"
+  }
+ ],
+ "baseline_still_queryable": true,
+ "rounding_reconciliation": {
+  "attributable_modeled_unrounded": "103179.68",
+  "published_paid": "98284.22",
+  "difference_lost_to_rounding": "4895.46",
+  "pct_of_modeled_lost": 4.7446,
+  "financial_groups": 3153008,
+  "groups_rounded_to_zero": 1569336,
+  "single_stream_groups": 1569336,
+  "unrounded_group_total": "103179.68",
+  "rounded_group_total": "98284.22",
+  "explanation": "money is published to cents at the (recording, split set, rate window) grain, and the median group is one stream worth $0.0035, which rounds to $0.00. This is not a leak: it is the measured cost of the published rounding policy at a very fine grain, and it is the same root cause as the zero-value holder rows.",
+  "not_a_restatement_trigger": "fixing this would require a minimum-payment threshold with multi-period balance carry-forward, which is explicitly out of scope"
+ },
+ "black_box": {
+  "total_listens": 38199641,
+  "matched_listens": 31598529,
+  "reconciles_to_total": true,
+  "categories": [
+   {
+    "attribution_status": "ATTRIBUTABLE",
+    "streams": 28386887,
+    "pct_of_total": 74.311921,
+    "pct_of_matched": 89.836103,
+    "matched_streams": 28386887,
+    "streams_with_a_rate": 28386887,
+    "streams_with_amount_unknown": 0,
+    "amount": "103179.68",
+    "amount_meaning": "illustrative modeled amount ATTRIBUTED over real listening events",
+    "amount_unknown_reason": null,
+    "days_present": 27
+   },
+   {
+    "attribution_status": "UNMATCHED",
+    "streams": 6601112,
+    "pct_of_total": 17.28056,
+    "pct_of_matched": null,
+    "matched_streams": 0,
+    "streams_with_a_rate": 5927896,
+    "streams_with_amount_unknown": 673216,
+    "amount": "21538.81",
+    "amount_meaning": "illustrative modeled suspended amount over real listening events",
+    "amount_unknown_reason": "no rate card row covers these dates; no rate is imputed",
+    "days_present": 30
+   },
+   {
+    "attribution_status": "RATE_CARD_GAP",
+    "streams": 3164839,
+    "pct_of_total": 8.284997,
+    "pct_of_matched": 10.01578,
+    "matched_streams": 3164839,
+    "streams_with_a_rate": 0,
+    "streams_with_amount_unknown": 3164839,
+    "amount": null,
+    "amount_meaning": "illustrative modeled suspended amount over real listening events",
+    "amount_unknown_reason": "no rate card row covers these dates; no rate is imputed",
+    "days_present": 3
+   },
+   {
+    "attribution_status": "MATCH_RISK_POLICY",
+    "streams": 35007,
+    "pct_of_total": 0.091642,
+    "pct_of_matched": 0.110787,
+    "matched_streams": 35007,
+    "streams_with_a_rate": 31347,
+    "streams_with_amount_unknown": 3660,
+    "amount": "113.91",
+    "amount_meaning": "illustrative modeled suspended amount over real listening events",
+    "amount_unknown_reason": "no rate card row covers these dates; no rate is imputed",
+    "days_present": 30
+   },
+   {
+    "attribution_status": "DEFECTIVE_OWNERSHIP",
+    "streams": 11796,
+    "pct_of_total": 0.03088,
+    "pct_of_matched": 0.037331,
+    "matched_streams": 11796,
+    "streams_with_a_rate": 10580,
+    "streams_with_amount_unknown": 1216,
+    "amount": "38.41",
+    "amount_meaning": "illustrative modeled suspended amount over real listening events",
+    "amount_unknown_reason": "no rate card row covers these dates; no rate is imputed",
+    "days_present": 30
+   }
+  ],
+  "suspended_amount_total": 21691.13,
+  "suspended_amount_meaning": "illustrative modeled suspended amount over real listening events",
+  "attributed_amount": "103179.68"
+ },
+ "cost": {
+  "bytes_billed": 7910457344,
+  "list_price_equivalent_usd": 0.045,
+  "caveat": "list-price equivalent of processing consumption; actual monetary cost UNKNOWN without billing evidence"
+ },
+ "wall_seconds": 24.5,
+ "jobs": [
+  {
+   "step": "publication identity",
+   "job_id": "eebd7d8e-37f3-443a-be7f-179eca31756a",
+   "bytes_billed": 817889280,
+   "slot_ms": 15068,
+   "duration_ms": 2171
+  },
+  {
+   "step": "publication content digest",
+   "job_id": "41a92eb2-ac79-4d11-8e35-5a79257aa58a",
+   "bytes_billed": 972029952,
+   "slot_ms": 77209,
+   "duration_ms": 2301
+  },
+  {
+   "step": "portfolio gross",
+   "job_id": "226d9c56-d847-43ca-accb-05a057b36b0e",
+   "bytes_billed": 711983104,
+   "slot_ms": 13676,
+   "duration_ms": 1988
+  },
+  {
+   "step": "upstream versions",
+   "job_id": "8bb9e7cb-91de-4fb7-bdfb-f51a9b27f6c4",
+   "bytes_billed": 2750414848,
+   "slot_ms": 12020,
+   "duration_ms": 336
+  },
+  {
+   "step": "ensure publication registry",
+   "job_id": "94639776-cea9-4b89-8a9f-d2799ea58a6f",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 119
+  },
+  {
+   "step": "register the frozen baseline",
+   "job_id": "7dc0270c-d8db-4d6b-bcfe-9d69ac00b899",
+   "bytes_billed": 10485760,
+   "slot_ms": 3270,
+   "duration_ms": 1121
+  },
+  {
+   "step": "read back the registry",
+   "job_id": "b3a13d45-bb3f-4e6b-86fa-1ab4ba800bd3",
+   "bytes_billed": 10485760,
+   "slot_ms": 30,
+   "duration_ms": 169
+  },
+  {
+   "step": "prove v1 still queryable",
+   "job_id": "7d38a355-4d0d-4ba2-a49a-bf922b90f0fd",
+   "bytes_billed": 231735296,
+   "slot_ms": 903,
+   "duration_ms": 233
+  },
+  {
+   "step": "black-box decomposition",
+   "job_id": "a8c0c408-18a4-439e-8ed9-f8ed15b98920",
+   "bytes_billed": 1188036608,
+   "slot_ms": 15684,
+   "duration_ms": 630
+  },
+  {
+   "step": "totals",
+   "job_id": "f29c3e64-c98e-411c-ad50-0c4ebc5741c5",
+   "bytes_billed": 363855872,
+   "slot_ms": 5448,
+   "duration_ms": 334
+  },
+  {
+   "step": "rounding loss at the published grain",
+   "job_id": "c6644812-372e-4e16-bd88-8ab5a0e15d9d",
+   "bytes_billed": 853540864,
+   "slot_ms": 19210,
+   "duration_ms": 2852
+  }
+ ]
+}

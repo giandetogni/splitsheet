@@ -28,10 +28,22 @@ def frozen() -> dict:
         return yaml.safe_load(fh)
 
 
-def test_normalization_version_is_frozen(frozen):
-    assert load_rules().version == frozen["pipeline"]["normalization_version"], (
-        "normalization rules changed while Phase 4B is frozen. That is a restatement: see "
-        "docs/restatement_candidates.md, not an edit to this file.")
+def test_the_frozen_normalization_copy_still_reproduces_the_baseline_version(frozen):
+    """The v1 financial publication must stay reproducible after the restatement moved the live
+    rules. Its rule set lives in a frozen copy, and this is the guard that it still loads to the
+    exact version that produced pub:v1."""
+    frozen_copy = MANIFEST_PATH.parents[1] / frozen["restatement"]["prior_normalization_frozen_copy"]
+    assert frozen_copy.exists(), "the frozen v1 rule set is gone; v1 is no longer reproducible"
+    assert load_rules(frozen_copy).version == frozen["pipeline"]["normalization_version"]
+
+
+def test_the_live_normalization_version_is_the_declared_restatement_version(frozen):
+    """The live rules may move only to a version this manifest declares. An undeclared change --
+    including a well-meaning tweak to the transliteration table -- fails here rather than silently
+    producing a third normalization version nobody recorded."""
+    assert load_rules().version == frozen["restatement"]["new_normalization_version"], (
+        "the live normalization version is neither the frozen baseline nor the declared "
+        "restatement version. Declare it in config/frozen_versions.yml in the same commit.")
 
 
 def test_scoring_version_is_frozen(frozen):
@@ -51,6 +63,26 @@ def test_weights_and_thresholds_are_the_calibrated_ones(frozen):
     }
     assert (rules.exact_threshold, rules.fallback_threshold) == (0.55, 0.85)
     assert (rules.minimum_score_margin, rules.tie_epsilon) == (0.02, 0.01)
+
+
+def test_the_restatement_left_scoring_rights_and_payout_frozen(frozen):
+    """A restatement is allowed to change ONE thing. Scoring, rights and payout policy must be
+    identical to the baseline, or the delta could not be attributed to the trigger."""
+    r = frozen["restatement"]
+    assert r["scoring_version"] == frozen["pipeline"]["scoring_version"]
+    assert r["rights_version"] == "1.0.0+47f801102e17"
+    assert r["payout_policy_version"] == "1.0.0+84b4b68a37c9"
+    assert load_scoring_rules().version == r["scoring_version"]
+    assert r["prior_normalization_version"] != r["new_normalization_version"]
+
+
+def test_the_baseline_publication_identity_is_recorded(frozen):
+    r = frozen["restatement"]
+    for key in ("baseline_publication_id", "baseline_attribution_run_id",
+                "baseline_content_digest", "baseline_portfolio_paid", "baseline_row_count"):
+        assert r[key], key
+    assert r["baseline_content_digest"] == "51193c1f2c4e8fcd8b8fa78ff197350e"
+    assert r["baseline_portfolio_paid"] == "98284.22"
 
 
 def test_evaluation_split_versions_are_frozen(frozen):

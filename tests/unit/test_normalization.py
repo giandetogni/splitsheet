@@ -31,7 +31,12 @@ RULES_PATH = pathlib.Path(__file__).parents[2] / "config/normalization_rules.yml
 #: Golden pin. Editing config/normalization_rules.yml changes the digest and fails this
 #: test, which is the mechanism that forces a rule change to be acknowledged rather than
 #: slipped in. Update it deliberately, in the same commit as the rule change.
-EXPECTED_VERSION = "1.0.0+0bc0dd643e06"
+EXPECTED_VERSION = "1.1.0+b3253b155934"
+
+#: The FROZEN v1 rule set, kept so the v1 financial publication stays reproducible after the
+#: Phase 6 restatement moved the live rules to 1.1.0.
+V1_RULES_PATH = pathlib.Path(__file__).parents[2] / "config/normalization_rules_v1.0.0.yml"
+EXPECTED_V1_VERSION = "1.0.0+0bc0dd643e06"
 
 
 def _raw_rules() -> dict:
@@ -41,13 +46,21 @@ def _raw_rules() -> dict:
 
 # --- the separation this module exists to enforce ---------------------------------------
 
+#: Scripts with NO algorithmic romanisation. These still produce no ASCII key under 1.1.0, and that
+#: is the rule working rather than a gap: romanising them would need a dictionary.
 NON_LATIN = [
     pytest.param("Кино", "Группа крови", id="cyrillic"),
     pytest.param("Ελευθερία Αρβανιτάκη", "Δυναμίτης", id="greek"),
     pytest.param("فيروز", "زهرة المدائن", id="arabic"),
-    pytest.param("椎名林檎", "丸ノ内サディスティック", id="cjk-japanese"),
+    pytest.param("椎名林檎", "丸ノ内サディスティック", id="cjk-japanese-with-kanji"),
     pytest.param("周杰倫", "七里香", id="cjk-chinese"),
+]
+
+#: Scripts the 1.1.0 transliteration rule DOES cover. Under the frozen 1.0.0 rules they produced no
+#: key; that behaviour is asserted against the frozen copy in tests/unit/test_transliteration.py.
+TRANSLITERABLE = [
     pytest.param("아이유", "좋은 날", id="hangul"),
+    pytest.param("YOASOBI", "アイドル", id="kana"),
 ]
 
 
@@ -61,6 +74,22 @@ def test_non_latin_content_is_valid_and_keeps_its_script(artist, recording):
     assert not n.artist_normalized_unicode.isascii(), "script was not preserved"
     assert n.lookup_exact == ""
     assert n.exact_key_status is KeyStatus.EMPTY
+
+
+@pytest.mark.parametrize(("artist", "recording"), TRANSLITERABLE)
+def test_transliterable_scripts_now_produce_a_key_and_keep_their_script(artist, recording):
+    """The 1.1.0 change, stated as a property: a key appears, and the stored value stays non-Latin.
+
+    This test replaced an assertion that hangul yields no key. That assertion was true of 1.0.0 and
+    is exactly what the Phase 6 restatement changed, so it was updated deliberately rather than
+    relaxed -- and the old behaviour is still asserted, against the frozen v1 rule set.
+    """
+    n = normalize(artist, recording)
+    assert n.normalization_status is NormalizationStatus.VALID
+    assert not n.recording_normalized_unicode.isascii(), "script must still be preserved"
+    assert n.lookup_exact, "a transliterable title must produce a key under 1.1.0"
+    assert n.lookup_exact.isascii()
+    assert n.exact_key_status is KeyStatus.AVAILABLE
 
 
 @pytest.mark.parametrize(("artist", "recording", "expected"), [

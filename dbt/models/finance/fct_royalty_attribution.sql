@@ -8,6 +8,15 @@
     cluster_by = ['attribution_run_id', 'recording_mbid']
 ) }}
 
+{% if flags.FULL_REFRESH %}
+  {{ exceptions.raise_compiler_error(
+       "REFUSED: --full-refresh on fct_royalty_attribution would drop every published financial "
+       ~ "statement, including the immutable baseline pub:v1. Publications are append-only and "
+       ~ "keyed by attribution_run_id; a re-run under the same inputs is already a no-op, so a "
+       ~ "full refresh is never the way to republish. If a publication really must be discarded, "
+       ~ "do it deliberately outside dbt and record why in docs/schema_notes.md.") }}
+{% endif %}
+
 -- THE FINANCIAL FACT. One row per holder per recording per split set per rate window per run.
 --
 -- GRAIN, physical and asserted:

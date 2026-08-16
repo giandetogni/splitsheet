@@ -75,3 +75,45 @@ validation_result:
     SCORED_EXACT_MULTIPLE: 0.001101
     SCORED_FALLBACK_UNIQUE: 0.032138
     SCORED_FALLBACK_MULTIPLE: 0.021687
+
+# ==========================================================================================
+# PHASE 6 RESTATEMENT — appended 2026-08-16.
+#
+# The block above is UNCHANGED and stays authoritative for the v1 financial publication. What
+# follows records that the live normalization rules have moved past it, and how v1 remains
+# reproducible anyway.
+#
+# tests/unit/test_frozen.py asserts BOTH claims: the frozen copy still produces the v1 version, and
+# the live config produces exactly the declared restatement version. Neither may drift silently.
+# ==========================================================================================
+restatement:
+  trigger_id: "RT-1"
+  trigger_reason: "TRANSLITERATION_KOREAN_JAPANESE_TITLES"
+  frozen_at: "2026-08-16"
+  # The baseline this restatement is measured against.
+  baseline_publication_id: "pub:v1"
+  baseline_attribution_run_id: "attr:83c013596d1d3da3"
+  baseline_content_digest: "51193c1f2c4e8fcd8b8fa78ff197350e"
+  baseline_portfolio_paid: "98284.22"
+  baseline_row_count: 5925913
+  # Normalization moved; everything else did not.
+  prior_normalization_version: "1.0.0+0bc0dd643e06"
+  prior_normalization_frozen_copy: "config/normalization_rules_v1.0.0.yml"
+  new_normalization_version: "1.1.0+b3253b155934"
+  scoring_version: "1.0.0+cb21f9704ff0"          # UNCHANGED
+  payout_policy_version: "1.0.0+84b4b68a37c9"    # UNCHANGED
+  rights_version: "1.0.0+47f801102e17"           # UNCHANGED
+  rule: >-
+    transliterate hangul and kana into Latin on the LOOKUP KEY path only, and only when the
+    conversion covers every non-Latin character. Kanji is deliberately not transliterated. The
+    preserved *_normalized_unicode values are untouched, so a Korean title is still stored in
+    Korean.
+  chosen_by: "docs/phase0/transliteration_probe.json, under the rule frozen in config/restatement_trigger.yml before the probe ran"
+  probe_evidence:
+    alternative_chosen: "B_broader"
+    scripts: ["hangul", "kana"]
+    listens_affected: 981720
+    listens_that_gained_a_key: 611493
+    unique_candidate_rate: 0.9997
+    keys_over_100_candidates: 0
+    conservative_alternative_keyed: 441869

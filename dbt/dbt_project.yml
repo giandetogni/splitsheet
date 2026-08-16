@@ -34,10 +34,36 @@ flags:
 # attribution_run_id and publication_status per publication, and tests/unit/test_payout_policy.py
 # asserts that payout_policy_version here still equals the digest-sealed value in
 # config/payout_policy.yml -- so the warehouse cannot drift from the policy it claims to apply.
+# The defaults describe the CURRENT state of the warehouse: pub:v2 is the publication in force and
+# the restated matches are what the financial gates read. That matters for more than tidiness -- with
+# the old defaults (prior and new both pointing at pub:v1) the restatement tests passed VACUOUSLY,
+# because the delta between a publication and itself is trivially consistent. A standalone
+# `dbt build` now validates the real restatement.
+#
+# Re-publishing is safe: fct_royalty_attribution refuses a run id it already holds, so building with
+# these defaults inserts nothing.
 vars:
   payout_policy_version: "1.0.0+84b4b68a37c9"
-  attribution_run_id: "attr:83c013596d1d3da3"
+  attribution_run_id: "attr:fb74b680430fa0b2"
   publication_status: "PUBLISHED"
+  # Which match result the frozen financial gates read: v1 (the Phase 4B matcher) or the Phase 6
+  # restated one. The gates themselves are identical for both, which is what makes the delta
+  # attributable to normalization alone.
+  matches_source: "restated"
+  # Restatement identity. Defaults describe pub:v1 -> pub:v2 so the models parse standalone; the
+  # publisher passes the real values.
+  prior_publication_id: "pub:v1"
+  new_publication_id: "pub:v2"
+  prior_attribution_run_id: "attr:83c013596d1d3da3"
+  restatement_run_id: "restate:6b3923771883e860"
+  trigger_reason: "TRANSLITERATION_KOREAN_JAPANESE_TITLES"
+  prior_normalization_version: "1.0.0+0bc0dd643e06"
+  new_normalization_version: "1.1.0+b3253b155934"
+  prior_scoring_version: "1.0.0+cb21f9704ff0"
+  new_scoring_version: "1.0.0+cb21f9704ff0"
+  payout_policy_version_expected: "1.0.0+84b4b68a37c9"
+  prior_row_count: 5925913
+  prior_portfolio_paid: "98284.22"
 
 models:
   splitsheet:

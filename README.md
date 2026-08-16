@@ -53,18 +53,29 @@ tests/      unit (pure, no cloud) and integration (real BigQuery, marked and sep
 
 ## Current state
 
-Phases 0 through 4B are complete and **frozen** (`config/frozen_versions.yml`): 82.72% of listens
+Phases 0 through 6 are complete. The Phase 4B matcher and the Phase 5B financial publication are
+**frozen** (`config/frozen_versions.yml`): 82.72% of listens
 carry a technical match, measured at 0.0066% disagreement with the reference label on a validation
 partition opened exactly once. Phase 5A added modeled rights, temporal ownership with half-open
 validity intervals, a real dbt SCD2 snapshot over rights holders, and a queryable data quality
 report. Phase 5B added the payout policy, royalty attribution and an immutable financial
 publication.
 
-**The number that matters is not the match rate.** 82.72% of listens are technically matched;
-**74.31% are payable**. The 8.41-point difference is 3.16M streams whose rate card has a deliberate
-gap, 35,007 held because the fallback match path is not trusted enough to pay on, and 11,796 with
-defective ownership. Every published amount is an *illustrative modeled amount*, the published
+**The number that matters is not the match rate.** Under the v1 publication 82.72% of listens are
+technically matched and **74.31% are payable**: the difference is 3.16M streams whose rate card has a
+deliberate gap, 35,007 held because the fallback match path is not trusted enough to pay on, and 11,796
+with defective ownership. Every published amount is an *illustrative modeled amount*, the published
 total closes to the cent against the sum of its parts, and the first publication is immutable.
+
+**Phase 6 restated it, and the result is the most instructive number in the project.** Transliterating
+Korean and Japanese titles (a change chosen by an unsupervised probe under criteria frozen beforehand)
+recovered **570,735 listens** of attribution — including all 384,926 listens of one recording that
+previously could not even be looked up. The published money moved **$0.86**. Two reasons, both of them
+the pipeline being right: the modeled rights universe was generated against the *old* match run, so
+26,665 of the 26,700 newly matched recordings have no ownership record and are correctly refused; and
+cent rounding at the published grain destroys small recoveries. Fixing matching does not produce
+payouts on its own. Both publications remain queryable, v1's content digest is unchanged, and
+`SUM(delta)` reconciles to the difference between them exactly.
 
 Every phase is written up in `docs/schema_notes.md`, including the measurements that contradicted
 my own expectations. `docs/restatement_candidates.md` records the changes known to be worth making

@@ -35,7 +35,16 @@ from rights.generator import load_rights_model
 MODEL = load_rights_model()
 GENERATION_REPORT = REPO / "docs/phase0/rights_generation.json"
 
-ELIGIBLE_LISTENS = 31_563_522
+#: Measured on the RESTATED matches (normalization 1.1.0+b3253b155934), which is what dbt last built.
+#: The Phase 5B figures for pub:v1 are preserved in docs/schema_notes.md section 23.
+#:
+#: NOTE WHICH GATE THIS FILE MEASURES. int_payout_eligibility applies only the MATCH gate, so its
+#: `payout_eligible` is "matched and not held for match risk" -- 32,134,257 listens. The FULL gate,
+#: which also requires ownership and a rate, lives in int_financial_disposition and admits 28,387,115.
+#: Conflating the two is exactly the mistake the two-column design in that model exists to prevent, and
+#: this test asserted the wrong one on the first attempt.
+MATCH_GATE_ELIGIBLE = 32_134_257
+MATCHED_LISTENS = 32_169_264
 RISK_HELD_LISTENS = 35_007
 LISTENS = 38_199_641
 
@@ -187,10 +196,12 @@ def test_matched_is_not_payable(bq):
         FROM `{PROJECT}.splitsheet_dbt.int_payout_eligibility`
     """)
     assert r["listens"] == LISTENS
-    assert r["eligible"] == ELIGIBLE_LISTENS
+    assert r["eligible"] == MATCH_GATE_ELIGIBLE
     assert r["risk_held"] == RISK_HELD_LISTENS
+    assert r["matched"] == MATCHED_LISTENS
     assert r["matched_but_held"] == RISK_HELD_LISTENS, (
-        "the whole point of the layer: technically matched listens that are not payable")
+        "at the MATCH gate, the only technically matched listens that are not eligible are the "
+        "risk-held ones. Ownership and rate holds are applied later, in int_financial_disposition.")
     assert r["matched"] - r["eligible"] == RISK_HELD_LISTENS
 
 

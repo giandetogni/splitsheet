@@ -30,6 +30,7 @@ import sys
 import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).parents[1]))
+from payout.digest import publication_digest_sql
 from payout.policy import attribution_run_id, load_payout_policy
 
 PROJECT = "ss-de-944054e7"
@@ -174,20 +175,15 @@ def content_digest(client, run_id: str, stats, label: str) -> dict:
     published_at is deliberately excluded: it is wall-clock metadata, and the claim being tested is
     that the AMOUNTS and their keys are untouched.
     """
-    r = run_query(client, f"""
-        SELECT COUNT(*) AS rows_published,
-               TO_HEX(SHA256(STRING_AGG(row_key, '\\n' ORDER BY row_key))) AS content_digest,
-               SUM(holder_payout) AS total_holder_payout,
-               MIN(published_at) AS first_published_at
-        FROM (
-          SELECT FORMAT('%t|%t|%t|%t|%t|%t|%t', recording_mbid, rights_holder_id,
-                        split_version_id, rate_card_id, holder_share_pct, holder_payout,
-                        gross_royalty) AS row_key,
-                 holder_payout, published_at
-          FROM `{FACT_TABLE}`
-          WHERE attribution_run_id = '{run_id}')
-    """, label, stats)[0]
-    return {k: (str(v) if v is not None else None) for k, v in r.items()}
+    r = run_query(client, publication_digest_sql(FACT_TABLE, run_id), label, stats)[0]
+    stamp = run_query(client, f"""
+        SELECT MIN(published_at) AS first_published_at
+        FROM `{FACT_TABLE}` WHERE attribution_run_id = '{run_id}'
+    """, f"{label}: published_at", stats)[0]
+    out = {"rows_published": r["row_count"], "content_digest": r["content_digest"],
+           "total_holder_payout": r["total_holder_payout"],
+           "first_published_at": stamp["first_published_at"]}
+    return {k: (str(v) if v is not None else None) for k, v in out.items()}
 
 
 def main() -> None:

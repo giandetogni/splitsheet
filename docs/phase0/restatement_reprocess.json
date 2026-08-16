@@ -1,0 +1,192 @@
+{
+ "artifact": "restatement_reprocessing",
+ "restatement_run_id": "restate:6b3923771883e860",
+ "prior_normalization_version": "1.0.0+0bc0dd643e06",
+ "new_normalization_version": "1.1.0+b3253b155934",
+ "scoring_version_unchanged": "1.0.0+cb21f9704ff0",
+ "blocking_version": "staged-1.1.0",
+ "cohort": {
+  "definition": "v1 failure_reason in ('NO_LOOKUP_KEY_PARTIAL', 'NO_LOOKUP_KEY_EMPTY') AND artist or recording contains a hangul or kana character, exactly as config/restatement_trigger.yml froze it",
+  "first_implementation_deviation": "the script test alone pulled in 395,540 listens that already had a key and cost 29,954 previously matched ones; restricted to the frozen definition, no v1 match can be lost because every listen in scope was unmatched",
+  "affected_listens": 982322,
+  "affected_pairs": 147599,
+  "pct_of_corpus": 2.571548,
+  "renormalized_pairs": 147599,
+  "renormalized_pairs_sha256": "711a59bc5d761fef10e5d63eddec56dd26d97adfff1b81a01898bdb3fc1c3681",
+  "transliterated_canonical_index_rows": 474298,
+  "transliterated_index_sha256": "05334f509a38a91b25b303761d012b240fd9503975a9db0c372f3e325b2dcc03"
+ },
+ "shape": {
+  "total_rows": 38199641,
+  "distinct_listens": 38199641,
+  "cohort_rows": 982322,
+  "unaffected_rows_that_moved": 0
+ },
+ "transitions": [
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "new_status": "MATCHED",
+   "new_reason": null,
+   "new_method": "STRUCTURAL_EXACT_UNIQUE",
+   "listens": 542536
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "new_status": "UNRESOLVED",
+   "new_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "new_method": "NO_CANDIDATES",
+   "listens": 189851
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+   "new_status": "UNRESOLVED",
+   "new_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "new_method": "NO_CANDIDATES",
+   "listens": 81241
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+   "new_status": "UNRESOLVED",
+   "new_reason": "NO_LOOKUP_KEY_EMPTY",
+   "new_method": "NO_CANDIDATES",
+   "listens": 71097
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "new_status": "UNRESOLVED",
+   "new_reason": "NO_BLOCK_CANDIDATES",
+   "new_method": "NO_CANDIDATES",
+   "listens": 58328
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+   "new_status": "MATCHED",
+   "new_reason": null,
+   "new_method": "STRUCTURAL_EXACT_UNIQUE",
+   "listens": 28199
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+   "new_status": "UNRESOLVED",
+   "new_reason": "NO_BLOCK_CANDIDATES",
+   "new_method": "NO_CANDIDATES",
+   "listens": 6133
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+   "new_status": "UNRESOLVED",
+   "new_reason": "AMBIGUOUS_TIE",
+   "new_method": "SCORED_EXACT_MULTIPLE",
+   "listens": 4735
+  },
+  {
+   "prior_status": "UNRESOLVED",
+   "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+   "new_status": "UNRESOLVED",
+   "new_reason": "AMBIGUOUS_TIE",
+   "new_method": "SCORED_EXACT_MULTIPLE",
+   "listens": 202
+  }
+ ],
+ "summary": {
+  "newly_matched": 570735,
+  "still_unmatched": 411587,
+  "newly_ambiguous": 4937,
+  "previously_matched_now_unmatched": 0
+ },
+ "cost": {
+  "bytes_billed": 35427188736,
+  "estimated_bytes_dry_run": 0,
+  "list_price_equivalent_usd": 0.2014,
+  "caveat": "list-price equivalent; actual monetary cost UNKNOWN without billing evidence"
+ },
+ "wall_seconds": 538.8,
+ "jobs": [
+  {
+   "step": "affected cohort size",
+   "job_id": "a196662d-bf72-41e4-a009-f7c9ded9c048",
+   "bytes_billed": 0,
+   "slot_ms": null,
+   "duration_ms": 134
+  },
+  {
+   "step": "affected distinct pairs",
+   "job_id": "8de31f8d-1e13-4469-9ee4-c52f33a6ec7f",
+   "bytes_billed": 0,
+   "slot_ms": null,
+   "duration_ms": 120
+  },
+  {
+   "step": "land re-normalized pairs",
+   "load_job_id": "2f555d6c-d028-483d-bfe7-2fe33cb10130",
+   "rows": 147599,
+   "bytes": 13259011,
+   "sha256": "711a59bc5d761fef10e5d63eddec56dd26d97adfff1b81a01898bdb3fc1c3681",
+   "object": "gs://splitsheet-raw-944054e7/derived/restatement/restate_6b3923771883e860/restated_pairs.tsv.gz"
+  },
+  {
+   "step": "canonical rows in scope",
+   "job_id": "9a9705fb-3ec0-43e3-a2d8-a72998605f9b",
+   "bytes_billed": 0,
+   "rows": 1254732
+  },
+  {
+   "step": "land transliterated canonical index",
+   "load_job_id": "89df17b7-a315-4593-a15d-3d2a055a151c",
+   "rows": 474298,
+   "bytes": 17522258,
+   "sha256": "05334f509a38a91b25b303761d012b240fd9503975a9db0c372f3e325b2dcc03",
+   "object": "gs://splitsheet-raw-944054e7/derived/restatement/restate_6b3923771883e860/restated_index.tsv.gz"
+  },
+  {
+   "step": "rebuild cohort and copy the rest",
+   "job_id": "c528c771-f12c-4e27-8774-9c23861d3298",
+   "bytes_billed": 14981005312,
+   "slot_ms": 2638128,
+   "duration_ms": 12351
+  },
+  {
+   "step": "prove the unaffected cohort did not move",
+   "job_id": "deb3c879-890e-413d-b69a-62eadcdc4335",
+   "bytes_billed": 11510218752,
+   "slot_ms": 425950,
+   "duration_ms": 1641
+  },
+  {
+   "step": "prove no v1 match was lost",
+   "job_id": "d4954b4e-427e-4c7f-943d-a0f82c8aa862",
+   "bytes_billed": 4216324096,
+   "slot_ms": 194314,
+   "duration_ms": 1510
+  },
+  {
+   "step": "cohort transitions",
+   "job_id": "db016b9e-140e-49fd-ad54-58f907dad801",
+   "bytes_billed": 4719640576,
+   "slot_ms": 109489,
+   "duration_ms": 941
+  },
+  {
+   "step": "drop staging stg_restated_pairs",
+   "job_id": "f251712d-04f9-41ca-8444-85a9a03cbecd",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 195
+  },
+  {
+   "step": "drop staging stg_restated_index",
+   "job_id": "763c98fb-a13a-4d70-aafa-e85685731462",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 123
+  }
+ ]
+}

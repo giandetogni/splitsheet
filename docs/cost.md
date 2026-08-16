@@ -350,3 +350,43 @@ Notes worth carrying forward:
 Cumulative project consumption is now roughly **0.98 TiB** across all phases against a 1 TiB
 monthly on-demand allowance — so the free tier has probably absorbed all of it, **probably, on
 arithmetic, not on billing evidence**.
+
+## Phase 6 — restatement
+
+| stage | jobs | bytes billed |
+|---|---|---|
+| freeze + black-box report | 11 | 7,910,457,344 |
+| transliteration probe (read-only) | 3 | 12,403,605,504 |
+| normalization + blocking (cohort reprocessing) | 11 | 35,427,188,736 |
+| financial recomputation + restatement + dbt | 11 | 8,900,313,088 |
+| concrete case | 5 | 20,224,933,888 |
+| evaluation | 5 | 36,785,094,656 |
+| **total** | **46** | **121,651,593,216 = 0.1106 TiB** |
+
+**List-price equivalent ≈ $0.69.** Processing consumption, **not** money known to have been charged.
+**Actual monetary cost remains UNKNOWN without billing evidence.**
+
+**Incremental versus full rebuild, measured rather than claimed.** The comparable stages of a full
+rebuild have known costs from when they last ran over the whole corpus: blocking 42,752,540,672 +
+features 12,382,633,984 + scoring/publication 30,855,397,376 = **85,990,572,032 bytes**. The incremental
+reprocessing achieved the same normalization change for **35,427,188,736**, about **41 %** of that. The
+comparison excludes the probe, freeze, case study and evaluation that a rebuild would also need, ignores
+local CPU for transliterating 1,254,732 canonical rows, and understates the floor: identifying and
+verifying the cohort scans the 38.2M-row match table either way. **No savings figure is claimed beyond
+that ratio.**
+
+Two stages cost more than the work they described:
+
+- **Evaluation, 36.8 GB** — more than the reprocessing it evaluated, because each metric query re-joins
+  the label table to two 38.2M-row match tables. Same finding as Phase 5A; the fix is still to
+  materialise the joined evaluation set once, and it is still not worth doing for a one-off run.
+- **The concrete case, 20.2 GB** to describe a single recording, because locating it means scanning both
+  match tables and the 31.5M-row canonical snapshot with no usable filter on artist and title.
+
+Two runs were wasted and are counted above: a reprocessing attempt killed by a 9-minute foreground wall
+after its staging tables landed, and a first cohort definition that ignored half the frozen predicate
+(~12 GB, and it is what surfaced the 29,954 lost matches).
+
+Cumulative project consumption is now roughly **1.09 TiB** across all phases. That is past the 1 TiB
+monthly on-demand allowance in aggregate, though the allowance is monthly and this project has spanned
+several months. **Whether anything was actually charged remains UNKNOWN without billing evidence.**

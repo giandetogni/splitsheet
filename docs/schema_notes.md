@@ -1981,3 +1981,422 @@ Cost: dry-run estimate **6,933,335,858 bytes** recorded before materialising; pu
 billed **8,299,479,040** across 13 jobs; dbt materialised the disposition (38.2M rows), attributable
 streams (3.2M) and the fact (5.9M) inside its own jobs. **List-price equivalent ≈ $0.05** for the
 publisher's queries. **Actual monetary cost remains UNKNOWN without billing evidence.**
+
+## 24. Phase 6 — black-box quantification and restatement
+
+The first five phases built a pipeline. This one changes a published financial figure and proves the
+change was contained, attributable and reversible. Every amount remains an **illustrative modeled
+amount over real listening events**: the listens and recordings are REAL, the rights and rate card
+are MODELED, and nothing here is revenue.
+
+### 24.1 v1 frozen, with a digest that can be recomputed
+
+Before anything else, the Phase 5B publication was recorded in a registry table
+(`splitsheet_dbt.publication_registry`) with everything needed to detect a change:
+
+| | |
+|---|---|
+| publication_id / attribution_run_id | `pub:v1` / `attr:83c013596d1d3da3` |
+| normalization / scoring | `1.0.0+0bc0dd643e06` / `1.0.0+cb21f9704ff0` |
+| payout policy / rights | `1.0.0+84b4b68a37c9` / `1.0.0+47f801102e17` |
+| rows / holders / recordings | 5,925,913 / 59,000 / 2,332,853 |
+| portfolio gross = paid | **98,284.22 = 98,284.22** |
+| content digest | `51193c1f2c4e8fcd8b8fa78ff197350e…` |
+| published_at | 2026-08-15 23:47:45 UTC |
+| still queryable | yes |
+
+**The digest is two-level on purpose.** The obvious form — SHA-256 over one ordered `STRING_AGG` of
+every row — builds a ~600 MB string for 5.9M rows and BigQuery killed it: *"Resources exceeded during
+query execution. Peak usage: 119% of limit."* So it hashes each row, then each of 512 buckets of row
+hashes, then the ordered bucket digests. The result depends only on row content, not on order,
+partitioning or slot count, and it is now the single definition used by both the publisher and the
+freeze (`src/payout/digest.py`).
+
+### 24.2 The black box, and a 4.74 % rounding loss I had not quantified
+
+All 38,199,641 listens, decomposed with amounts only where a rate legitimately exists:
+
+| terminal state | streams | share | modeled amount | streams with amount UNKNOWN |
+|---|---|---|---|---|
+| ATTRIBUTABLE | 28,386,887 | 74.3119 % | 103,179.68 | 0 |
+| UNMATCHED | 6,601,112 | 17.2806 % | 21,538.81 | 673,216 |
+| RATE_CARD_GAP | 3,164,839 | 8.2850 % | **UNKNOWN** | 3,164,839 |
+| MATCH_RISK_POLICY | 35,007 | 0.0916 % | 113.91 | 3,660 |
+| DEFECTIVE_OWNERSHIP | 11,796 | 0.0309 % | 38.41 | 1,216 |
+| **suspended total** | | | **21,691.13** | |
+
+`RATE_CARD_GAP` has **no amount at all** — not the previous rate, not an average, not zero. The other
+held categories can be valued because a rate is a function of the date, and applying the rate the
+card actually defines for a date to streams withheld for a different reason is not imputation. The
+678,092 held streams that fall inside the gap days are reported as UNKNOWN rather than folded in.
+
+**Two numbers then had to be reconciled**: the attributable modeled amount is **103,179.68** but the
+publication paid **98,284.22**. The difference is **4,895.46, or 4.7446 %**, and it is not a leak: it
+is the measured cost of rounding to cents at the published grain. **1,569,336 of 3,153,008 financial
+groups round to 0.00**, because the median group is one stream worth $0.0035. This is the same root
+cause as the 3,926,337 zero-value holder rows reported in Phase 5B, now quantified in money. Fixing
+it needs a minimum-payment threshold with multi-period carry-forward, which is explicitly out of
+scope, so it is recorded rather than closed.
+
+### 24.3 The trigger was frozen before the probe, and the probe chose the rule
+
+`config/restatement_trigger.yml` (digest `a1de8b98302e`) fixed, **before any measurement**: the
+trigger and its pre-Phase-6 evidence, the two alternatives, a third alternative rejected on prior
+evidence, the versions, the expected cohort, and — critically — the rule for choosing between the
+alternatives:
+
+> maximise listens that gain a usable key, subject to a unique-candidate rate ≥ 0.90 and no new key
+> producing more than 100 canonical candidates; if neither alternative qualifies, implement nothing.
+> Forbidden inputs: reference labels, calibration, validation, holdout, and how much money moves.
+
+**Why only hangul and kana.** Both are algorithmic: a hangul syllable decomposes arithmetically into
+jamo, and kana is a syllabary with one reading per character. **Kanji is not** — a Han character's
+reading depends on the word it appears in, so romanising it needs a dictionary and a parser whose
+errors would be indistinguishable from matching bugs. Kanji is therefore left alone, and a title
+containing it is reported as *not fully covered* and produces **no key**. Partial coverage was
+rejected before measurement: keying on a fragment of a title is exactly the low-information key the
+Phase 4 preflight measured (`cvver`, 434,700 candidate pairs from one key).
+
+The probe measured both alternatives on the real residual (336,253 distinct pairs, 1,597,809 listens
+across `NO_LOOKUP_KEY_PARTIAL` and `NO_LOOKUP_KEY_EMPTY`), transliterating **both sides** of the
+join:
+
+| | A: hangul | B: hangul + kana |
+|---|---|---|
+| canonical rows scanned | 65,429 | 1,035,644 |
+| canonical fully covered → keyed | 63,254 → 63,250 | 216,180 → 216,010 |
+| listens affected | 443,478 | 981,720 |
+| listens that gained a key | 441,869 | **611,493** |
+| unique candidate | 409,748 | 516,594 |
+| multi-candidate | **0** | 142 |
+| unique-candidate rate | 1.0000 | 0.9997 |
+| keys over 100 candidates | 0 | 0 |
+| satisfies the frozen constraints | yes | yes |
+
+Both qualified, so the frozen rule took the one keying more listens: **B_broader**. Note what the
+probe also shows — of 1,597,809 residual listens, **1,407,530 contain kanji**, which is why the
+larger share of the residual is untouched by design rather than by omission.
+
+Script inventory over the cohort, by listens: han 1,407,530 · kana 1,077,630 · hangul 886,956 ·
+other 584,920 (a listen can contain several).
+
+### 24.4 A deviation from the frozen definition, caught by its own numbers
+
+The first reprocessing run defined the affected cohort as "the strings contain hangul or kana" and
+ignored the other half of the frozen definition. `config/restatement_trigger.yml` says the cohort is
+that condition **AND** a v1 failure reason of `NO_LOOKUP_KEY_PARTIAL` or `NO_LOOKUP_KEY_EMPTY`.
+
+The consequence was measurable and bad:
+
+| | listens |
+|---|---|
+| cohort under the loose definition | 1,377,862 |
+| of those, inside the frozen definition | 982,322 |
+| of those, **outside** it (already had a key) | **395,540** |
+| previously matched listens that LOST their match | **29,954** |
+| — of which were STRUCTURAL_EXACT_UNIQUE under v1 | 21,211 |
+| — of which were SCORED_EXACT_MULTIPLE | 7,476 |
+| — of which were SCORED_FALLBACK_* | 1,267 |
+
+The mechanism is worth understanding, because it is a real property of the rule rather than a coding
+slip: **transliteration does not only add keys, it CHANGES existing ones.** A mixed string like
+`Dynamite (한국어)` had an ASCII key under v1, built by dropping the Korean characters. Under 1.1.0
+those characters transliterate instead of vanishing, so the key becomes a different string — and the
+recording it used to find is no longer behind that key. For 22,612 listens the new key found nothing;
+for 7,342 it found several.
+
+Restricting to the frozen definition removes the regression by construction: every listen in scope
+was unmatched under v1, so there is no match to lose. A new invariant now enforces it — the
+reprocessing run fails if a single cohort listen loses a v1 match.
+
+**Where the loose cohort would have been the honest choice**: nowhere in this phase. Changing keys for
+already-matched listens is a much larger change than the trigger asked for, and it would have needed
+its own probe, its own evidence and its own decision. It is recorded here as a known property of the
+rule rather than smuggled into a restatement that was scoped to unmatched listens.
+
+### 24.5 What the reprocessing does, and what it deliberately does not
+
+**Incremental by construction.** Only the cohort's distinct pairs are re-normalized, only canonical
+recordings containing an enabled script get transliterated index rows, and every listen outside the
+cohort is copied from the frozen v1 result and then **proven byte-identical** on
+`matched_recording_mbid`, `match_status`, `match_method`, `failure_reason` and `candidate_count`. A
+full rebuild would have re-normalized 4,599,791 pairs, rebuilt a 58.8M-row index and regenerated
+34.5M candidates to move a cohort of about a million listens.
+
+**One deliberate simplification, and it only ever reduces what the restatement claims.** The cohort's
+new candidates are decided structurally: a single candidate is accepted, several are refused as
+`AMBIGUOUS_TIE`. The frozen scorer is NOT re-run over them, because scoring new candidates would
+require extending the feature table (text similarity for recordings that were never in the scored
+universe) and that is a larger change than the trigger justifies. The consequence is stated rather
+than hidden: newly ambiguous listens are **refused, not scored**, so the recovered coverage reported
+below is a **lower bound**. Refusing cannot pay the wrong holder; scoring might.
+
+`scoring_version` is therefore untouched at `1.0.0+cb21f9704ff0`, which is what lets the financial
+delta be attributed to normalization alone.
+
+### 24.6 The reprocessing result
+
+Cohort: **982,322 listens (2.5715 % of the corpus), 147,599 distinct pairs**, re-normalized under
+`1.1.0+b3253b155934`. Canonical side: **474,298 transliterated index rows** added from 1,254,732
+in-scope snapshot rows.
+
+| | listens |
+|---|---|
+| **newly matched** | **570,735** |
+| still unmatched | 411,587 |
+| newly ambiguous (refused, not scored) | 4,937 |
+| **v1 matches lost** | **0** |
+| **listens outside the cohort that moved** | **0** |
+
+Transitions, in full:
+
+| from | to | listens | method |
+|---|---|---|---|
+| NO_LOOKUP_KEY_PARTIAL | MATCHED | 542,536 | STRUCTURAL_EXACT_UNIQUE |
+| NO_LOOKUP_KEY_PARTIAL | NO_LOOKUP_KEY_PARTIAL | 189,851 | no candidates |
+| NO_LOOKUP_KEY_EMPTY | NO_LOOKUP_KEY_PARTIAL | 81,241 | no candidates |
+| NO_LOOKUP_KEY_EMPTY | NO_LOOKUP_KEY_EMPTY | 71,097 | no candidates |
+| NO_LOOKUP_KEY_PARTIAL | NO_BLOCK_CANDIDATES | 58,328 | no candidates |
+| NO_LOOKUP_KEY_EMPTY | MATCHED | 28,199 | STRUCTURAL_EXACT_UNIQUE |
+| NO_LOOKUP_KEY_EMPTY | NO_BLOCK_CANDIDATES | 6,133 | no candidates |
+| NO_LOOKUP_KEY_PARTIAL | AMBIGUOUS_TIE | 4,735 | SCORED_EXACT_MULTIPLE |
+| NO_LOOKUP_KEY_EMPTY | AMBIGUOUS_TIE | 202 | SCORED_EXACT_MULTIPLE |
+
+Three of those rows are worth reading carefully rather than skimming:
+
+- **81,241 listens moved from `NO_LOOKUP_KEY_EMPTY` to `NO_LOOKUP_KEY_PARTIAL`.** That is progress
+  that produced no match: one half of the key became transliterable (usually the artist) while the
+  other half still contains kanji. The listen is still unmatched, but the reason is now more specific,
+  and that is the honest label rather than pretending nothing changed.
+- **64,461 listens moved to `NO_BLOCK_CANDIDATES`.** They now have a complete key, and the key finds
+  nothing in the canonical snapshot. The failure moved from "we cannot ask the question" to "we asked
+  and MusicBrainz has no such recording" — a different problem with a different owner.
+- **189,851 + 71,097 = 260,948 listens did not move at all**, because their titles contain kanji and
+  the rule deliberately refuses to guess at it.
+
+### 24.7 The restated publication, and the finding that matters most
+
+`pub:v2` / `attr:fb74b680430fa0b2`, produced by running the **identical frozen gates** over the
+restated matches. Payout policy `1.0.0+84b4b68a37c9`, scoring `1.0.0+cb21f9704ff0`, rights
+`1.0.0+47f801102e17`, rate rule `rc-1.0.0` — all unchanged. Only normalization moved.
+
+| | pub:v1 | pub:v2 |
+|---|---|---|
+| holder rows | 5,925,913 | 5,925,923 |
+| portfolio paid | 98,284.22 | 98,285.08 |
+| content digest | `51193c1f2c4e…` | `1acd4e4fa032…` |
+| normalization | 1.0.0+0bc0dd643e06 | 1.1.0+b3253b155934 |
+
+**570,735 listens gained a match. The money moved $0.86.**
+
+That is not a bug and it is the most instructive result in this phase, so here is the whole chain:
+
+| | |
+|---|---|
+| newly matched listens | 570,735 |
+| distinct recordings behind them | 26,700 |
+| **of those, recordings with MODELED ownership** | **35** |
+| recordings with **no** ownership record | **26,665** |
+| newly matched listens ending as `DEFECTIVE_OWNERSHIP` / `OWNERSHIP_MISSING` | **570,493** |
+| newly matched listens ending as `ATTRIBUTABLE` | 228 |
+| newly matched listens landing in the rate-card gap | 14 |
+| unrounded value of 570,735 streams at ~$0.0036 | ≈ 2,054.65 |
+| actual published delta | **0.86** |
+
+**Two independent reasons, both of them the pipeline behaving correctly.**
+
+1. **The rights universe has its own boundary.** The MODELED ownership was generated in Phase 5A
+   against the recordings that the *v1* matcher matched (`universe.match_run_id
+   match:101eef5c5b5c081e`, 2,471,846 recordings). The restatement matched 26,665 recordings that
+   universe never contained, so they have no ownership row, so the payout policy refuses them —
+   `DEFECTIVE_OWNERSHIP`, exactly as it refuses a real recording with a broken split. Phase 5A rights
+   are frozen and regenerating them was out of scope, so this is the correct outcome under the
+   constraints rather than something to work around.
+
+2. **Cent rounding destroys small recoveries.** Even where ownership existed, the newly attributable
+   groups are tiny. Across the whole v2 publication the unrounded gross is 103,180.51 against 98,285.08
+   published: **1,569,327 of 3,153,014 financial groups still round to $0.00**.
+
+So the honest headline is: **the restatement recovered 570,735 listens of attribution (1.4941 % of the
+corpus) and almost no money.** Fixing matching does not produce payouts on its own — the reference
+data has its own universe, and the financial layer is right to refuse what it cannot attribute.
+
+**A restatement that only ADDS streams can still REDUCE a holder's payout.** Measured, one case:
+`MRH-028402` went from 686 streams / \$0.15 to 712 streams / \$0.14, a delta of **−\$0.01**. Nothing
+was taken away: the recording gained streams, the group's gross rose, and the largest-remainder
+allocation redistributed the cents so that this holder's fraction stopped winning one. That is
+inherent to publishing money at cent precision, and it is why the delta mart records
+`PAYOUT_DECREASED` as a first-class change type instead of assuming deltas are one-directional.
+
+Delta composition: 0 holders added, 0 removed, **27 increased, 1 decreased**, everything else
+unchanged.
+
+### 24.8 Immutability, proven after the fact
+
+| property | evidence |
+|---|---|
+| v1 content digest unchanged | recomputed before and after the entire restatement: identical, and equal to the registry value |
+| v1 `published_at` unchanged | 2026-08-15 23:47:45 UTC, before and after |
+| v1 row count and total unchanged | 5,925,913 rows, 98,284.22 |
+| v2 is a separate publication | own `attribution_run_id`, own digest, own registry row |
+| the pointer can move | moved to v2; the current view returns v2's 5,925,923 rows |
+| v1 still queryable while not current | 5,925,913 rows totalling 98,284.22, read after the pointer moved |
+| no row was UPDATEd or DELETEd | append-only `merge` on a grain that includes `attribution_run_id`, plus the run-id guard |
+| the restatement references both | every `fct_restatements` row carries `prior_publication_id` and `new_publication_id` |
+
+A **full-refresh guard** was added to both published models: `dbt build --full-refresh` on
+`fct_royalty_attribution` or `fct_restatements` now fails at compile time with an explanation. It is a
+Jinja check, so it stops the accident rather than a determined operator — the real protection would be
+a Terraform-managed table with deletion protection and no dbt write path, which is recorded as the
+remaining gap rather than implied to be solved.
+
+### 24.9 The concrete case: Agust D / 해금
+
+Demonstrated end to end, and it does not end where a marketing version would stop.
+
+**BEFORE** — normalization `1.0.0+0bc0dd643e06`
+
+| | |
+|---|---|
+| raw strings | `Agust D` / `해금` |
+| normalized unicode | `agust d` / `해금` (script preserved) |
+| lookup key | `''` — `PARTIAL`: the artist half folded, the title half did not |
+| match | `UNRESOLVED` / `NO_LOOKUP_KEY_PARTIAL`, 0 candidates |
+| listens | **384,926** |
+| payout | none: never matched, so it never reached the financial gates |
+
+**AFTER** — normalization `1.1.0+b3253b155934`
+
+| | |
+|---|---|
+| transliterated for the key | `haegeum` |
+| normalized unicode | `해금`, **unchanged and still Korean** |
+| lookup key | `agustdhaegeum` — `AVAILABLE` |
+| candidates | 1 |
+| match | **`MATCHED` / `STRUCTURAL_EXACT_UNIQUE`** → `079a54bb-1a59-4e40-8456-7695b644d059` |
+| canonical row it matched | `Agust D` / `해금` |
+| financial disposition | **`DEFECTIVE_OWNERSHIP`**, `payout_eligible = false`, rate `NULL` |
+| payout delta | **none** |
+
+Two things in that table are the whole point of doing this honestly.
+
+**The canonical row is also in Hangul.** MusicBrainz stores `해금`, not `Haegeum`. So transliterating
+only the listen side would have matched nothing at all — the key exists on both sides only because the
+rule is applied symmetrically. That was designed in from the trigger config, and this case is the
+evidence it was necessary.
+
+**It matched and it still does not pay.** 384,926 listens — 1.01 % of the entire corpus — moved from
+"we cannot even ask" to a confident single-candidate match, and then stopped at the ownership gate,
+because this recording has no MODELED ownership row: the Phase 5A rights universe was generated against
+the recordings the v1 matcher matched, and this was not one of them. The payout policy refuses it for
+exactly the same reason it refuses a real recording with a broken split. **Reporting a $0.00 payout for
+a successfully matched flagship case is the accurate outcome**, and forcing it to pay would have
+required regenerating frozen rights.
+
+### 24.10 Evaluation: no untouched partition exists, and what was measured anyway
+
+The inventory first, because the honest answer changes what may be claimed:
+
+| partition | status |
+|---|---|
+| calibration | **CONSUMED** — weights, thresholds and margins were chosen on it |
+| validation | **CONSUMED** — opened exactly once under scoring 1.0.0+cb21f9704ff0 |
+| holdout | **PREVIOUSLY OBSERVED** — read in the Phase 3B fallback analysis and Phase 4 preflight |
+| NOT_EVALUABLE | no mapper label exists; not a partition and not a test set |
+
+So **no untouched reference partition exists**, and none was manufactured: consumed data was not
+reshuffled under a new name, and **no new generalisation-accuracy claim is made**.
+
+**Unsupervised observables** (no label involved): 570,735 newly matched, 411,587 still unmatched, 4,937
+newly ambiguous, 0 v1 matches lost, 0 listens outside the cohort changed, and the full transition
+matrix in §24.6.
+
+**One reference comparison**, restricted to newly matched listens and labelled for what it is:
+
+| partition | labelled | agree | disagree | reference absent from snapshot |
+|---|---|---|---|---|
+| calibration | 495,438 | 491,286 | 2 | 4,150 |
+| holdout | 39,475 | 37,988 | 2 | 1,485 |
+| validation | 33,936 | 32,268 | 1 | 1,667 |
+| **total** | **568,849** | **561,542** | **5** | 7,302 |
+
+Agreement **0.999991** over 561,547 evaluable listens; 1,886 newly matched listens carry no label at
+all.
+
+**The narrow claim this supports**: these particular labels could not have participated in choosing
+any rule. Under v1 these listens produced **zero candidates**, so they never entered the feature table,
+the calibration grid or the validation measurement — and the transliteration rule was frozen before
+this query ran, with the alternative chosen by an unsupervised probe.
+
+**The claim it does NOT support**: that this is a blind validation of the restatement. These labels sit
+inside partitions that are already consumed, and the mapper output remains a *correlated reference
+label, not independent ground truth* — its errors correlate with any string matcher's, and a
+transliteration rule that agrees with ListenBrainz's own romanisation would agree with its mistakes
+too. This comparison is now recorded as consumed as well.
+
+### 24.11 Cost, per stage, and the incremental-versus-rebuild comparison
+
+| stage | jobs | bytes billed | slot-ms |
+|---|---|---|---|
+| freeze + black-box report | 11 | 7,910,457,344 | 162,518 |
+| transliteration probe | 3 | 12,403,605,504 | 305,063 |
+| normalization + blocking (cohort reprocessing) | 11 | 35,427,188,736 | 3,367,881 |
+| financial recomputation + restatement + dbt | 11 | 8,900,313,088 | 414,042 |
+| concrete case | 5 | 20,224,933,888 | — |
+| evaluation | 5 | 36,785,094,656 | 1,105,251 |
+| **total** | **46** | **121,651,593,216 = 0.1106 TiB** | |
+
+**List-price equivalent ≈ $0.69.** Processing consumption at the published on-demand rate, **not**
+money known to have been charged. **Actual monetary cost remains UNKNOWN without billing evidence.**
+
+**Incremental versus full rebuild, on measured figures rather than a claim.** A full rebuild of the
+matching pipeline under the new normalization version would have re-run the three stages this project
+has already paid for at least once:
+
+| stage | measured bytes when it was run over the whole corpus |
+|---|---|
+| blocking (Phase 3B) | 42,752,540,672 |
+| candidate features (Phase 4B) | 12,382,633,984 |
+| scoring and publication (Phase 4B) | 30,855,397,376 |
+| **sum** | **85,990,572,032 = 0.0782 TiB** |
+
+The incremental reprocessing cost **35,427,188,736 bytes** for the same normalization change, so the
+comparable stages came in at roughly **41 %** of a full rebuild. That is an honest comparison of like
+stages and nothing more: it excludes the probe, the freeze, the case study and the evaluation, which a
+full rebuild would also have needed; it does not count the local CPU spent transliterating 1,254,732
+canonical rows; and the saving is smaller than it looks because the expensive part of the rebuild —
+scanning the 38.2M-row listen table to identify and verify the cohort — has to happen either way. **No
+savings figure is claimed beyond that ratio.**
+
+Two things cost more than expected and are worth recording:
+
+- **The evaluation was the single most expensive stage (36.8 GB)**, more than the reprocessing it was
+  evaluating, because each metric query re-joins the label table to two 38.2M-row match tables. The
+  same observation was made in Phase 5A and the fix is the same: materialise the joined evaluation set
+  once. It was not done here because the evaluation runs once.
+- **The concrete case cost 20.2 GB** to describe one recording, because finding it means scanning both
+  match tables and the 31.5M-row canonical snapshot without a usable filter on artist and title.
+
+### 24.12 What a restatement actually costs in test maintenance
+
+Six integration tests failed after the restatement, and the reason is worth recording because it is a
+property of restatements rather than a defect: **`int_financial_disposition` is a derived table, so it
+describes whichever match result dbt last built it from.** Tests that asserted the Phase 5B disposition
+counts were asserting the state of the world in August, not an invariant.
+
+They were updated deliberately, not relaxed. The invariants they defend are unchanged — exact
+reconciliation to 38,199,641, no rate imputation, held listens never pay, the pointer names a
+registered publication — and the v1 figures they used to hard-code now live in
+`config/frozen_versions.yml` and section 23, where they describe `pub:v1` rather than a mutable derived
+table.
+
+One of the six was a genuine mistake of mine and is instructive: I replaced the eligibility count in
+`test_matched_is_not_payable` with the FULL-gate number (28,387,115) when that test reads
+`int_payout_eligibility`, which applies only the MATCH gate (32,134,257). Conflating the two is exactly
+what the two-column design in that model exists to prevent, and the test caught me doing it.
+
+The dbt defaults were also wrong in a way that mattered: with `prior_attribution_run_id` and
+`attribution_run_id` both pointing at `pub:v1`, the restatement tests passed **vacuously** — the delta
+between a publication and itself reconciles trivially. The defaults now describe the current state
+(`pub:v2` current, restated matches as the source), so a standalone `dbt build` validates the real
+restatement. Re-publishing under those defaults is safe: the fact refuses a run id it already holds.

@@ -1,3 +1,14 @@
+# FROZEN COPY — normalization 1.0.0+0bc0dd643e06.
+#
+# This is the exact rule set that produced the Phase 4B match result (match:101eef5c5b5c081e) and
+# therefore the v1 financial publication (pub:v1, digest 51193c1f2c4e8fcd8b8fa78ff197350e).
+#
+# It exists so v1 remains REPRODUCIBLE after the live rules moved to 1.1.0 in the Phase 6
+# restatement. Never edit this file: tests/unit/test_normalization.py loads it and asserts it still
+# produces version 1.0.0+0bc0dd643e06 and still refuses a key for the Korean title that the
+# restatement later matched. If this file changes, v1 becomes unreproducible and the baseline's
+# provenance is broken.
+#
 # Normalization rules for SplitSheet.
 #
 # TWO STAGES, and the split is the whole point.
@@ -39,7 +50,7 @@
 # trigger a restatement rather than silently altering history.
 
 # Semantic part of the version. Bump on an intentional behavioural change.
-version: "1.1.0"
+version: "1.0.0"
 
 # --- applied in BOTH stages -------------------------------------------------------------
 common:
@@ -117,43 +128,3 @@ fallback:
     - remix
     - mix
     - version
-
-# ---------------------------------------------------------------------------------------
-# TRANSLITERATION — added in 1.1.0 by the Phase 6 restatement (trigger RT-1).
-#
-# WHY: 1,164,629 listens failed as NO_LOOKUP_KEY_PARTIAL because a Latin artist with a non-Latin
-# title leaves half the ASCII key empty, and a single case (Agust D / 해금) was 384,926 listens.
-# Measured before this rule existed; see docs/restatement_candidates.md.
-#
-# WHAT IT IS: writing-system conversion, applied to the LOOKUP KEY path only. It never changes
-# `*_normalized_unicode`, which stays script-preserving, so the stored representation of a Korean
-# title is still Korean.
-#
-# WHAT IT IS NOT: translation. 해금 becomes `haegeum`, never a meaning.
-#
-# SCRIPTS, chosen by the probe in docs/phase0/transliteration_probe.json under a rule frozen before
-# it ran (config/restatement_trigger.yml):
-#
-#   hangul   algorithmic: syllable blocks decompose arithmetically into jamo
-#   kana     algorithmic: syllabary, one reading per character
-#   han      DELIBERATELY ABSENT: a kanji reading depends on the word, so it needs a dictionary and
-#            a parser, whose errors would be indistinguishable from matching bugs
-#
-# FULL COVERAGE IS REQUIRED. A key is emitted only when every non-Latin character was converted. A
-# partially converted title would key on a fragment, which is the low-information key the Phase 4
-# preflight measured (cvver: 5 ASCII survivors from 26 alphanumerics, 434,700 candidate pairs from
-# one key).
-#
-# MEASURED BY THE PROBE for these settings: 981,720 listens affected, 611,493 gained a key,
-# unique-candidate rate 0.9997, 142 listens landed on a multi-candidate key, no key exceeded 100
-# canonical candidates.
-transliteration:
-  enabled: true
-  scripts: ["hangul", "kana"]
-  require_full_coverage: true
-  # Both sides of the blocking join, or it cannot join: the canonical index is rebuilt with the
-  # identical rule.
-  applies_to: ["listen_side", "canonical_side"]
-  applies_to_fields: ["artist", "recording"]
-  stage: "lookup_key_path_only"
-  preserves_normalized_unicode: true

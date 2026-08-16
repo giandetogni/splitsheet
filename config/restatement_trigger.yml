@@ -1,0 +1,128 @@
+# RESTATEMENT TRIGGER — frozen 2026-08-16, BEFORE the transliteration probe was run.
+#
+# ==========================================================================================
+# WHY THIS FILE EXISTS AT ALL: a restatement changes a published financial figure. If the rule
+# that triggers it were chosen after looking at how much money it moves, the restatement would be
+# an argument dressed as an analysis. So the trigger, the scope, the alternatives and the rule for
+# choosing between them are all fixed here first, and the probe is then allowed to decide only
+# what this file leaves open.
+# ==========================================================================================
+
+trigger_id: "RT-1"
+frozen_at: "2026-08-16"
+trigger_reason: "TRANSLITERATION_KOREAN_JAPANESE_TITLES"
+
+# --- the evidence, all of it recorded BEFORE Phase 6 --------------------------------------
+#
+# Sources: docs/restatement_candidates.md (RC-1, registered at the Phase 4B freeze) and
+# docs/phase0/top_unmatched.json. No new measurement was taken to justify starting this work, and
+# none of this came from a calibration or validation partition.
+evidence_before_phase_6:
+  failure_reason: "NO_LOOKUP_KEY_PARTIAL"
+  listens_in_that_reason: 1164629
+  pct_of_corpus: 3.0488
+  top_20_concentration_pct: 35.34
+  worst_single_case:
+    artist: "Agust D"
+    recording: "해금"
+    listens: 384926
+    pct_of_reason: 33.05
+    pct_of_corpus: 1.01
+  mechanism: >-
+    a Latin artist with a non-Latin title leaves the artist half of the ASCII lookup key intact and
+    the title half empty, so the combined key is never emitted -- correctly, because emitting half a
+    key would collide every unromanisable title by that artist into one block
+  second_cohort_considered:
+    failure_reason: "NO_LOOKUP_KEY_EMPTY"
+    listens: 433180
+    note: "both halves non-Latin; in scope for measurement, included only if the probe supports it"
+
+# --- what is frozen about the change ------------------------------------------------------
+rule_proposal: >-
+  Before building the ASCII lookup key, transliterate the artist and recording strings from scripts
+  whose romanisation is ALGORITHMIC into Latin letters. Emit a key only when the transliteration
+  covers every non-Latin character in the string. Apply the identical rule to the canonical side, so
+  both sides of the blocking join are transliterated symmetrically. This is transliteration, never
+  translation: 해금 becomes haegeum, not a meaning.
+
+scripts_considered:
+  hangul:
+    algorithmic: true
+    why: "syllable blocks decompose arithmetically into jamo, each with a fixed Latin value"
+  kana:
+    algorithmic: true
+    why: "hiragana and katakana are syllabaries; one reading per character plus small fixed rules"
+  han_kanji:
+    algorithmic: false
+    excluded: true
+    why: >-
+      a Han character's reading depends on the word it appears in, so romanising it requires a
+      dictionary and a parser. That is a data dependency and a language model, and its errors would
+      be indistinguishable from matching bugs. Titles containing kanji are therefore reported as not
+      fully covered and produce NO key.
+
+alternatives:
+  A_conservative:
+    scripts: ["hangul"]
+    require_full_coverage: true
+  B_broader:
+    scripts: ["hangul", "kana"]
+    require_full_coverage: true
+  C_rejected_before_measurement:
+    scripts: ["hangul", "kana"]
+    require_full_coverage: false
+    why_rejected: >-
+      allowing partial coverage emits a key built from a fragment of the title, which is exactly the
+      low-information key the Phase 4 preflight measured: cvver retained 5 ASCII characters out of 26
+      Unicode alphanumerics and one key produced 434,700 candidate pairs. Rejected on prior evidence
+      rather than probed.
+
+# --- HOW THE ALTERNATIVE WILL BE CHOSEN, fixed before any number is seen ------------------
+#
+# UNSUPERVISED ONLY. No reference label participates in this decision. The calibration and
+# validation partitions are consumed and are not reopened to choose a rule.
+selection_rule:
+  objective: "maximise listens that gain a usable combined lookup key"
+  constraints:
+    - "unique-candidate rate among newly keyed listens >= 0.90"
+    - "no new blocking key may produce more than 100 canonical candidates"
+  tie_or_failure: >-
+    if both alternatives satisfy the constraints, take the one with more newly keyed listens; if only
+    one does, take it; if neither does, implement NOTHING and report the probe as a negative result
+  forbidden_inputs:
+    - "mapper reference labels"
+    - "calibration partition"
+    - "validation partition"
+    - "holdout partition"
+    - "money moved by the restatement"
+
+# --- versions -----------------------------------------------------------------------------
+prior_normalization_version: "1.0.0+0bc0dd643e06"
+new_normalization_semantic_version: "1.1.0"
+new_normalization_version: "computed from the rules digest at implementation time"
+scoring_version: "1.0.0+cb21f9704ff0"
+scoring_version_change: "FORBIDDEN unless technically unavoidable, and then only with a reason"
+payout_policy_version: "1.0.0+84b4b68a37c9"
+rights_version: "1.0.0+47f801102e17"
+baseline_publication_id: "pub:v1"
+baseline_attribution_run_id: "attr:83c013596d1d3da3"
+baseline_content_digest: "51193c1f2c4e8fcd8b8fa78ff197350e"
+
+# --- expected affected cohort -------------------------------------------------------------
+#
+# An EXPECTATION recorded in advance, not a prediction to be defended. The probe measures the real
+# figure and the difference is reported either way.
+expected_affected_cohort:
+  definition: >-
+    listens whose Phase 4B failure_reason is NO_LOOKUP_KEY_PARTIAL or NO_LOOKUP_KEY_EMPTY AND whose
+    artist or recording string contains a character in an enabled script
+  upper_bound_listens: 1597809      # 1,164,629 PARTIAL + 433,180 EMPTY
+  expectation: >-
+    well below the upper bound, because most of these titles contain kanji or other scripts that the
+    chosen alternatives deliberately do not transliterate
+  unaffected_cohort: >-
+    every listen whose strings contain no character in an enabled script; its normalized values,
+    keys, candidates and match decision must be byte-identical under the new version, and that is
+    asserted rather than assumed
+
+rules_sha256: "a1de8b98302e"

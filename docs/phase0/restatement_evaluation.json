@@ -1,0 +1,395 @@
+{
+ "artifact": "restatement_evaluation",
+ "partition_inventory": {
+  "calibration": "CONSUMED: weights, thresholds and margins were chosen on it",
+  "validation": "CONSUMED: opened exactly once under scoring 1.0.0+cb21f9704ff0",
+  "holdout": "PREVIOUSLY OBSERVED: read in the Phase 3B fallback analysis and Phase 4 preflight",
+  "NOT_EVALUABLE": "no mapper label exists; not a partition and not a test set"
+ },
+ "untouched_partition_exists": false,
+ "consequence": "no new validation was created: consumed partitions were not reshuffled under a new name, and no new generalisation-accuracy claim is made",
+ "unsupervised": {
+  "state_transitions": [
+   {
+    "prior_status": "MATCHED",
+    "prior_method": "STRUCTURAL_EXACT_UNIQUE",
+    "prior_reason": null,
+    "new_status": "MATCHED",
+    "new_method": "STRUCTURAL_EXACT_UNIQUE",
+    "new_reason": null,
+    "listens": 31421104
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_BLOCK_CANDIDATES",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_BLOCK_CANDIDATES",
+    "listens": 4493892
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_LOOKUP_KEY_PARTIAL",
+    "listens": 559030
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+    "new_status": "MATCHED",
+    "new_method": "STRUCTURAL_EXACT_UNIQUE",
+    "new_reason": null,
+    "listens": 542536
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_LOOKUP_KEY_EMPTY",
+    "listens": 317405
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "SCORED_FALLBACK_UNIQUE",
+    "prior_reason": "BELOW_THRESHOLD",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_FALLBACK_UNIQUE",
+    "new_reason": "BELOW_THRESHOLD",
+    "listens": 283994
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "SCORED_FALLBACK_MULTIPLE",
+    "prior_reason": "BELOW_THRESHOLD",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_FALLBACK_MULTIPLE",
+    "new_reason": "BELOW_THRESHOLD",
+    "listens": 205130
+   },
+   {
+    "prior_status": "MATCHED",
+    "prior_method": "SCORED_EXACT_MULTIPLE",
+    "prior_reason": null,
+    "new_status": "MATCHED",
+    "new_method": "SCORED_EXACT_MULTIPLE",
+    "new_reason": null,
+    "listens": 130886
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_LOOKUP_KEY_PARTIAL",
+    "listens": 81241
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_BLOCK_CANDIDATES",
+    "listens": 58328
+   },
+   {
+    "prior_status": "MATCHED",
+    "prior_method": "SCORED_FALLBACK_UNIQUE",
+    "prior_reason": null,
+    "new_status": "MATCHED",
+    "new_method": "SCORED_FALLBACK_UNIQUE",
+    "new_reason": null,
+    "listens": 35007
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+    "new_status": "MATCHED",
+    "new_method": "STRUCTURAL_EXACT_UNIQUE",
+    "new_reason": null,
+    "listens": 28199
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_ALPHANUMERIC_CONTENT",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_ALPHANUMERIC_CONTENT",
+    "listens": 17438
+   },
+   {
+    "prior_status": "MATCHED",
+    "prior_method": "SCORED_FALLBACK_MULTIPLE",
+    "prior_reason": null,
+    "new_status": "MATCHED",
+    "new_method": "SCORED_FALLBACK_MULTIPLE",
+    "new_reason": null,
+    "listens": 11532
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+    "new_status": "UNRESOLVED",
+    "new_method": "NO_CANDIDATES",
+    "new_reason": "NO_BLOCK_CANDIDATES",
+    "listens": 6133
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_PARTIAL",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_EXACT_MULTIPLE",
+    "new_reason": "AMBIGUOUS_TIE",
+    "listens": 4735
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "SCORED_EXACT_MULTIPLE",
+    "prior_reason": "BELOW_THRESHOLD",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_EXACT_MULTIPLE",
+    "new_reason": "BELOW_THRESHOLD",
+    "listens": 1759
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "SCORED_FALLBACK_MULTIPLE",
+    "prior_reason": "AMBIGUOUS_TIE",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_FALLBACK_MULTIPLE",
+    "new_reason": "AMBIGUOUS_TIE",
+    "listens": 883
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "SCORED_EXACT_MULTIPLE",
+    "prior_reason": "AMBIGUOUS_TIE",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_EXACT_MULTIPLE",
+    "new_reason": "AMBIGUOUS_TIE",
+    "listens": 207
+   },
+   {
+    "prior_status": "UNRESOLVED",
+    "prior_method": "NO_CANDIDATES",
+    "prior_reason": "NO_LOOKUP_KEY_EMPTY",
+    "new_status": "UNRESOLVED",
+    "new_method": "SCORED_EXACT_MULTIPLE",
+    "new_reason": "AMBIGUOUS_TIE",
+    "listens": 202
+   }
+  ],
+  "distinct_changed_transitions": 7,
+  "listens_that_changed_state": 721374,
+  "newly_matched": 570735,
+  "newly_matched_by_method": {
+   "STRUCTURAL_EXACT_UNIQUE": 570735,
+   "SCORED_EXACT_MULTIPLE": 0
+  },
+  "cohort_candidate_distribution": [
+   {
+    "candidate_count": 0,
+    "listens": 406650
+   },
+   {
+    "candidate_count": 1,
+    "listens": 570735
+   },
+   {
+    "candidate_count": 2,
+    "listens": 2832
+   },
+   {
+    "candidate_count": 3,
+    "listens": 1064
+   },
+   {
+    "candidate_count": 4,
+    "listens": 304
+   },
+   {
+    "candidate_count": 5,
+    "listens": 260
+   },
+   {
+    "candidate_count": 6,
+    "listens": 12
+   },
+   {
+    "candidate_count": 7,
+    "listens": 25
+   },
+   {
+    "candidate_count": 8,
+    "listens": 40
+   },
+   {
+    "candidate_count": 9,
+    "listens": 33
+   },
+   {
+    "candidate_count": 10,
+    "listens": 5
+   },
+   {
+    "candidate_count": 11,
+    "listens": 7
+   },
+   {
+    "candidate_count": 12,
+    "listens": 19
+   },
+   {
+    "candidate_count": 13,
+    "listens": 3
+   },
+   {
+    "candidate_count": 15,
+    "listens": 13
+   },
+   {
+    "candidate_count": 16,
+    "listens": 1
+   },
+   {
+    "candidate_count": 17,
+    "listens": 1
+   },
+   {
+    "candidate_count": 19,
+    "listens": 218
+   },
+   {
+    "candidate_count": 20,
+    "listens": 6
+   },
+   {
+    "candidate_count": 23,
+    "listens": 2
+   },
+   {
+    "candidate_count": 24,
+    "listens": 6
+   },
+   {
+    "candidate_count": 25,
+    "listens": 3
+   },
+   {
+    "candidate_count": 26,
+    "listens": 64
+   },
+   {
+    "candidate_count": 28,
+    "listens": 1
+   },
+   {
+    "candidate_count": 31,
+    "listens": 2
+   },
+   {
+    "candidate_count": 33,
+    "listens": 1
+   },
+   {
+    "candidate_count": 37,
+    "listens": 14
+   },
+   {
+    "candidate_count": 38,
+    "listens": 1
+   }
+  ],
+  "candidate_collision": {
+   "multi_candidate_listens": 4937.0,
+   "unique_candidate_listens": 570735.0,
+   "no_candidate_listens": 406650.0,
+   "collision_rate": 0.008576064147639628
+  }
+ },
+ "reference_comparison": {
+  "scope": "newly matched listens only",
+  "by_partition": [
+   {
+    "eval_partition": "calibration",
+    "newly_matched_with_a_label": 495438,
+    "reference_absent_from_snapshot": 4150,
+    "agree": 491286,
+    "disagree": 2
+   },
+   {
+    "eval_partition": "holdout",
+    "newly_matched_with_a_label": 39475,
+    "reference_absent_from_snapshot": 1485,
+    "agree": 37988,
+    "disagree": 2
+   },
+   {
+    "eval_partition": "validation",
+    "newly_matched_with_a_label": 33936,
+    "reference_absent_from_snapshot": 1667,
+    "agree": 32268,
+    "disagree": 1
+   }
+  ],
+  "evaluable": 561547,
+  "agree": 561542,
+  "disagree": 5,
+  "agreement_rate": 0.999991,
+  "newly_matched_without_a_label": 1886,
+  "reference_absent_from_snapshot": 7302,
+  "narrow_claim_supported": "these specific labels could not have participated in choosing any rule: under v1 these listens produced zero candidates, so they never entered the feature table, the calibration grid or the validation measurement, and the transliteration rule was frozen before this query ran",
+  "broad_claim_NOT_supported": "this is NOT a blind validation of the restatement. These labels sit inside partitions that are already consumed, the mapper output is a correlated reference label rather than ground truth, and no generalisation accuracy is claimed",
+  "status": "CONSUMED by this run"
+ },
+ "cost": {
+  "bytes_billed": 36785094656,
+  "list_price_equivalent_usd": 0.2091,
+  "caveat": "list-price equivalent; actual monetary cost UNKNOWN without billing evidence"
+ },
+ "wall_seconds": 17.0,
+ "jobs": [
+  {
+   "step": "state transitions (unsupervised)",
+   "job_id": "70c1770f-3690-457a-bb77-7e394c16a330",
+   "bytes_billed": 8437891072,
+   "slot_ms": 227510
+  },
+  {
+   "step": "candidate counts for the cohort (unsupervised)",
+   "job_id": "c97f4b5f-8b9c-48c3-a390-e2c3ec7b9ac1",
+   "bytes_billed": 4188012544,
+   "slot_ms": 154504
+  },
+  {
+   "step": "candidate collision rate (unsupervised)",
+   "job_id": "7e9f1cf9-d6c3-44ff-ba81-1e8a5182d8b0",
+   "bytes_billed": 4188012544,
+   "slot_ms": 157468
+  },
+  {
+   "step": "reference comparison on newly matched listens ONLY",
+   "job_id": "44a43858-e124-4148-84ca-d9314583a494",
+   "bytes_billed": 12762218496,
+   "slot_ms": 454567
+  },
+  {
+   "step": "newly matched total",
+   "job_id": "702494b4-bfab-40d1-8856-bb0c484c09ca",
+   "bytes_billed": 7208960000,
+   "slot_ms": 111202
+  }
+ ]
+}

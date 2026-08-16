@@ -109,15 +109,42 @@ def normalized_unicode(text: str, rules: NormalizationRules) -> str:
     return _WHITESPACE.sub(" ", out).strip()
 
 
+def transliterated_for_key(text: str, rules: NormalizationRules) -> str:
+    """Apply the configured transliteration, but ONLY on the lookup-key path.
+
+    Added in normalization 1.1.0. Two properties matter:
+
+      * `*_normalized_unicode` is untouched, so the stored representation of a Korean title stays
+        Korean. Transliteration exists to build a KEY, not to rewrite content.
+      * a string that is not FULLY covered is returned unchanged, so it folds to nothing exactly as
+        it did under 1.0.0. A half-transliterated title would key on a fragment, which is the
+        low-information key the Phase 4 preflight measured.
+
+    With transliteration disabled (the frozen 1.0.0 rule set) this is the identity function, which
+    is what keeps v1 reproducible.
+    """
+    if not rules.transliteration_enabled or not text:
+        return text
+    from normalization.transliterate import transliterate
+
+    converted, covered = transliterate(text, rules.transliteration_scripts)
+    if rules.transliteration_require_full_coverage and not covered:
+        return text
+    return converted
+
+
 def fold(text: str, rules: NormalizationRules) -> str:
     """Reduce to ASCII alphanumerics: the lookup key, not the normalized value.
 
     Matches the observed MusicBrainz combined_lookup key on 90.84% of the measured
-    canonical rows. Non-Latin scripts fold to empty because MusicBrainz romanises them and
-    we have no transliteration table; that is a missing KEY, not invalid content.
+    canonical rows. Under 1.0.0 non-Latin scripts folded to empty because we had no
+    transliteration table; under 1.1.0 hangul and kana are converted first (see
+    `transliterated_for_key`), while kanji and every other script still fold to empty -- a missing
+    KEY, not invalid content.
     """
     if not text:
         return ""
+    text = transliterated_for_key(text, rules)
     if not text.isascii():
         text = unicodedata.normalize(rules.unicode_form, text)
         if rules.strip_diacritics:

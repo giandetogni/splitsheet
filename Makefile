@@ -322,3 +322,56 @@ phase5b-waterfall:
 	@uv run python -c "from google.cloud import bigquery; c=bigquery.Client(project='ss-de-944054e7'); \
 	[print(f\"  {r.attribution_status:<22} listens={r.listens:>12,}  {r.pct_of_all_listens:>10}%\") \
 	 for r in c.query('SELECT attribution_status, listens, pct_of_all_listens FROM \`ss-de-944054e7.splitsheet_dbt.royalty_reconciliation\` ORDER BY listens DESC').result()]"
+
+# ---------------------------------------------------------------------------
+# Phase 6: black-box quantification and restatement.
+#
+# The v1 financial publication is an IMMUTABLE BASELINE. Every target below
+# reads it; none modifies it. `phase6-freeze` records its digest first, and
+# every later step re-checks that digest.
+#
+# Order matters: freeze -> probe -> reprocess -> publish -> case -> evaluate.
+# The probe must run BEFORE any rule is implemented, and the trigger config
+# must be frozen before the probe.
+# ---------------------------------------------------------------------------
+RESTATEMENT_RUN_ID ?= restate:6b3923771883e860
+NEW_NORM_VERSION   ?= 1.1.0+b3253b155934
+PRIOR_RUN_ID       ?= attr:83c013596d1d3da3
+
+.PHONY: phase6-freeze phase6-probe phase6-reprocess phase6-publish phase6-case \
+        phase6-evaluate
+
+# Freezes v1 with a reproducible digest and produces the black-box decomposition.
+phase6-freeze:
+	.venv/bin/python src/restatement/freeze_baseline.py \
+	  --out $(OUT_DIR)/baseline_v1_freeze.json
+
+# Read-only. Measures both transliteration alternatives and applies the frozen selection rule.
+phase6-probe:
+	.venv/bin/python src/restatement/probe_transliteration.py \
+	  --out $(OUT_DIR)/transliteration_probe.json
+
+# Reprocesses ONLY the affected cohort under the new normalization version and proves that
+# everything outside it is byte-identical to v1.
+phase6-reprocess:
+	.venv/bin/python src/restatement/reprocess_cohort.py --bucket $(GCS_BUCKET) \
+	  --work-dir $(DERIVED_DIR)/restatement --out $(OUT_DIR)/restatement_reprocess.json
+
+# Runs the SAME frozen financial gates over the restated matches, publishes v2, builds the delta
+# mart, and proves v1 is untouched throughout.
+phase6-publish:
+	.venv/bin/python src/restatement/publish_restatement.py \
+	  --restatement-run-id "$(RESTATEMENT_RUN_ID)" \
+	  --new-normalization-version "$(NEW_NORM_VERSION)" \
+	  --out $(OUT_DIR)/restatement_publication.json
+
+# The Agust D / 해금 case, before and after, reported as measured even if it fails.
+phase6-case:
+	.venv/bin/python src/restatement/concrete_case.py --prior-run-id "$(PRIOR_RUN_ID)" \
+	  --new-run-id "$(NEW_NORM_VERSION)" --out $(OUT_DIR)/restatement_concrete_case.json
+
+# Inventories whether an untouched reference partition exists (it does not) and reports
+# unsupervised observables plus one clearly-labelled reference comparison.
+phase6-evaluate:
+	.venv/bin/python src/restatement/evaluate_restatement.py \
+	  --out $(OUT_DIR)/restatement_evaluation.json

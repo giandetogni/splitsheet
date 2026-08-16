@@ -1,0 +1,90 @@
+{
+ "artifact": "concrete_case",
+ "case": {
+  "artist": "Agust D",
+  "recording": "\ud574\uae08",
+  "note": "submitted content strings; no user_id, recording_msid or listen_hash here"
+ },
+ "before": {
+  "normalization_version": "1.0.0+0bc0dd643e06",
+  "normalized_representation": {
+   "artist_normalized_unicode": "agust d",
+   "recording_normalized_unicode": "\u1112\u1162\u1100\u1173\u11b7",
+   "lookup_exact": "",
+   "exact_key_status": "PARTIAL"
+  },
+  "listens": 384926,
+  "match_status": "UNRESOLVED",
+  "match_method": "NO_CANDIDATES",
+  "failure_reason": "NO_LOOKUP_KEY_PARTIAL",
+  "candidate_count": 0,
+  "payout_state": "no payout: never matched, so it never reached the financial gates"
+ },
+ "after": {
+  "normalization_version": "1.1.0+b3253b155934",
+  "transliterated_representation": {
+   "recording_transliterated_for_key": "haegeum",
+   "artist_normalized_unicode": "agust d",
+   "recording_normalized_unicode": "\u1112\u1162\u1100\u1173\u11b7",
+   "note": "the stored Unicode value is unchanged and still Korean; only the LOOKUP KEY is transliterated",
+   "lookup_exact": "agustdhaegeum",
+   "exact_key_status": "AVAILABLE"
+  },
+  "listens": 384926,
+  "match_status": "MATCHED",
+  "match_method": "STRUCTURAL_EXACT_UNIQUE",
+  "failure_reason": null,
+  "candidate_count": 1,
+  "matched_recording_mbid": "079a54bb-1a59-4e40-8456-7695b644d059",
+  "canonical_recording": [
+   {
+    "recording_mbid": "079a54bb-1a59-4e40-8456-7695b644d059",
+    "artist_credit_name": "Agust D",
+    "recording_name": "\ud574\uae08",
+    "release_name": "D\u2010DAY"
+   }
+  ],
+  "financial_disposition": [
+   {
+    "attribution_status": "DEFECTIVE_OWNERSHIP",
+    "payout_eligible": false,
+    "hold_reason": "DEFECTIVE_OWNERSHIP",
+    "listens": 384926,
+    "rate_per_stream": null,
+    "split_version_id": null
+   }
+  ],
+  "money_by_publication": [],
+  "restatement_delta": []
+ },
+ "resolved_into_a_safe_match": true,
+ "honest_verdict": "the case resolved to a single canonical recording through a transliterated exact key",
+ "wall_seconds": 7.4,
+ "jobs": [
+  {
+   "step": "match state before and after",
+   "job_id": "207174c3-4645-4350-9e91-8b19fdfd8dc5",
+   "bytes_billed": 15401484288
+  },
+  {
+   "step": "the canonical recording it matched",
+   "job_id": "03d6f751-3941-458a-94b4-697085d5724e",
+   "bytes_billed": 3512729600
+  },
+  {
+   "step": "financial disposition after",
+   "job_id": "ff3bc027-423b-403d-8eb9-cad0e04af8df",
+   "bytes_billed": 781189120
+  },
+  {
+   "step": "money for this recording, per publication",
+   "job_id": "02ab2e63-6191-427e-9f9c-f9cf4f1c56b1",
+   "bytes_billed": 100663296
+  },
+  {
+   "step": "restatement delta for this recording",
+   "job_id": "904ba897-eecb-43fa-a5ee-1d2971ca3c28",
+   "bytes_billed": 428867584
+  }
+ ]
+}

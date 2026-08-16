@@ -1,0 +1,77 @@
+version: 2
+
+models:
+  - name: int_attributable_streams
+    description: >-
+      Attributable streams per recording, per ownership split set, per rate window. Only
+      ATTRIBUTABLE listens enter. `rate_card_id` is part of the grain because the MODELED rate card
+      changes value inside the period, so gross = streams x rate is only exact per rate window.
+    columns:
+      - name: attributable_streams
+        data_tests: [not_null]
+      - name: gross_royalty
+        description: ILLUSTRATIVE MODELED AMOUNT, NUMERIC. Rounded once, at publication.
+        data_tests: [not_null]
+
+  - name: fct_royalty_attribution
+    description: >-
+      The financial fact, append-only and immutable per attribution_run_id. Amounts are
+      ILLUSTRATIVE MODELED AMOUNTS over real listening events. Refuses --full-refresh, because that
+      would drop every published statement including the frozen baseline.
+    columns:
+      - name: holder_payout
+        description: NUMERIC, published to cents. Never FLOAT, never negative.
+        data_tests: [not_null]
+      - name: attribution_run_id
+        data_tests: [not_null]
+      - name: publication_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["PUBLISHED", "REHEARSAL"]
+
+  - name: fct_royalty_attribution_current
+    description: >-
+      The publication in force, selected by the pointer table rather than by recency. Latest is not
+      the same as current: a restatement may be published and left un-pointed until approved.
+
+  - name: fct_restatements
+    description: >-
+      The restatement as a DELTA between two immutable publications, never an overwrite. One row per
+      (period, recording, holder, prior publication, new publication, restatement run) with prior,
+      restated and delta in NUMERIC, plus the versions on both sides and the trigger reason.
+      Append-only; refuses --full-refresh.
+    columns:
+      - name: delta
+        description: restated_payout - prior_payout, NUMERIC. Negative for a removed holder.
+        data_tests: [not_null]
+      - name: change_type
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["HOLDER_ADDED", "HOLDER_REMOVED", "PAYOUT_INCREASED",
+                         "PAYOUT_DECREASED", "UNCHANGED"]
+      - name: trigger_reason
+        data_tests: [not_null]
+      - name: prior_normalization_version
+        data_tests: [not_null]
+      - name: new_normalization_version
+        data_tests: [not_null]
+
+  - name: royalty_reconciliation
+    description: >-
+      The waterfall over all 38,199,641 listens in mutually exclusive terminal states, plus the five
+      metrics kept deliberately apart: match coverage, payout eligibility, ownership validity, rate
+      availability and financial attribution.
+
+  - name: restatement_reconciliation
+    description: >-
+      The two identities a restatement must satisfy: SUM(delta) equals the difference between the two
+      portfolio totals exactly, and no listen disappeared. Also reports newly matched, still
+      unmatched, matches lost and newly ambiguous.
+    columns:
+      - name: delta_reconciles_exactly
+        data_tests: [not_null]
+      - name: no_listen_disappeared
+        data_tests: [not_null]

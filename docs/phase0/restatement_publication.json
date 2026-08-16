@@ -1,0 +1,198 @@
+{
+ "artifact": "restatement_publication",
+ "declaration": {
+  "listens": "REAL",
+  "recordings": "REAL",
+  "rights_and_rates": "MODELED",
+  "amounts": "illustrative modeled amounts over real listening events"
+ },
+ "trigger_reason": "TRANSLITERATION_KOREAN_JAPANESE_TITLES",
+ "restatement_run_id": "restate:6b3923771883e860",
+ "prior": {
+  "publication_id": "pub:v1",
+  "attribution_run_id": "attr:83c013596d1d3da3",
+  "row_count": 5925913,
+  "portfolio_paid": "98284.22",
+  "content_digest": "51193c1f2c4e8fcd8b8fa78ff197350ebe8b5a7c97c4ff1cd3f6a1ce6274b4cc",
+  "published_at": "2026-08-15 23:47:45.331701+00:00"
+ },
+ "new": {
+  "publication_id": "pub:v2",
+  "attribution_run_id": "attr:fb74b680430fa0b2",
+  "row_count": 5925923,
+  "portfolio_paid": "98285.08",
+  "content_digest": "1acd4e4fa032258a33f64439d78cfe9caa51016f8557a73088cdb338414e14cb",
+  "published_at": "2026-08-16 16:09:58.153660+00:00",
+  "recordings": 2332853,
+  "holders": 59000
+ },
+ "unchanged_inputs": {
+  "payout_policy_version": "1.0.0+84b4b68a37c9",
+  "scoring_version": "1.0.0+cb21f9704ff0",
+  "rights_version": "1.0.0+47f801102e17",
+  "rule_version_id": "rc-1.0.0"
+ },
+ "changed_input": {
+  "prior_normalization_version": "1.0.0+0bc0dd643e06",
+  "new_normalization_version": "1.1.0+b3253b155934"
+ },
+ "immutability_of_v1": {
+  "digest_before": "51193c1f2c4e8fcd8b8fa78ff197350ebe8b5a7c97c4ff1cd3f6a1ce6274b4cc",
+  "digest_after": "51193c1f2c4e8fcd8b8fa78ff197350ebe8b5a7c97c4ff1cd3f6a1ce6274b4cc",
+  "digest_unchanged": true,
+  "registry_digest": "51193c1f2c4e8fcd8b8fa78ff197350ebe8b5a7c97c4ff1cd3f6a1ce6274b4cc",
+  "matches_registry": true,
+  "published_at_unchanged": true,
+  "row_count_unchanged": true,
+  "portfolio_paid_unchanged": true
+ },
+ "pointer": {
+  "current_run": "attr:fb74b680430fa0b2",
+  "current_view_rows": "5925923",
+  "v1_rows_still_readable": "5925913",
+  "v1_total_still_readable": "98284.22"
+ },
+ "reconciliation": {
+  "prior_publication_id": "pub:v1",
+  "new_publication_id": "pub:v2",
+  "restatement_run_id": "restate:6b3923771883e860",
+  "trigger_reason": "TRANSLITERATION_KOREAN_JAPANESE_TITLES",
+  "prior_portfolio_paid": "98284.22",
+  "restated_portfolio_paid": "98285.08",
+  "portfolio_difference": "0.86",
+  "summed_delta": "0.86",
+  "delta_reconciles_exactly": "True",
+  "prior_holder_rows": "5925913",
+  "restated_holder_rows": "5925923",
+  "prior_recordings_paid": "2332853",
+  "restated_recordings_paid": "2332853",
+  "delta_from_added_holders": "0",
+  "delta_from_removed_holders": "0",
+  "delta_from_increases": "0.87",
+  "delta_from_decreases": "-0.01",
+  "holders_added": "0",
+  "holders_removed": "0",
+  "payouts_increased": "27",
+  "payouts_decreased": "1",
+  "unchanged_rows": "4416873",
+  "listens_total": "38199641",
+  "no_listen_disappeared": "True",
+  "prior_matched": "31598529",
+  "new_matched": "32169264",
+  "newly_matched": "570735",
+  "still_unmatched": "6030377",
+  "matches_lost": "0",
+  "newly_ambiguous": "4937",
+  "cohort_listens": "982322",
+  "attributable_now": "28387115",
+  "risk_held_now": "35007",
+  "rate_gap_now": "3164853",
+  "defective_now": "582289",
+  "unmatched_now": "6030377",
+  "listens_classified": "38199641",
+  "dispositions_reconcile": "True",
+  "measured_at": "2026-08-16 16:10:56.076009+00:00"
+ },
+ "dbt_runs": [
+  {
+   "label": "recompute financial layer over restated matches",
+   "exit_code": 0,
+   "summary": "\u001b[0m16:10:34  Done. PASS=65 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=65"
+  },
+  {
+   "label": "build the delta mart",
+   "exit_code": 0,
+   "summary": "\u001b[0m16:11:00  Done. PASS=12 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=12"
+  },
+  {
+   "label": "dbt test under the restated configuration",
+   "exit_code": 0,
+   "summary": "\u001b[0m16:11:38  Done. PASS=79 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=79"
+  }
+ ],
+ "cost": {
+  "bytes_billed": 8900313088,
+  "list_price_equivalent_usd": 0.0506,
+  "caveat": "publisher queries only; dbt reports its own job bytes. Actual monetary cost UNKNOWN without billing evidence."
+ },
+ "wall_seconds": 174.1,
+ "jobs": [
+  {
+   "step": "read the frozen baseline from the registry",
+   "job_id": "7dfaf4dc-b0f0-4c83-8c68-bd4568c55d39",
+   "bytes_billed": 10485760,
+   "slot_ms": 19,
+   "duration_ms": 238
+  },
+  {
+   "step": "v1 digest BEFORE",
+   "job_id": "d34b0a45-da22-4afe-8aa5-9756b6831f32",
+   "bytes_billed": 972029952,
+   "slot_ms": 69748,
+   "duration_ms": 2077
+  },
+  {
+   "step": "verify the restated match table",
+   "job_id": "9986860e-9854-42eb-b648-50b23d460b4c",
+   "bytes_billed": 4393533440,
+   "slot_ms": 188091,
+   "duration_ms": 2662
+  },
+  {
+   "step": "v2 identity",
+   "job_id": "67c82759-741c-470c-97d7-04425cbaa604",
+   "bytes_billed": 575668224,
+   "slot_ms": 11322,
+   "duration_ms": 1934
+  },
+  {
+   "step": "v2 digest",
+   "job_id": "c9beb52f-c6d5-450a-bb2d-217e64ff89a4",
+   "bytes_billed": 972029952,
+   "slot_ms": 69666,
+   "duration_ms": 1907
+  },
+  {
+   "step": "restatement reconciliation",
+   "job_id": "d531ccc6-becc-4575-a5e8-0434d9a137fd",
+   "bytes_billed": 10485760,
+   "slot_ms": 22,
+   "duration_ms": 172
+  },
+  {
+   "step": "v1 digest AFTER",
+   "job_id": "2c4555fb-9c09-49d3-ad8b-87a9fa87a291",
+   "bytes_billed": 972029952,
+   "slot_ms": 66924,
+   "duration_ms": 2770
+  },
+  {
+   "step": "v1 published_at AFTER",
+   "job_id": "c461c864-6f2c-4b0c-8d02-7c47f27a2e2a",
+   "bytes_billed": 278921216,
+   "slot_ms": 633,
+   "duration_ms": 373
+  },
+  {
+   "step": "register v2 in the publication registry",
+   "job_id": "76d26b29-aa36-4da6-ba24-31b5f16afe23",
+   "bytes_billed": 10485760,
+   "slot_ms": 2337,
+   "duration_ms": 1086
+  },
+  {
+   "step": "move the current pointer to v2",
+   "job_id": "e04e9adf-0da8-43d7-ae5b-1eac64997ba1",
+   "bytes_billed": 10485760,
+   "slot_ms": 852,
+   "duration_ms": 1036
+  },
+  {
+   "step": "pointer moved to v2, v1 still queryable",
+   "job_id": "6f7b99f5-6257-43c8-8682-698eaa7fa1ad",
+   "bytes_billed": 694157312,
+   "slot_ms": 4428,
+   "duration_ms": 552
+  }
+ ]
+}

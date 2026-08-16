@@ -1,0 +1,360 @@
+{
+ "artifact": "transliteration_probe",
+ "read_only": true,
+ "normalization_version_during_probe": "1.0.0+0bc0dd643e06",
+ "trigger_id": "RT-1",
+ "forbidden_inputs_used": "none: no reference label, no calibration, no validation, no money",
+ "selection_rule": {
+  "objective": "maximise listens that gain a usable combined lookup key",
+  "min_unique_candidate_rate": 0.9,
+  "max_candidates_per_key": 100,
+  "frozen_before_probe": true
+ },
+ "cohort": {
+  "failure_reasons": [
+   "NO_LOOKUP_KEY_PARTIAL",
+   "NO_LOOKUP_KEY_EMPTY"
+  ],
+  "distinct_pairs": 336253,
+  "listens": 1597809,
+  "script_inventory_by_listens": {
+   "han": 1407530,
+   "kana": 1077630,
+   "hangul": 886956,
+   "other": 584920
+  }
+ },
+ "alternatives": [
+  {
+   "alternative": "A_conservative",
+   "scripts": [
+    "hangul"
+   ],
+   "canonical_scanned": 65429,
+   "canonical_fully_covered": 63254,
+   "canonical_keyed": 63250,
+   "canonical_distinct_keys": 63242,
+   "affected_pairs": 12437,
+   "affected_listens": 443478,
+   "pairs_that_produced_a_key": 11897,
+   "listens_that_produced_a_key": 441869,
+   "listens_with_a_unique_candidate": 409748,
+   "listens_with_multiple_candidates": 0,
+   "listens_with_no_candidate": 33730,
+   "unique_candidate_rate": 1.0,
+   "keys_over_candidate_cap": 0,
+   "worst_key_candidates": 1,
+   "newly_keyed_listens_by_prior_failure_reason": {
+    "NO_LOOKUP_KEY_PARTIAL": 433691,
+    "NO_LOOKUP_KEY_EMPTY": 8178
+   },
+   "candidate_count_distribution_by_listens": {
+    "0": 32121,
+    "1": 409748
+   },
+   "examples": {
+    "korean": [
+     {
+      "artist": "\uc628\uc720",
+      "recording": "Dice",
+      "listens": 49,
+      "transliterated": "onyu / Dice",
+      "lookup_key": "onyudice",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\ub2e4\ube44\uce58",
+      "recording": "\uc774 \uc0ac\ub791",
+      "listens": 19,
+      "transliterated": "dabichi / i sarang",
+      "lookup_key": "dabichiisarang",
+      "candidates": 1,
+      "candidate_sample": [
+       "7994fefc-a1b4-4929-a752-240141dab354"
+      ]
+     },
+     {
+      "artist": "STAYC",
+      "recording": "\ub108\ub780 \ubcc4\uc744 \ub9cc\ub098",
+      "listens": 104,
+      "transliterated": "STAYC / neoran byeoleul manna",
+      "lookup_key": "staycneoranbyeoleulmanna",
+      "candidates": 1,
+      "candidate_sample": [
+       "e5c9fb4c-f0bb-4fb6-b0f1-063330f78947"
+      ]
+     },
+     {
+      "artist": "bangtantv",
+      "recording": "\ub0b4 \ubc29\uc744 \uc5ec\ud589\ud558\ub294 \ubc95",
+      "listens": 15,
+      "transliterated": "bangtantv / nae bangeul yeohaenghaneun beop",
+      "lookup_key": "bangtantvnaebangeulyeohaenghaneunbeop",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\ubc29\ud0c4\uc18c\ub144\ub2e8",
+      "recording": "10000 Hours (cover) by JK of BTS",
+      "listens": 38,
+      "transliterated": "bangtansonyeondan / 10000 Hours (cover) by JK of BTS",
+      "lookup_key": "bangtansonyeondan10000hourscoverbyjkofbts",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\ubc15\ud6a8\uc2e0",
+      "recording": "\uc0ac\ub791 \uc0ac\ub791 \uc0ac\ub791",
+      "listens": 15,
+      "transliterated": "bakhyosin / sarang sarang sarang",
+      "lookup_key": "bakhyosinsarangsarangsarang",
+      "candidates": 1,
+      "candidate_sample": [
+       "3b0c7233-b649-46ba-a3d0-2b390778859d"
+      ]
+     }
+    ],
+    "japanese": [
+     {
+      "artist": "TRAP CHICK \ud2b8\ub7a9\uce59",
+      "recording": "\uc2b9\uc778\ud574\uc8fc\uc138\uc694 \uc9c0\ub2c8\ub2d8! / \uce74\uc0ac\ub124 \ud14c\ud1a0\u30fb\uc624\ud1a0\ub9c8\uce58 \uc6b0\ub098",
+      "listens": 73,
+      "transliterated": "TRAP CHICK teuraepchik / seunginhaejuseyo jininim! / kasane teto\u30fbotomachi una",
+      "lookup_key": "trapchickteuraepchikseunginhaejuseyojininimkasanetetootomachiuna",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\uc2b9\uc778\ud574\uc8fc\uc138\uc694 \uc9c0\ub2c8\ub2d8!",
+      "recording": "\uce74\uc0ac\ub124 \ud14c\ud1a0\u30fb\uc624\ud1a0\ub9c8\uce58 \uc6b0\ub098",
+      "listens": 35,
+      "transliterated": "seunginhaejuseyo jininim! / kasane teto\u30fbotomachi una",
+      "lookup_key": "seunginhaejuseyojininimkasanetetootomachiuna",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\uba5c\ud2b8 \uc544\uc774\uc2a4\ud06c\ub9bc\ud83c\udf68\ud83c\udf66\ud83d\udca6",
+      "recording": "\ud558\uce20\ub124 \ubbf8\ucfe0\u30fb\uce74\uc0ac\ub124 \ud14c\ud1a0",
+      "listens": 1,
+      "transliterated": "melteu aiseukeurim\ud83c\udf68\ud83c\udf66\ud83d\udca6 / hacheune miku\u30fbkasane teto",
+      "lookup_key": "melteuaiseukeurimhacheunemikukasaneteto",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "TRAP CHICK",
+      "recording": "\uc2b9\uc778\ud574\uc8fc\uc138\uc694 \uc9c0\ub2c8\ub2d8! / \uce74\uc0ac\ub124 \ud14c\ud1a0\u30fb\uc624\ud1a0\ub9c8\uce58 \uc6b0\ub098",
+      "listens": 3,
+      "transliterated": "TRAP CHICK / seunginhaejuseyo jininim! / kasane teto\u30fbotomachi una",
+      "lookup_key": "trapchickseunginhaejuseyojininimkasanetetootomachiuna",
+      "candidates": 0,
+      "candidate_sample": []
+     }
+    ],
+    "other": []
+   },
+   "constraints": {
+    "unique_candidate_rate_ok": true,
+    "no_key_over_cap_ok": true
+   },
+   "satisfies_frozen_constraints": true
+  },
+  {
+   "alternative": "B_broader",
+   "scripts": [
+    "hangul",
+    "kana"
+   ],
+   "canonical_scanned": 1035644,
+   "canonical_fully_covered": 216180,
+   "canonical_keyed": 216010,
+   "canonical_distinct_keys": 215902,
+   "affected_pairs": 147541,
+   "affected_listens": 981720,
+   "pairs_that_produced_a_key": 45376,
+   "listens_that_produced_a_key": 611493,
+   "listens_with_a_unique_candidate": 516594,
+   "listens_with_multiple_candidates": 142,
+   "listens_with_no_candidate": 464984,
+   "unique_candidate_rate": 0.999725,
+   "keys_over_candidate_cap": 0,
+   "worst_key_candidates": 2,
+   "newly_keyed_listens_by_prior_failure_reason": {
+    "NO_LOOKUP_KEY_PARTIAL": 576959,
+    "NO_LOOKUP_KEY_EMPTY": 34534
+   },
+   "candidate_count_distribution_by_listens": {
+    "0": 94757,
+    "1": 516594,
+    "2": 142
+   },
+   "examples": {
+    "korean": [
+     {
+      "artist": "\uc628\uc720",
+      "recording": "Dice",
+      "listens": 49,
+      "transliterated": "onyu / Dice",
+      "lookup_key": "onyudice",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\ub2e4\ube44\uce58",
+      "recording": "\uc774 \uc0ac\ub791",
+      "listens": 19,
+      "transliterated": "dabichi / i sarang",
+      "lookup_key": "dabichiisarang",
+      "candidates": 1,
+      "candidate_sample": [
+       "7994fefc-a1b4-4929-a752-240141dab354"
+      ]
+     },
+     {
+      "artist": "STAYC",
+      "recording": "\ub108\ub780 \ubcc4\uc744 \ub9cc\ub098",
+      "listens": 104,
+      "transliterated": "STAYC / neoran byeoleul manna",
+      "lookup_key": "staycneoranbyeoleulmanna",
+      "candidates": 1,
+      "candidate_sample": [
+       "e5c9fb4c-f0bb-4fb6-b0f1-063330f78947"
+      ]
+     },
+     {
+      "artist": "bangtantv",
+      "recording": "\ub0b4 \ubc29\uc744 \uc5ec\ud589\ud558\ub294 \ubc95",
+      "listens": 15,
+      "transliterated": "bangtantv / nae bangeul yeohaenghaneun beop",
+      "lookup_key": "bangtantvnaebangeulyeohaenghaneunbeop",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\ubc29\ud0c4\uc18c\ub144\ub2e8",
+      "recording": "10000 Hours (cover) by JK of BTS",
+      "listens": 38,
+      "transliterated": "bangtansonyeondan / 10000 Hours (cover) by JK of BTS",
+      "lookup_key": "bangtansonyeondan10000hourscoverbyjkofbts",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\ubc15\ud6a8\uc2e0",
+      "recording": "\uc0ac\ub791 \uc0ac\ub791 \uc0ac\ub791",
+      "listens": 15,
+      "transliterated": "bakhyosin / sarang sarang sarang",
+      "lookup_key": "bakhyosinsarangsarangsarang",
+      "candidates": 1,
+      "candidate_sample": [
+       "3b0c7233-b649-46ba-a3d0-2b390778859d"
+      ]
+     }
+    ],
+    "japanese": [
+     {
+      "artist": "Machine Girl",
+      "recording": "\u3046\u305a\u307e\u304d",
+      "listens": 248,
+      "transliterated": "Machine Girl / uzumaki",
+      "lookup_key": "machinegirluzumaki",
+      "candidates": 1,
+      "candidate_sample": [
+       "6bdda2f8-476b-4f83-8844-24ef520bd925"
+      ]
+     },
+     {
+      "artist": "ClariS",
+      "recording": "\u30d2\u30c8\u30ea\u30b4\u30c8",
+      "listens": 78,
+      "transliterated": "ClariS / hitorigoto",
+      "lookup_key": "clarishitorigoto",
+      "candidates": 1,
+      "candidate_sample": [
+       "d2783ee0-2e4e-4ae5-900b-ad1c81bbca93"
+      ]
+     },
+     {
+      "artist": "Ryhthmy",
+      "recording": "\u30d5\u30a3\u30ed\u30d5\u30a9\u30d3\u30a2",
+      "listens": 33,
+      "transliterated": "Ryhthmy / firofobia",
+      "lookup_key": "ryhthmyfirofobia",
+      "candidates": 0,
+      "candidate_sample": []
+     },
+     {
+      "artist": "\u3044\u304d\u3082\u306e\u304c\u304b\u308a",
+      "recording": "\u3042\u308a\u304c\u3068\u3046",
+      "listens": 19,
+      "transliterated": "ikimonogakari / arigatou",
+      "lookup_key": "ikimonogakariarigatou",
+      "candidates": 1,
+      "candidate_sample": [
+       "7db8e047-b9fa-47cf-9e48-01787ca7087d"
+      ]
+     },
+     {
+      "artist": "\u304d\u304f\u304a",
+      "recording": "\u3066\u3093\u3057\u3087\u3046 \u3057\u3087\u3046\u3066\u3093\u3057\u3087\u3046 (Extended mix)",
+      "listens": 25,
+      "transliterated": "kikuo / tenshou shoutenshou (Extended mix)",
+      "lookup_key": "kikuotenshoushoutenshouextendedmix",
+      "candidates": 1,
+      "candidate_sample": [
+       "9cb74388-ce69-421e-a4a1-6dec6856ec0e"
+      ]
+     },
+     {
+      "artist": "\u306b\u307b\u3057\u304b",
+      "recording": "No End to Captivity",
+      "listens": 53,
+      "transliterated": "nihoshika / No End to Captivity",
+      "lookup_key": "nihoshikanoendtocaptivity",
+      "candidates": 0,
+      "candidate_sample": []
+     }
+    ],
+    "other": []
+   },
+   "constraints": {
+    "unique_candidate_rate_ok": true,
+    "no_key_over_cap_ok": true
+   },
+   "satisfies_frozen_constraints": true
+  }
+ ],
+ "chosen_alternative": "B_broader",
+ "decision_basis": "frozen rule: among alternatives satisfying both constraints, the one keying the most listens",
+ "cost": {
+  "bytes_billed": 12403605504,
+  "list_price_equivalent_usd": 0.0705,
+  "caveat": "list-price equivalent; actual monetary cost UNKNOWN without billing evidence"
+ },
+ "wall_seconds": 423.1,
+ "jobs": [
+  {
+   "step": "cohort pairs",
+   "job_id": "0edec8d5-0089-4d91-8438-c83ba71da1f6",
+   "bytes_billed": 6896484352,
+   "slot_ms": 201617,
+   "rows": 336253
+  },
+  {
+   "step": "canonical rows for hangul",
+   "job_id": "d62c23a6-c7ae-432a-b468-702e788cd95c",
+   "bytes_billed": 2753560576,
+   "slot_ms": 50216,
+   "rows": 65429
+  },
+  {
+   "step": "canonical rows for hangul+kana",
+   "job_id": "0da9a7f8-d89d-4b9c-a978-c8ea0df72006",
+   "bytes_billed": 2753560576,
+   "slot_ms": 53230,
+   "rows": 1035644
+  }
+ ]
+}

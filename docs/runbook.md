@@ -359,3 +359,60 @@ A payout policy change is a new publication, never an edited one:
 No black-box revenue, no restatement, no transliteration, no threshold retuning. `RATE_CARD_GAP`
 streams are **never** priced: not at the previous rate, not at an average, not at zero. 3,164,839
 streams are held on that basis and the money is simply not created.
+
+## Phase 6 — restatement
+
+```
+make phase6-freeze      # register v1 + digest, and produce the black-box report. Do this FIRST.
+make phase6-probe       # read-only; measures both alternatives under the frozen selection rule
+#   -> implement the chosen rule under a NEW normalization_version, keeping a frozen v1 copy
+make verify             # ruff + unit + terraform, exit codes printed
+make phase6-reprocess GCS_BUCKET=splitsheet-raw-944054e7
+make phase6-publish     # same frozen gates over restated matches -> pub:v2 + delta mart
+make phase6-case        # the Agust D / 해금 case, before and after
+make phase6-evaluate    # partition inventory + unsupervised observables
+uv run pytest tests/integration/test_restatement_contract.py -m integration_readonly
+```
+
+### The order is not negotiable
+
+- **Freeze before anything.** Every later step re-checks v1's digest against the registry and stops
+  if it moved.
+- **Trigger config before the probe.** `config/restatement_trigger.yml` fixes the alternatives and
+  the selection rule; a probe that chose its own criteria afterwards would be an argument, not a
+  measurement.
+- **Probe before implementing.** The rule that shipped is the one the probe selected under the frozen
+  criteria, and the losing alternative is recorded next to it.
+
+### Two normalization versions now exist
+
+| | |
+|---|---|
+| `config/normalization_rules_v1.0.0.yml` | FROZEN COPY, `1.0.0+0bc0dd643e06`. Never edit it: it is what makes pub:v1 reproducible. |
+| `config/normalization_rules.yml` | live, `1.1.0+b3253b155934`, with the transliteration block. |
+
+`tests/unit/test_frozen.py` asserts both — the frozen copy still loads to the v1 version, and the
+live config equals the version declared in `config/frozen_versions.yml`. A third, undeclared version
+fails the suite.
+
+### What must never happen to a publication
+
+`dbt build --full-refresh` on `fct_royalty_attribution` or `fct_restatements` now **fails at compile
+time** with an explanatory error, because a full refresh would drop every published statement
+including the frozen baseline. That guard is a Jinja check, not IAM: it stops the accident, not a
+determined operator. Re-publishing under the same inputs is already a no-op, so a full refresh is
+never the way to republish.
+
+### Restatement run ids
+
+`restatement_run_id` is derived from the normalization version, the scoring version, the v1 match run
+and the blocking version. It does **not** include the cohort predicate, so two runs with different
+cohort definitions under the same versions would share an id. The cohort definition is frozen in
+`config/restatement_trigger.yml` and recorded in the run's own artifact, which is how they are told
+apart today; folding it into the hash is a small, worthwhile change for the next restatement.
+
+### dbt invocation
+
+Use `.venv/bin/dbt` and `.venv/bin/python` rather than `uv run` for long commands: several `uv run`
+invocations stalled in startup under memory pressure with no BigQuery job issued. A timeout is never
+read as success here — check `ps` and the job list before concluding anything.

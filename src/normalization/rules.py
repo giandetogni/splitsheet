@@ -31,6 +31,11 @@ class NormalizationRules:
     featuring_markers: tuple[str, ...]
     leading_articles: tuple[str, ...]
     version_suffixes: tuple[str, ...]
+    # Transliteration, added in 1.1.0. Empty scripts means the rule is off, which is how the frozen
+    # v1 rule set still loads and still reproduces v1 keys.
+    transliteration_enabled: bool
+    transliteration_scripts: tuple[str, ...]
+    transliteration_require_full_coverage: bool
     rules_digest: str = field(compare=False)
 
     @property
@@ -54,6 +59,17 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
 
     common = raw["common"]
     fallback = raw["fallback"]
+    translit = raw.get("transliteration")
+    if translit:
+        unknown = set(translit["scripts"]) - {"hangul", "kana"}
+        if unknown:
+            raise ValueError(
+                f"transliteration names scripts with no algorithmic romanisation: {sorted(unknown)}. "
+                f"Han/kanji needs a dictionary and is deliberately unsupported.")
+        if not translit["require_full_coverage"]:
+            raise ValueError(
+                "partial-coverage transliteration would key on a fragment of the title, which is "
+                "the low-information key the Phase 4 preflight measured; it is not permitted")
 
     if common["keep"] != "ascii_alphanumeric":
         raise ValueError(f"unsupported keep policy: {common['keep']!r}")
@@ -74,6 +90,18 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
             "version_suffixes": sorted(fallback["version_suffixes"]),
         },
     }
+    # ADDED, NOT DEFAULTED. The key is inserted only when the block exists, so a rule set without
+    # transliteration hashes byte-identically to how it hashed before the feature existed -- which is
+    # what keeps normalization 1.0.0+0bc0dd643e06 reproducible from its frozen copy. Writing
+    # `"transliteration": None` instead would have silently rehashed v1 and broken the baseline's
+    # provenance; it did, on the first attempt, and the frozen copy's digest test caught it.
+    if translit:
+        effective["transliteration"] = {
+            "enabled": bool(translit["enabled"]),
+            "scripts": sorted(translit["scripts"]),
+            "require_full_coverage": bool(translit["require_full_coverage"]),
+            "stage": translit["stage"],
+        }
     digest = hashlib.sha256(_canonical(effective).encode()).hexdigest()[:12]
 
 
@@ -94,5 +122,9 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
         featuring_markers=tuple(sorted(fallback["featuring_markers"], key=len, reverse=True)),
         leading_articles=tuple(fallback["leading_articles"]),
         version_suffixes=tuple(sorted(fallback["version_suffixes"], key=len, reverse=True)),
+        transliteration_enabled=bool(translit["enabled"]) if translit else False,
+        transliteration_scripts=tuple(sorted(translit["scripts"])) if translit else (),
+        transliteration_require_full_coverage=(
+            bool(translit["require_full_coverage"]) if translit else True),
         rules_digest=digest,
     )
