@@ -318,3 +318,35 @@ Three things worth carrying forward:
 Cumulative project consumption is now roughly **0.96 TiB** across all phases. The monthly on-demand
 allowance is 1 TiB, so the free tier has probably absorbed all of it — **probably, on arithmetic,
 not on billing evidence**.
+
+## Phase 5B — payout policy, attribution, publication
+
+| stage | bytes |
+|---|---|
+| dry-run estimate for `int_financial_disposition`, recorded before materialising | 6,933,335,858 *(estimate)* |
+| publisher queries: input verification, digests, pointer, reconciliation, money summary (13 jobs) | 8,299,479,040 *(billed)* |
+| dbt materialisations: disposition 38.2M rows, attributable streams 3.2M, fact 5.9M, plus 63 tests, run three times across build, idempotency proof and rehearsal | ~14,000,000,000 *(billed, from dbt's own job logs)* |
+| **total** | **≈ 22.3 GB = 0.0203 TiB** |
+
+**List-price equivalent ≈ $0.13.** Processing consumption at the published on-demand rate, **not**
+money known to have been charged. **Actual monetary cost remains UNKNOWN without billing
+evidence.**
+
+Notes worth carrying forward:
+
+- **The dry run was cheap insurance and is now part of the publisher.** 6.9 GB estimated against a
+  38.2M-row model before any table was written; the estimate is recorded in
+  `docs/phase0/payout_publication.json` next to what was actually billed.
+- **Publishing three times cost about as much as publishing once.** The idempotency proof re-runs
+  the fact model, and the guard makes it a scan-and-insert-nothing — the expensive part is the
+  disposition table, which the re-run does not rebuild.
+- **The 972 MB content digest is the price of provable immutability.** Each digest hashes all
+  5.9M published rows, and it ran five times (before, during and after the pointer move, plus the
+  idempotency comparison). That is roughly 4.8 GB of the phase total, spent entirely on evidence
+  rather than on output.
+- **The aborted first attempt cost ~3 GB.** The fact table was built once from a disposition model
+  that leaked a rate onto held listens, caught by a dbt test, then dropped and rebuilt.
+
+Cumulative project consumption is now roughly **0.98 TiB** across all phases against a 1 TiB
+monthly on-demand allowance — so the free tier has probably absorbed all of it, **probably, on
+arithmetic, not on billing evidence**.

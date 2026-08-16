@@ -291,3 +291,34 @@ dbt-parse:
 # Records what was built, at what cost, and reconciles injected against detected defects.
 phase5a-verify:
 	uv run python src/rights/verify_rights.py --out $(OUT_DIR)/rights_verification.json
+
+# ---------------------------------------------------------------------------
+# Phase 5B: payout policy, royalty attribution, immutable publication.
+#
+# MATCHED != PAYABLE. Every amount is an ILLUSTRATIVE MODELED AMOUNT: the rate
+# card and ownership splits are MODELED. The matcher and the rights data are
+# frozen; nothing here may change them.
+#
+# `phase5b-publish` is the real financial publication. It is idempotent: a
+# re-run under the same inputs inserts zero rows, because attribution_run_id is
+# deterministic and the fact model refuses a run it already holds.
+# ---------------------------------------------------------------------------
+.PHONY: phase5b-publish phase5b-rehearse phase5b-waterfall
+
+# Dry-runs the expensive models, publishes, then proves idempotency and that
+# moving the current pointer destroys nothing.
+phase5b-publish:
+	uv run python src/payout/publish.py --out $(OUT_DIR)/payout_publication.json \
+	  --prove-idempotency --prove-pointer-move
+
+# A second, clearly labelled publication that coexists with the first. NOT a
+# financial statement: it exists so immutability and pointer movement are proven
+# with two real publications instead of one.
+phase5b-rehearse:
+	uv run python src/payout/publish.py --label REHEARSAL --skip-dry-run \
+	  --out $(OUT_DIR)/payout_publication_rehearsal.json
+
+phase5b-waterfall:
+	@uv run python -c "from google.cloud import bigquery; c=bigquery.Client(project='ss-de-944054e7'); \
+	[print(f\"  {r.attribution_status:<22} listens={r.listens:>12,}  {r.pct_of_all_listens:>10}%\") \
+	 for r in c.query('SELECT attribution_status, listens, pct_of_all_listens FROM \`ss-de-944054e7.splitsheet_dbt.royalty_reconciliation\` ORDER BY listens DESC').result()]"

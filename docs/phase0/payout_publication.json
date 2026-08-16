@@ -1,0 +1,266 @@
+{
+ "artifact": "royalty_attribution_publication",
+ "declaration": {
+  "listenbrainz_listens": "REAL",
+  "musicbrainz_recordings": "REAL",
+  "rights_holders": "MODELED",
+  "ownership_splits": "MODELED",
+  "rate_cards": "MODELED",
+  "amounts": "illustrative modeled amounts, not observed industry payouts"
+ },
+ "payout_policy_version": "1.0.0+84b4b68a37c9",
+ "publication_label": "PUBLISHED",
+ "attribution_run_id": "attr:83c013596d1d3da3",
+ "frozen_inputs_verified": {
+  "match_runs": 1,
+  "match_run_id": "match:101eef5c5b5c081e",
+  "scoring_version": "1.0.0+cb21f9704ff0",
+  "rights_version": "1.0.0+47f801102e17",
+  "rights_generation_run_id": "rights:d2b8a2dc146673e9",
+  "rule_version_id": "rc-1.0.0"
+ },
+ "policy": {
+  "hold_methods": [
+   "SCORED_FALLBACK_UNIQUE"
+  ],
+  "rate_imputation": "FORBIDDEN",
+  "rounding": "largest_remainder, single rounding point, tiebreak rights_holder_id ascending",
+  "terminal_states": [
+   "ATTRIBUTABLE",
+   "UNMATCHED",
+   "MATCH_RISK_POLICY",
+   "DEFECTIVE_OWNERSHIP",
+   "RATE_CARD_GAP",
+   "RATE_CARD_AMBIGUOUS"
+  ],
+  "fact_grain": [
+   "period",
+   "recording_mbid",
+   "rights_holder_id",
+   "split_version_id",
+   "rate_card_id",
+   "rule_version_id",
+   "payout_policy_version",
+   "attribution_run_id"
+  ]
+ },
+ "proofs": {
+  "first_publication": {
+   "rows_published": "5925913",
+   "content_digest": "06be4935d8e980d8ad42e90d33930d47eccf7a8027d2e37b60359a1b0ce23c58",
+   "total_holder_payout": "98284.22",
+   "first_published_at": "2026-08-15 23:47:45.331701+00:00"
+  },
+  "after_rerun": {
+   "rows_published": "5925913",
+   "content_digest": "06be4935d8e980d8ad42e90d33930d47eccf7a8027d2e37b60359a1b0ce23c58",
+   "total_holder_payout": "98284.22",
+   "first_published_at": "2026-08-15 23:47:45.331701+00:00"
+  },
+  "idempotent": true,
+  "pointer_move": {
+   "published_rows_before": "5925913",
+   "published_rows_while_moved": "5925913",
+   "published_rows_after": "5925913",
+   "current_view_rows_while_moved": 0,
+   "digest_unchanged": true,
+   "previous_publication_still_queryable": true
+  }
+ },
+ "reconciliation": [
+  {
+   "attribution_status": "ATTRIBUTABLE",
+   "listens": 28386887,
+   "streams": 28386887,
+   "pct_of_all_listens": 74.311921,
+   "distinct_recordings": 2332853,
+   "total_gross_royalty": "98284.22",
+   "total_holder_payout": "98284.22",
+   "holder_rows": 5925913,
+   "recordings_paid": 2332853,
+   "holders_paid": 59000
+  },
+  {
+   "attribution_status": "UNMATCHED",
+   "listens": 6601112,
+   "streams": 6601112,
+   "pct_of_all_listens": 17.28056,
+   "distinct_recordings": 0,
+   "total_gross_royalty": "98284.22",
+   "total_holder_payout": "98284.22",
+   "holder_rows": 5925913,
+   "recordings_paid": 2332853,
+   "holders_paid": 59000
+  },
+  {
+   "attribution_status": "RATE_CARD_GAP",
+   "listens": 3164839,
+   "streams": 3164839,
+   "pct_of_all_listens": 8.284997,
+   "distinct_recordings": 664665,
+   "total_gross_royalty": "98284.22",
+   "total_holder_payout": "98284.22",
+   "holder_rows": 5925913,
+   "recordings_paid": 2332853,
+   "holders_paid": 59000
+  },
+  {
+   "attribution_status": "MATCH_RISK_POLICY",
+   "listens": 35007,
+   "streams": 35007,
+   "pct_of_all_listens": 0.091642,
+   "distinct_recordings": 11673,
+   "total_gross_royalty": "98284.22",
+   "total_holder_payout": "98284.22",
+   "holder_rows": 5925913,
+   "recordings_paid": 2332853,
+   "holders_paid": 59000
+  },
+  {
+   "attribution_status": "DEFECTIVE_OWNERSHIP",
+   "listens": 11796,
+   "streams": 11796,
+   "pct_of_all_listens": 0.03088,
+   "distinct_recordings": 1747,
+   "total_gross_royalty": "98284.22",
+   "total_holder_payout": "98284.22",
+   "holder_rows": 5925913,
+   "recordings_paid": 2332853,
+   "holders_paid": 59000
+  }
+ ],
+ "money": {
+  "holder_rows": "5925913",
+  "total_holder_payout": "98284.22",
+  "min_holder_payout": "0",
+  "max_holder_payout": "4647.1",
+  "negative_payouts": "0",
+  "zero_payouts": "3926337",
+  "holders_paid": "59000",
+  "recordings_paid": "2332853",
+  "financial_groups": "3153008",
+  "total_gross_royalty": "98284.22",
+  "remainder_cents_distributed": "1369876",
+  "groups_that_do_not_close": "0"
+ },
+ "dbt_runs": [
+  {
+   "label": "build financial layer",
+   "exit_code": 0,
+   "seconds": 35.0,
+   "summary": "\u001b[0m23:57:15  Done. PASS=12 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=12"
+  },
+  {
+   "label": "re-run publication (idempotency)",
+   "exit_code": 0,
+   "seconds": 9.9,
+   "summary": "\u001b[0m23:57:31  Done. PASS=1 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=1"
+  },
+  {
+   "label": "dbt test",
+   "exit_code": 0,
+   "seconds": 22.5,
+   "summary": "\u001b[0m23:58:21  Done. PASS=63 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=63"
+  }
+ ],
+ "cost": {
+  "estimated_bytes_dry_run": 0,
+  "bytes_billed_queries": 8299479040,
+  "list_price_equivalent_usd": 0.0472,
+  "caveat": "list-price equivalent of processing consumption for this script's own queries; dbt's own job bytes are reported separately by dbt. Actual monetary cost UNKNOWN without billing evidence."
+ },
+ "wall_seconds": 106.8,
+ "jobs": [
+  {
+   "step": "verify frozen inputs",
+   "job_id": "1c497e17-708c-401c-a34b-5d57c0c497dc",
+   "bytes_billed": 2199912448,
+   "slot_ms": 12692,
+   "duration_ms": 356
+  },
+  {
+   "step": "ensure pointer table",
+   "job_id": "d1a30dd8-98a9-418a-9684-1db0bb5ff72b",
+   "bytes_billed": 0,
+   "slot_ms": 0,
+   "duration_ms": 107
+  },
+  {
+   "step": "publication content digest",
+   "job_id": "4a77ed45-6f0e-4346-ae93-c6a284a0debb",
+   "bytes_billed": 972029952,
+   "slot_ms": 61697,
+   "duration_ms": 3785
+  },
+  {
+   "step": "set pointer -> attr:83c013596d1d3da3",
+   "job_id": "bb23043d-25c2-4c61-8e00-769912a9ad89",
+   "bytes_billed": 10485760,
+   "slot_ms": 2521,
+   "duration_ms": 912
+  },
+  {
+   "step": "digest after re-run",
+   "job_id": "05135dda-7430-48a4-b288-590b5a8e3b4d",
+   "bytes_billed": 972029952,
+   "slot_ms": 56603,
+   "duration_ms": 5048
+  },
+  {
+   "step": "digest before pointer move",
+   "job_id": "24e0bb63-5019-4cb9-8262-ede405533a5c",
+   "bytes_billed": 972029952,
+   "slot_ms": 59155,
+   "duration_ms": 6297
+  },
+  {
+   "step": "set pointer -> attr:none",
+   "job_id": "1355ac81-433f-4a4a-9364-00f72660152a",
+   "bytes_billed": 10485760,
+   "slot_ms": 2663,
+   "duration_ms": 966
+  },
+  {
+   "step": "digest while pointer moved away",
+   "job_id": "b3bb1500-57a1-4844-a384-5b881b5068af",
+   "bytes_billed": 972029952,
+   "slot_ms": 55986,
+   "duration_ms": 3335
+  },
+  {
+   "step": "current view while pointer moved away",
+   "job_id": "ad468b42-2744-4a3a-947d-13973f3db911",
+   "bytes_billed": 272629760,
+   "slot_ms": 236,
+   "duration_ms": 194
+  },
+  {
+   "step": "set pointer -> attr:83c013596d1d3da3",
+   "job_id": "761c0faa-8ee7-4f63-a4fe-96aa0662d3fd",
+   "bytes_billed": 10485760,
+   "slot_ms": 2949,
+   "duration_ms": 918
+  },
+  {
+   "step": "digest after pointer restored",
+   "job_id": "73fd9a0f-0a21-4015-9a12-820d5f105639",
+   "bytes_billed": 972029952,
+   "slot_ms": 51287,
+   "duration_ms": 4179
+  },
+  {
+   "step": "reconciliation",
+   "job_id": "368798a4-d3b2-4495-a849-de86f193bd1e",
+   "bytes_billed": 10485760,
+   "slot_ms": 28,
+   "duration_ms": 140
+  },
+  {
+   "step": "money summary",
+   "job_id": "50fb559f-46f8-42e5-b19e-b07bc9e5fe55",
+   "bytes_billed": 924844032,
+   "slot_ms": 60531,
+   "duration_ms": 1819
+  }
+ ]
+}

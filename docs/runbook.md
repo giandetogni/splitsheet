@@ -313,3 +313,49 @@ model fails instead of billing. Run with `DBT_PROFILES_DIR` pointing at `dbt/`.
 No payout amount is computed. No gold layer. Streams, share and rate are joined and classified but
 never multiplied — that waits until ownership validity is fully proven, which is what this phase
 measures.
+
+## Phase 5B — payout policy and immutable financial publication
+
+```
+make phase5b-publish     # dry run, publish, prove idempotency, prove pointer moves are safe
+make phase5b-rehearse    # a second labelled publication so immutability has two real versions
+make phase5b-waterfall   # the reconciliation, all 38,199,641 listens
+uv run pytest tests/integration/test_payout_contract.py -m integration_readonly
+```
+
+### The publisher refuses more than it does
+
+`src/payout/publish.py` will not run if the warehouse no longer holds the exact inputs named in
+`config/payout_policy.yml` — matcher run, scoring version, rights version, rights generation run,
+rate rule version. Pricing a different universe under the same `payout_policy_version` would be a
+silent restatement, so it is a hard stop rather than a warning.
+
+### Re-publishing is safe; re-building is not
+
+A re-run under the same inputs inserts **zero** rows: `attribution_run_id` is deterministic and the
+fact model's guard makes the select empty. So `make phase5b-publish` is safe to repeat.
+
+**`dbt build --full-refresh` is NOT safe.** It would drop and rebuild `fct_royalty_attribution`,
+destroying every prior publication. The immutability of a published statement rests on the
+append-only strategy and the run-id guard, not on IAM: nothing in the warehouse prevents a
+deliberate full refresh. If a real financial system needed this guarantee, the publication would
+belong in a Terraform-managed table with `deletion_protection` and no dbt write path. That gap is
+recorded rather than implied away.
+
+### Changing the policy
+
+A payout policy change is a new publication, never an edited one:
+
+1. edit `config/payout_policy.yml`, bump `payout_policy_version`, recompute `rules_sha256`;
+2. update `EXPECTED_POLICY_VERSION` in `tests/unit/test_payout_policy.py` and the
+   `payout_policy_version` var in `dbt/dbt_project.yml` — a unit test asserts the two agree, so the
+   warehouse cannot apply one policy while labelling rows with another;
+3. run `make phase5b-publish`, which produces a **new** `attribution_run_id` and leaves the previous
+   publication intact;
+4. move the pointer only when the new figures are approved. Latest is not the same as current.
+
+### What Phase 5B deliberately does not do
+
+No black-box revenue, no restatement, no transliteration, no threshold retuning. `RATE_CARD_GAP`
+streams are **never** priced: not at the previous rate, not at an average, not at zero. 3,164,839
+streams are held on that basis and the money is simply not created.

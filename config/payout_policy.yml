@@ -1,0 +1,175 @@
+# PAYOUT POLICY — the point where a technical result becomes a financial decision.
+#
+# ==========================================================================================
+# MATCHED != PAYABLE.
+#
+# A match says "we believe this listen is this recording". A payout says "we authorise money to
+# leave the account on that belief". This file is the second statement, and it is deliberately a
+# separate, versioned artifact: the matcher is frozen (scoring_version 1.0.0+cb21f9704ff0) and
+# nothing here may change it, retune a threshold, or reinterpret a match score.
+#
+# Every amount produced under this policy is an ILLUSTRATIVE MODELED AMOUNT. Rights holders,
+# ownership splits and rate cards are MODELED (config/rights_model.yml); ListenBrainz listens and
+# MusicBrainz recordings are REAL. No figure here is an observed industry payout.
+# ==========================================================================================
+#
+# THE GATES, in the order they are evaluated. Order is the policy, not an implementation detail:
+# each gate answers a different question, and the FIRST failure is the reported reason.
+#
+#   1. is it matched at all?          -> UNMATCHED
+#   2. do we trust HOW it matched?    -> MATCH_RISK_POLICY
+#   3. do we know who owns it, on the listen's own date?
+#                                     -> DEFECTIVE_OWNERSHIP
+#   4. do we know what a stream was worth on that date?
+#                                     -> RATE_CARD_GAP / RATE_CARD_AMBIGUOUS
+#   5. everything above passed        -> ATTRIBUTABLE
+#
+# WHY OWNERSHIP IS CHECKED BEFORE RATE: a listen whose ownership is broken must not be reported
+# as a pricing problem. Ownership is the more fundamental defect -- an unknown owner cannot be
+# paid at any rate -- so a listen failing both is reported as DEFECTIVE_OWNERSHIP.
+#
+# THERE IS NO UNKNOWN BUCKET. Every listen lands in exactly one terminal state, and every state
+# below is reachable from a named condition rather than from a fallback.
+
+payout_policy_version: "1.0.0"
+frozen_at: "2026-08-15"
+
+# Bound to the artifacts this policy was written against. A different matcher run or a different
+# rights generation is a different financial universe, and the publisher refuses to mix them.
+inputs:
+  match_run_id: "match:101eef5c5b5c081e"
+  scoring_version: "1.0.0+cb21f9704ff0"
+  rights_version: "1.0.0+47f801102e17"
+  rights_generation_run_id: "rights:d2b8a2dc146673e9"
+  rule_version_id: "rc-1.0.0"
+  period_start: "2026-06-01"
+  period_end: "2026-07-01"          # exclusive, half-open like every interval in this project
+
+# --- gate 2: match risk -------------------------------------------------------------------
+#
+# SCORED_FALLBACK_UNIQUE remains MATCHED. It is not downgraded to unmatched, not re-scored, and
+# not re-thresholded: the matcher's conclusion stands and this policy declines to pay on it.
+#
+# MEASURED BASIS: 3.2138% disagreement with the mapper reference label on the validation
+# partition, against 0.0055% for STRUCTURAL_EXACT_UNIQUE and 0.1101% for SCORED_EXACT_MULTIPLE.
+# 35,007 listens. No approved business risk policy exists that would justify paying at that rate,
+# and the reference label is a correlated proxy rather than ground truth, so the disagreement is
+# a floor on the risk rather than a measurement of it.
+#
+# This is a POLICY DECISION, reversible by editing this list. It is NOT presented as validated by
+# the validation partition, which is consumed and measured the matcher, not the payout risk.
+match_risk:
+  hold_methods: ["SCORED_FALLBACK_UNIQUE"]
+  hold_reason: "MATCH_RISK_POLICY"
+  keeps_match_status: "MATCHED"
+  expected_held_listens: 35007
+
+# --- gate 3: ownership --------------------------------------------------------------------
+#
+# Ownership must resolve to EXACTLY ONE valid split set covering the listen's own date. The
+# precise cause is preserved in `ownership_status`; all of them collapse to one terminal state,
+# because the financial consequence is identical -- nobody gets paid -- and a waterfall with six
+# ownership variants would obscure that.
+ownership:
+  terminal_state: "DEFECTIVE_OWNERSHIP"
+  # resolution_status from int_ownership_resolution -> ownership_status recorded on the listen
+  status_map:
+    RESOLVED: "OWNERSHIP_RESOLVED"
+    RATE_CARD_GAP: "OWNERSHIP_RESOLVED"        # ownership was fine; the rate was not
+    RATE_CARD_OVERLAP: "OWNERSHIP_RESOLVED"
+    DEFECTIVE_OWNERSHIP: "OWNERSHIP_DEFECTIVE"
+    COVERED_ONLY_BY_INVALID_SET: "OWNERSHIP_COVERED_ONLY_BY_INVALID_SET"
+    NO_OWNERSHIP_RECORD: "OWNERSHIP_MISSING"
+    OWNERSHIP_GAP_FOR_DATE: "OWNERSHIP_GAP_FOR_DATE"
+    MULTIPLE_VALID_SETS: "OWNERSHIP_AMBIGUOUS"
+  payable_statuses: ["OWNERSHIP_RESOLVED"]
+
+# --- gate 4: rate -------------------------------------------------------------------------
+#
+# NO IMPUTATION. EVER. A day with no rate card row is not priced at the previous rate, not at an
+# average, not at zero, and not at an invented number. The streams are held with their reason
+# attached and the money is simply not created, because a pipeline that invents a rate for an
+# uncovered day is inventing money.
+#
+# The MODELED rate card has a deliberate three-day hole (2026-06-10 to 2026-06-12) precisely so
+# this rule has something real to refuse.
+rate:
+  imputation: "FORBIDDEN"
+  imputation_alternatives_rejected: ["previous_rate", "next_rate", "period_average",
+                                     "zero", "any_default"]
+  gap_state: "RATE_CARD_GAP"
+  ambiguous_state: "RATE_CARD_AMBIGUOUS"
+  payable_statuses: ["RATE_RESOLVED"]
+
+# --- terminal states ----------------------------------------------------------------------
+#
+# Mutually exclusive and exhaustive over all 38,199,641 listens. RATE_CARD_AMBIGUOUS is expected
+# to be empty on this corpus (the rate card has no overlapping rows); it exists so that a future
+# overlapping rate card is refused by name instead of falling into a default.
+attribution_states:
+  - "ATTRIBUTABLE"
+  - "UNMATCHED"
+  - "MATCH_RISK_POLICY"
+  - "DEFECTIVE_OWNERSHIP"
+  - "RATE_CARD_GAP"
+  - "RATE_CARD_AMBIGUOUS"
+payable_state: "ATTRIBUTABLE"
+
+# --- money --------------------------------------------------------------------------------
+#
+# NUMERIC/DECIMAL everywhere. Never FLOAT for a rate, a gross amount, a share, a payout, or a
+# remainder. A share is money's denominator and a float sum of four shares is not exactly 100.
+money:
+  currency: "USD"
+  internal_scale: 9        # BigQuery NUMERIC is DECIMAL(38, 9)
+  published_scale: 2       # money is published in cents
+  # ONE rounding point, at publication. Rounding each holder independently and accepting a
+  # residual difference is how a published total stops matching the sum of its parts.
+  rounding:
+    method: "largest_remainder"
+    single_rounding_point: true
+    tiebreak: "rights_holder_id ascending"
+    tiebreak_is_deterministic: true
+    # Invariant asserted in cents, not in dollars, and not approximately:
+    #   SUM(published_holder_payout) == published_gross_royalty
+    exact_cent_closure_required: true
+  negative_payout: "FORBIDDEN"
+
+# --- the financial fact grain -------------------------------------------------------------
+#
+# GRAIN ADJUSTMENT, and the measurement that forced it: the project's stated grain was
+# period + recording_mbid + rights_holder_id + split_version_id + rule_version_id +
+# payout_policy_version + attribution_run_id. The MODELED rate card changes value INSIDE the
+# period (0.003500000 until 2026-06-10, 0.003700000 from 2026-06-13), so a single row at that
+# grain cannot satisfy `gross_royalty = attributable_streams * rate_per_stream` -- one row would
+# have to carry two rates. `rate_card_id` is therefore part of the physical grain, which keeps
+# that identity exactly true per row and keeps the rate auditable.
+fact_grain:
+  - "period"
+  - "recording_mbid"
+  - "rights_holder_id"
+  - "split_version_id"
+  - "rate_card_id"
+  - "rule_version_id"
+  - "payout_policy_version"
+  - "attribution_run_id"
+grain_adjustment_reason: >-
+  rate_card_id added because the modeled rate card changes value inside the period, so
+  gross_royalty = attributable_streams * rate_per_stream is only exact per rate window
+
+# --- publication --------------------------------------------------------------------------
+#
+# The first financial publication is IMMUTABLE. Publications are append-only and identified by a
+# deterministic attribution_run_id; a current pointer selects which one is in force. Moving the
+# pointer never touches published rows, which is the mechanism Phase 6 restatement will need.
+publication:
+  strategy: "append_only_versioned_by_attribution_run_id"
+  destructive_update: "FORBIDDEN"
+  current_pointer_table: "publication_pointer"
+  statuses: ["PUBLISHED", "REHEARSAL"]
+  # A REHEARSAL publication is not a financial statement. It exists to prove the immutability and
+  # pointer mechanics with real rows, without inventing a policy change to justify a second
+  # PUBLISHED version inside a frozen phase.
+  rehearsal_is_not_a_financial_statement: true
+
+rules_sha256: "84b4b68a37c9"

@@ -30,6 +30,15 @@ flags:
   require_explicit_package_overrides_for_builtin_materializations: true
   source_freshness_run_project_hooks: false
 
+# Defaults so `dbt build` runs standalone. The publisher (src/payout/publish.py) overrides
+# attribution_run_id and publication_status per publication, and tests/unit/test_payout_policy.py
+# asserts that payout_policy_version here still equals the digest-sealed value in
+# config/payout_policy.yml -- so the warehouse cannot drift from the policy it claims to apply.
+vars:
+  payout_policy_version: "1.0.0+84b4b68a37c9"
+  attribution_run_id: "attr:83c013596d1d3da3"
+  publication_status: "PUBLISHED"
+
 models:
   splitsheet:
     +materialized: view
@@ -42,6 +51,10 @@ models:
     dimensions:
       +materialized: table
     quality:
+      +materialized: table
+    finance:
+      # Tables, not views: these carry money and are read by tests, the reconciliation and the
+      # current-publication view. A view would re-derive every amount on each reference.
       +materialized: table
 
 snapshots:

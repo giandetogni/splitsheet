@@ -1799,3 +1799,185 @@ while dbt rebuilds freely, and the financial joins live in reviewable SQL rather
 `dbt build`: **64 passed, 0 errors** (1 snapshot, 6 tables, 4 views, 53 data tests).
 `dbt parse` runs with **no credentials at all**, so public CI validates every ref, source, macro and
 YAML contract without touching GCP.
+
+## 23. Phase 5B — payout policy, royalty attribution, immutable publication
+
+**MATCHED != PAYABLE.** Phase 4B produced a technical conclusion; Phase 5A produced temporal
+rights; this phase turns both into an explicit, versioned, auditable financial decision — and
+declines to pay on most of what it could have.
+
+Every amount below is an **ILLUSTRATIVE MODELED AMOUNT**. The rate card and ownership splits are
+MODELED (`config/rights_model.yml`); ListenBrainz listens and MusicBrainz recordings are REAL. No
+figure here is an observed industry payout. The matcher, `normalization_version`,
+`scoring_version`, the consumed evaluation partitions and the Phase 5A rights data were all read
+and none was changed — asserted by `test_the_frozen_matcher_is_still_untouched`.
+
+### 23.1 The policy is an artifact, not a comment
+
+`config/payout_policy.yml`, version **1.0.0+84b4b68a37c9**, digest-sealed and mutation-tested. The
+publisher refuses to run if the warehouse no longer holds the exact inputs the policy names
+(`match:101eef5c5b5c081e`, `1.0.0+cb21f9704ff0`, rights `1.0.0+47f801102e17`,
+`rights:d2b8a2dc146673e9`, `rc-1.0.0`): a different matcher run is a different financial universe,
+and pricing it under the same policy version would be a silent restatement.
+
+**Four gates, in order, and the order is the policy:**
+
+| # | question | failure state |
+|---|---|---|
+| 1 | is it matched at all? | `UNMATCHED` |
+| 2 | do we trust **how** it matched? | `MATCH_RISK_POLICY` |
+| 3 | do we know who owned it **on that date**? | `DEFECTIVE_OWNERSHIP` |
+| 4 | do we know what a stream was worth **on that date**? | `RATE_CARD_GAP` / `RATE_CARD_AMBIGUOUS` |
+| 5 | everything passed | `ATTRIBUTABLE` |
+
+Ownership is checked before rate because an unknown owner cannot be paid at any rate; reporting
+such a listen as a pricing problem would misdirect the fix. **There is no `UNKNOWN` bucket** — an
+unmapped upstream status produces NULL and a test refuses the publication rather than defaulting to
+"unpayable", which would hide a broken contract.
+
+### 23.2 The waterfall: all 38,199,641 listens, exclusive and exhaustive
+
+| terminal state | listens (= streams) | share |
+|---|---|---|
+| **ATTRIBUTABLE** | **28,386,887** | **74.3119 %** |
+| UNMATCHED | 6,601,112 | 17.2806 % |
+| RATE_CARD_GAP | 3,164,839 | 8.2850 % |
+| MATCH_RISK_POLICY | 35,007 | 0.0916 % |
+| DEFECTIVE_OWNERSHIP | 11,796 | 0.0309 % |
+| RATE_CARD_AMBIGUOUS | 0 | 0 % |
+| **total** | **38,199,641** | **100 %** |
+
+**The headline moves from 82.72 % to 74.31 %, and that is the point of the phase.** Match coverage
+was 82.72 %; payable is 74.31 %. The 8.41-point gap is not a matching regression — it is 3.16M
+streams whose rate card has a deliberate three-day hole, 35,007 held on match risk, and 11,796 with
+defective ownership. Reporting 82.72 % as revenue-ready would have been the single most misleading
+number this project could produce.
+
+**Five metrics, kept apart, and they are NOT nested.** A first version of the test assumed they
+were and failed:
+
+| metric | listens | denominator |
+|---|---|---|
+| match coverage | 31,598,529 | all listens |
+| match gate passed | 31,563,522 | matched listens |
+| ownership resolved | 31,562,884 | listens whose recording-day resolved |
+| rate resolved | 28,407,435 | listens whose date had exactly one rate |
+| **payable** | **28,386,887** | listens passing **every** gate |
+
+Ownership and rate are properties of a recording-**day**, so they resolve for listens that are held
+for an earlier reason: 9,968 risk-held listens have a resolved rate and 11,158 have resolved
+ownership, because they share a recording-day with an attributable listen. Each metric decomposes
+exactly into the terminal states it spans, which is asserted rather than assumed.
+
+### 23.3 A leak the tests caught
+
+`int_ownership_resolution` is keyed on (recording_mbid, listen_date), and **5,790 recordings appear
+in both the payout-eligible and risk-held groups**. The plain join therefore attached an eligible
+recording-day's resolved rate to **9,968 `MATCH_RISK_POLICY` listens** — a real rate, sitting on a
+held row, in a column called `rate_per_stream`. Nothing multiplied it, but it is exactly the shape
+of a value that a later query would.
+
+`assert_held_listens_never_produce_money` failed on it. The fix is in the model, not the test: the
+payable columns (`split_version_id`, `rule_version_id`, `rate_per_stream`, `currency`) are NULL
+unless the listen is `ATTRIBUTABLE`, and the diagnostic value is retained under
+`resolved_split_version_id` so a held row can still be investigated without carrying a number that
+looks payable.
+
+### 23.4 Money: NUMERIC, one rounding point, largest remainder
+
+Every monetary column is `NUMERIC` — checked against `INFORMATION_SCHEMA`, not assumed from the
+model SQL: `rate_per_stream`, `gross_royalty`, `gross_royalty_unrounded`, `holder_share_pct`,
+`holder_payout`, `holder_payout_unrounded`, `remainder_fraction`. No `FLOAT` anywhere.
+
+```
+gross_royalty     = attributable_streams * rate_per_stream        (exact, per rate window)
+holder_unrounded  = gross_royalty_unrounded * holder_share_pct / 100
+published         = floor to cents, then one leftover cent each to the largest discarded
+                    fractions, tiebreak rights_holder_id ascending
+```
+
+**GRAIN ADJUSTMENT, forced by measurement.** The project's stated grain could not satisfy
+`gross = streams × rate`, because the MODELED rate card changes value **inside** the period
+(0.003500000 until 2026-06-10, 0.003700000 from 2026-06-13). One row per recording per split set
+would have to carry two rates. `rate_card_id` is therefore part of the physical grain:
+
+```
+period + recording_mbid + rights_holder_id + split_version_id + rate_card_id
+       + rule_version_id + payout_policy_version + attribution_run_id
+```
+
+Uniqueness on that grain is asserted (`assert_financial_grain_is_unique`).
+
+**The closure invariant, in cents and exactly, at two levels:**
+
+| level | measured |
+|---|---|
+| every one of 3,153,008 financial groups | `SUM(holder_payout) = gross_royalty`, 0 failures |
+| the whole publication | gross **98,284.22** = paid **98,284.22** USD |
+
+1,369,876 remainder cents were distributed. Naive per-holder rounding would have lost most of
+them. The unit suite pins the algorithm with fixtures built to break it — thirds of a dollar, a
+half-cent gross, four-way splits where every holder floors to zero — and 58 tests assert closure on
+every combination. An integration test then recomputes 400 published groups in Python and requires
+**cent-for-cent agreement** with what BigQuery published.
+
+**Ties are decided, not left to chance.** `remainder_fraction DESC, rights_holder_id ASC` is a
+total order, so two runs cannot hand the same cent to different holders. `ROW_NUMBER()` appears
+here and is *not* an arbitrary pick — it orders by a measured quantity with a total tiebreak, which
+is the policy itself. Compare the matcher and the ownership join, where `ROW_NUMBER() = 1` would
+have chosen among candidates that no measurement separated, and where it is therefore absent.
+
+### 23.5 Immutable publication
+
+`fct_royalty_attribution` is incremental with `merge` on the **full grain including
+attribution_run_id**, plus a guard that makes the select return zero rows when the run is already
+published. dbt-bigquery has no `append` strategy and `insert_overwrite` would replace a partition —
+the destructive update the policy forbids — so immutability is built from the two mechanisms
+together: a re-run performs no insert and no update, and a new run can never match an old run's
+rows.
+
+Proven, with two publications coexisting:
+
+| property | evidence |
+|---|---|
+| first publication exists | `attr:83c013596d1d3da3`, 5,925,913 holder rows, `PUBLISHED` |
+| re-run is idempotent | second run inserted 0 rows; content digest, total and **first `published_at` all unchanged** |
+| previous publication stays queryable | `attr:6f8b48e90eef6b7b` (`REHEARSAL`) still returns 5,925,913 rows |
+| no published row overwritten | SHA-256 over all published rows identical before, during and after the pointer moved |
+| moving the pointer destroys nothing | pointer set to `attr:none` → current view returns **0** rows while the fact table still holds 11,851,826; restored, and the digest never changed |
+
+The `REHEARSAL` publication is **not a financial statement** and says so in its own
+`publication_status`. It exists because a second *PUBLISHED* version would have required inventing a
+policy change inside a frozen phase; the mechanics Phase 6 restatement needs are proven with real
+rows instead.
+
+### 23.6 What the money actually looks like
+
+| | |
+|---|---|
+| holder rows published | 5,925,913 |
+| financial groups | 3,153,008 |
+| recordings paid | 2,332,853 |
+| holders paid | 59,000 of 60,000 (the 1,000 reserved holders own nothing, by design) |
+| total | 98,284.22 USD *(illustrative modeled)* |
+| largest single holder amount | 4,647.10 |
+| negative payouts | **0** |
+| **holder rows publishing exactly 0.00** | **3,926,337 (66.3 %)** |
+
+That last row is the honest headline of the money layer: at a modeled rate of $0.0035 and a median
+of one stream per recording-day, most individual holder amounts floor to zero cents and no remainder
+cent reaches them. The arithmetic is correct and the totals close, but a real system would
+accumulate sub-cent balances to a payment threshold rather than publish 3.9M zero-value rows. That
+is a design gap in this phase, not a rounding bug.
+
+### 23.7 Evidence
+
+`dbt build` **79/79**. Python: **378 unit tests**, 17 payout integration tests, 17 rights
+integration tests. `make verify`: ruff exit=0, pytest exit=0, terraform fmt exit=0, terraform
+validate exit=0. `terraform plan`: **No changes** — Phase 5B added no infrastructure; the
+publication pointer is a small table created by the publisher inside the dbt-owned dataset.
+
+Cost: dry-run estimate **6,933,335,858 bytes** recorded before materialising; publisher queries
+billed **8,299,479,040** across 13 jobs; dbt materialised the disposition (38.2M rows), attributable
+streams (3.2M) and the fact (5.9M) inside its own jobs. **List-price equivalent ≈ $0.05** for the
+publisher's queries. **Actual monetary cost remains UNKNOWN without billing evidence.**

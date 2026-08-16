@@ -55,10 +55,16 @@ tests/      unit (pure, no cloud) and integration (real BigQuery, marked and sep
 
 Phases 0 through 4B are complete and **frozen** (`config/frozen_versions.yml`): 82.72% of listens
 carry a technical match, measured at 0.0066% disagreement with the reference label on a validation
-partition opened exactly once. Phase 5A adds modeled rights, temporal ownership with half-open
+partition opened exactly once. Phase 5A added modeled rights, temporal ownership with half-open
 validity intervals, a real dbt SCD2 snapshot over rights holders, and a queryable data quality
-report. **No payout amount is computed anywhere yet** — that waits until ownership validity is
-fully proven, which is what Phase 5A measures.
+report. Phase 5B added the payout policy, royalty attribution and an immutable financial
+publication.
+
+**The number that matters is not the match rate.** 82.72% of listens are technically matched;
+**74.31% are payable**. The 8.41-point difference is 3.16M streams whose rate card has a deliberate
+gap, 35,007 held because the fallback match path is not trusted enough to pay on, and 11,796 with
+defective ownership. Every published amount is an *illustrative modeled amount*, the published
+total closes to the cent against the sum of its parts, and the first publication is immutable.
 
 Every phase is written up in `docs/schema_notes.md`, including the measurements that contradicted
 my own expectations. `docs/restatement_candidates.md` records the changes known to be worth making

@@ -107,3 +107,25 @@ sources:
             data_tests: [not_null]
           - name: currency
             data_tests: [not_null]
+
+  # ---------------------------------------------------------------------------------------
+  # The publication pointer. Maintained OUTSIDE dbt, by src/payout/publish.py, because it is
+  # mutable state by design: moving it is how a different publication becomes current, and dbt
+  # models are rebuilt rather than updated.
+  # ---------------------------------------------------------------------------------------
+  - name: finance
+    schema: splitsheet_dbt
+    description: >-
+      Financial control tables that are not dbt models. Amounts derived from them are ILLUSTRATIVE
+      MODELED AMOUNTS: the rate card and ownership splits are MODELED.
+    tables:
+      - name: publication_pointer
+        description: >-
+          One row per pointer name. `CURRENT` names the publication in force. Moving the pointer
+          touches no published row -- the fact table is append-only and every publication stays
+          queryable by attribution_run_id.
+        columns:
+          - name: pointer_name
+            data_tests: [not_null, unique]
+          - name: attribution_run_id
+            data_tests: [not_null]
