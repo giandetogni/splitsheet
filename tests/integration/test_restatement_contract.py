@@ -249,15 +249,39 @@ def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq
     assert reg["cohort_sha256"] == ident["cohort_sha256"]
     assert reg["new_publication_id"] == ident["publication_id"]
 
-    published_rows = one(bq, f"""
-        SELECT COUNT(DISTINCT restatement_run_id) AS distinct_ids,
-               ANY_VALUE(restatement_run_id) AS carried_id, COUNT(*) AS n
-        FROM `{RESTATEMENTS}`
+    # The rows that actually reconcile to the published delta must still carry the legacy string.
+    carried = rows(bq, f"""
+        SELECT restatement_run_id, COUNT(*) AS n, SUM(delta) AS summed_delta
+        FROM `{RESTATEMENTS}` GROUP BY 1 ORDER BY n DESC
     """)
-    assert published_rows["distinct_ids"] == 1
-    assert published_rows["carried_id"] == ident["legacy_run_id"], (
+    real = [r for r in carried if r["summed_delta"] != 0]
+    assert len(real) == 1
+    assert real[0]["restatement_run_id"] == ident["legacy_run_id"], (
         "the published restatement rows carry an identifier other than the one they were published "
         "with; a published statement was rewritten")
+    assert ident["canonical_run_id"] not in {r["restatement_run_id"] for r in carried}, (
+        "the canonical identity was retrofitted onto published rows; the correction is supposed to "
+        "be a registry entry, not an edit")
+
+
+@pytest.mark.integration_readonly
+def test_every_identifier_in_the_delta_mart_is_accounted_for(bq):
+    """No orphan run ids. The one that is not a real run is named, not tolerated silently.
+
+    `restate:pending` is a placeholder from the rehearsal built under the vacuous dbt defaults
+    (section 24.12): 4,416,901 rows whose deltas are all zero because prior and new pointed at the
+    same publication. It is not deleted -- fct_restatements is append-only and deleting from it to
+    tidy the mart would be exactly the kind of edit this phase refuses -- but it is a second symptom
+    of the same defect the registry fixes: a string that names no cohort, no period and no
+    publication is not an identity.
+    """
+    known = {r["legacy_run_id"] for r in rows(bq, f"""
+        SELECT DISTINCT legacy_run_id FROM `{PROJECT}.{DATASET}.restatement_run_registry`
+    """)} | {"restate:pending"}
+    present = {r["restatement_run_id"] for r in rows(bq, f"""
+        SELECT DISTINCT restatement_run_id FROM `{RESTATEMENTS}`
+    """)}
+    assert present <= known, f"restatement ids in the mart that no registry row explains: {present - known}"
 
 
 @pytest.mark.integration_readonly

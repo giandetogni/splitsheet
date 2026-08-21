@@ -2480,6 +2480,20 @@ rows carry and **refuses** any identity that would mint a successor publication 
 `published_run_identity` block, and `test_frozen.py` fails if it drifts from what the identity module
 computes.
 
+**A second symptom, found while proving the first.** Recomputing both publications after the patch
+turned up something the old identifier had hidden: `fct_restatements` holds **two** run ids, not one.
+Alongside the published `restate:6b3923771883e860` (4,416,901 rows, `SUM(delta) = 0.86`) there are
+4,416,901 rows under **`restate:pending`** whose deltas are all zero — the rehearsal built under the
+vacuous dbt defaults of section 24.12, when prior and new pointed at the same publication. A
+placeholder that names no cohort, no period and no publication is not an identity at all, and it sat
+in the mart unnoticed because nothing ever checked that a run id could be explained.
+
+Those rows are **not deleted**. `fct_restatements` is append-only, and deleting from it to tidy the
+mart would be precisely the edit this phase refuses. Instead the placeholder is named: the singular
+test `assert_restatement_identity_separates_cohorts` now fails on any run id in the delta mart that
+no registry row explains, with `restate:pending` allowed **by name and only by name**. The next
+orphan will not be tolerated silently.
+
 **Language.** Section 24.7 previously said the restatement "recovered 570,735 listens". Three
 different quantities were hiding inside that verb, and they are now always named separately:
 **570,735 listens became newly matched** under normalization v2, **228 became newly attributable**,
