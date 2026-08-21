@@ -334,12 +334,18 @@ phase5b-waterfall:
 # The probe must run BEFORE any rule is implemented, and the trigger config
 # must be frozen before the probe.
 # ---------------------------------------------------------------------------
+# THE LEGACY IDENTIFIER, and it stays. It is what the published pub:v2 rows carry, and
+# attribution_run_id is a hash of it -- publishing under the canonical
+# `restate:v1:2f08f786d0d3e552` would mint a THIRD publication rather than correct anything.
+# The mapping between the two lives in dbt/models/finance/restatement_run_registry.sql, and
+# publish_restatement.py refuses any identity that would create a successor publication unless
+# --allow-new-publication is passed. Leave this unset to reproduce the published statement.
 RESTATEMENT_RUN_ID ?= restate:6b3923771883e860
 NEW_NORM_VERSION   ?= 1.1.0+b3253b155934
 PRIOR_RUN_ID       ?= attr:83c013596d1d3da3
 
 .PHONY: phase6-freeze phase6-probe phase6-reprocess phase6-publish phase6-case \
-        phase6-evaluate
+        phase6-evaluate phase6-registry
 
 # Freezes v1 with a reproducible digest and produces the black-box decomposition.
 phase6-freeze:
@@ -364,6 +370,12 @@ phase6-publish:
 	  --restatement-run-id "$(RESTATEMENT_RUN_ID)" \
 	  --new-normalization-version "$(NEW_NORM_VERSION)" \
 	  --out $(OUT_DIR)/restatement_publication.json
+
+# Regenerates the restatement run registry model from config/restatement_cohorts.yml and
+# src/restatement/identity.py. Pure: no cloud. The unit suite fails if the checked-in model
+# is stale, so this is the only way the warehouse's copy is allowed to change.
+phase6-registry:
+	cd src && ../.venv/bin/python -m restatement.registry --write
 
 # The Agust D / 해금 case, before and after, reported as measured even if it fails.
 phase6-case:

@@ -69,13 +69,24 @@ total closes to the cent against the sum of its parts, and the first publication
 
 **Phase 6 restated it, and the result is the most instructive number in the project.** Transliterating
 Korean and Japanese titles (a change chosen by an unsupervised probe under criteria frozen beforehand)
-recovered **570,735 listens** of attribution — including all 384,926 listens of one recording that
-previously could not even be looked up. The published money moved **$0.86**. Two reasons, both of them
-the pipeline being right: the modeled rights universe was generated against the *old* match run, so
-26,665 of the 26,700 newly matched recordings have no ownership record and are correctly refused; and
-cent rounding at the published grain destroys small recoveries. Fixing matching does not produce
+meant **570,735 listens became newly matched under normalization v2** — including all 384,926 listens
+of one recording that previously could not even be looked up. Of those, **228 became newly
+attributable**, and the **modeled payout delta was \$0.86**. Those three quantities are deliberately
+never collapsed into one: a technical match, a payable listen and a published amount are different
+claims, and nothing here was *recovered*. Two reasons, both of them the pipeline being right: the
+modeled rights universe was generated against the *old* match run, so 26,665 of the 26,700 newly
+matched recordings have no ownership record and are correctly refused; and cent rounding at the
+published grain leaves small newly attributable amounts at \$0.00. Fixing matching does not produce
 payouts on its own. Both publications remain queryable, v1's content digest is unchanged, and
 `SUM(delta)` reconciles to the difference between them exactly.
+
+**Every restatement is identified by what it touched, not only by which versions it ran under.**
+`restatement_run_id` is a SHA-256 over canonical inputs that include the *cohort definition* — a
+structured predicate in `config/restatement_cohorts.yml`, never prose and never a SQL string. The
+first Phase 6 identifier hashed the versions alone, so the cohort that was built and rejected
+(1,377,862 listens) and the cohort that was published (982,322) shared one id. That identifier is
+preserved as legacy/insufficient rather than rewritten onto the 5.9M published rows:
+`dbt/models/finance/restatement_run_registry.sql` maps it to the canonical identity of each run.
 
 Every phase is written up in `docs/schema_notes.md`, including the measurements that contradicted
 my own expectations. `docs/restatement_candidates.md` records the changes known to be worth making

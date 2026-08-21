@@ -37,6 +37,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).parents[1]))
 from matching.scoring import load_scoring_rules
 from normalization import load_rules, normalize
 from normalization.transliterate import would_transliterate
+from restatement.identity import (
+    LEGACY_RUN_ID,
+    PUBLISHED_COHORT_KEY,
+    SCRIPT_PATTERNS,
+    inputs_for_published_restatement,
+    legacy_run_id,
+    load_cohorts,
+)
 
 PROJECT = "ss-de-944054e7"
 MAX_BYTES = 200 * 1024**3
@@ -56,15 +64,10 @@ def period(alias: str = "") -> str:
 
 PERIOD = period()
 SNAPSHOT = "2026-07-17"
-HANGUL_RE = r"[\x{AC00}-\x{D7A3}\x{1100}-\x{11FF}\x{3130}-\x{318F}]"
-KANA_RE = r"[\x{3040}-\x{30FF}]"
-IN_SCRIPT = (f"(REGEXP_CONTAINS(artist_name, r'{HANGUL_RE}') "
-             f"OR REGEXP_CONTAINS(artist_name, r'{KANA_RE}') "
-             f"OR REGEXP_CONTAINS(recording_name, r'{HANGUL_RE}') "
-             f"OR REGEXP_CONTAINS(recording_name, r'{KANA_RE}'))")
-
-# THE COHORT IS BOTH CONDITIONS, exactly as config/restatement_trigger.yml froze it: the strings
-# contain an enabled script AND the v1 failure reason was a missing key.
+# THE COHORT COMES FROM config/restatement_cohorts.yml, and so does this script's identity.
+#
+# It is both conditions, exactly as config/restatement_trigger.yml froze it: the strings contain an
+# enabled script AND the v1 failure reason was a missing key.
 #
 # The first implementation used the script test ALONE, which pulled in 395,540 extra listens that
 # already had a key -- mixed Latin/CJK strings like "Dynamite (한국어)" whose ASCII key CHANGES when
@@ -72,7 +75,15 @@ IN_SCRIPT = (f"(REGEXP_CONTAINS(artist_name, r'{HANGUL_RE}') "
 # listens (21,211 exact-unique, 7,476 exact-multiple, 1,267 fallback), which is a regression the
 # frozen definition never asked for. Restricting to the frozen definition means no v1 match can be
 # lost, because every listen in scope was unmatched to begin with.
-COHORT_FAILURE_REASONS = ("NO_LOOKUP_KEY_PARTIAL", "NO_LOOKUP_KEY_EMPTY")
+#
+# That wrong cohort is not deleted from the registry -- it is kept there as the counter-example that
+# proves the run identity actually distinguishes cohorts. Under the superseded scheme both cohorts
+# produced the SAME restatement_run_id, which is the defect this wiring closes: the predicate that
+# selects the rows below and the hash that names the run are now the same object.
+COHORT = load_cohorts()[PUBLISHED_COHORT_KEY]
+COHORT_SQL = COHORT.sql_predicate(normalized_alias="n", matches_alias="m")
+HANGUL_RE = SCRIPT_PATTERNS["hangul"]
+KANA_RE = SCRIPT_PATTERNS["kana"]
 
 EXPECTED_LISTENS = 38_199_641
 V1_MATCH_RUN = "match:101eef5c5b5c081e"
@@ -104,10 +115,24 @@ def main() -> None:
     print(f"restating under normalization {rules.version} (v1 was {v1_rules.version})", flush=True)
     print(f"scoring stays {scoring.version}", flush=True)
 
-    run_id = "restate:" + hashlib.sha256(
-        f"{rules.version}|{scoring.version}|{V1_MATCH_RUN}|{BLOCKING_VERSION}".encode()
-    ).hexdigest()[:16]
-    print(f"restatement_run_id {run_id}", flush=True)
+    # THE RUN'S IDENTITY IS DERIVED, NOT INVENTED HERE: canonical inputs -> sha256 -> id, with the
+    # cohort digest among the inputs. The superseded formula is computed alongside it only to show
+    # what it could not see, and to keep the mapping to the rows already published under it honest.
+    identity = inputs_for_published_restatement()
+    run_id = identity.run_id
+    # Recomputed from THIS script's live constants, not from a copy of the answer: if the versions
+    # here no longer reproduce the identifier the published rows carry, the registry's mapping from
+    # legacy to canonical is describing a run that never happened.
+    superseded = legacy_run_id(rules.version, scoring.version, V1_MATCH_RUN, BLOCKING_VERSION)
+    if superseded != LEGACY_RUN_ID.run_id:
+        raise SystemExit(
+            f"the superseded formula now yields {superseded}, not the published "
+            f"{LEGACY_RUN_ID.run_id}; the legacy-to-canonical mapping in the restatement run "
+            f"registry would be wrong")
+    print(f"restatement_run_id  {run_id}  (cohort {COHORT.cohort_key}, "
+          f"digest {COHORT.digest[:12]})", flush=True)
+    print(f"  superseded id     {superseded}  -- versions only, cohort-blind; pub:v2 rows carry it",
+          flush=True)
 
     def q(sql: str, label: str, dry: bool = False):
         job = client.query(sql, job_config=bigquery.QueryJobConfig(
@@ -156,12 +181,19 @@ def main() -> None:
         FROM `{PROJECT}.splitsheet_silver.silver_listens_normalized` n
         JOIN `{PROJECT}.splitsheet_silver.silver_listen_matches` m USING (listen_hash)
         WHERE {period('n')} AND {period('m')}
-          AND m.failure_reason IN {COHORT_FAILURE_REASONS} AND {IN_SCRIPT}
+          AND {COHORT_SQL}
     """, "affected cohort size")[0]
     affected_listens = int(cohort["affected_listens"])
     print(f"  affected cohort: {affected_listens:,} listens, "
           f"{int(cohort['affected_pairs']):,} distinct pairs "
           f"({100 * affected_listens / EXPECTED_LISTENS:.4f}% of the corpus)", flush=True)
+    # The registry records what this predicate measured when the run was published. A different
+    # count here means the identity would name a run that is not the one being executed.
+    if affected_listens != COHORT.measured_listens:
+        raise SystemExit(
+            f"cohort {COHORT.cohort_key!r} now selects {affected_listens:,} listens but the registry "
+            f"records {COHORT.measured_listens:,}. Identity and cohort have diverged; refusing to "
+            f"restate under an id that would describe a different set of rows.")
 
     # --- 2. re-normalize ONLY the affected pairs -------------------------------------------
     pairs = q(f"""
@@ -169,7 +201,7 @@ def main() -> None:
         FROM `{PROJECT}.splitsheet_silver.silver_listens_normalized` n
         JOIN `{PROJECT}.splitsheet_silver.silver_listen_matches` m USING (listen_hash)
         WHERE {period('n')} AND {period('m')}
-          AND m.failure_reason IN {COHORT_FAILURE_REASONS} AND {IN_SCRIPT}
+          AND {COHORT_SQL}
     """, "affected distinct pairs")
 
     SEP = "\x1f"
@@ -255,7 +287,7 @@ def main() -> None:
       FROM `{PROJECT}.splitsheet_silver.silver_listens_normalized` n
       JOIN `{PROJECT}.splitsheet_silver.silver_listen_matches` m USING (listen_hash)
       WHERE {period('n')} AND {period('m')}
-        AND m.failure_reason IN {COHORT_FAILURE_REASONS} AND {IN_SCRIPT}
+        AND {COHORT_SQL}
     ),
     cohort_norm AS (
       SELECT c.listen_hash, c.listened_at,
@@ -389,14 +421,23 @@ def main() -> None:
     report = {
         "artifact": "restatement_reprocessing",
         "restatement_run_id": run_id,
+        "identity": {
+            "scheme": identity.canonical_payload()["identity_scheme"],
+            "canonical_inputs": identity.canonical_payload(),
+            "inputs_digest": identity.inputs_digest,
+            "cohort_key": COHORT.cohort_key,
+            "cohort_sha256": COHORT.digest,
+            "superseded_run_id": superseded,
+            "why_superseded": LEGACY_RUN_ID.why_insufficient,
+        },
         "prior_normalization_version": v1_rules.version,
         "new_normalization_version": rules.version,
         "scoring_version_unchanged": scoring.version,
         "blocking_version": BLOCKING_VERSION,
         "cohort": {
-            "definition": ("v1 failure_reason in " + str(COHORT_FAILURE_REASONS)
-                           + " AND artist or recording contains a hangul or kana character, "
-                             "exactly as config/restatement_trigger.yml froze it"),
+            "definition": COHORT.canonical_predicate(),
+            "definition_source": "config/restatement_cohorts.yml, hashed into the run identity",
+            "generated_sql": COHORT_SQL,
             "first_implementation_deviation": (
                 "the script test alone pulled in 395,540 listens that already had a key and cost "
                 "29,954 previously matched ones; restricted to the frozen definition, no v1 match "

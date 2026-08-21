@@ -16,7 +16,7 @@ Nothing in this file may be acted on inside Phase 5. The Phase 4B result is froz
 implemented. The matcher is untouched.
 
 **What it would change:** the normalization rules, therefore `normalization_version`, therefore
-every downstream run id. It is the largest single recoverable block of unmatched listens
+every downstream run id. It is the largest single block of unmatched listens with one addressable cause
 identified so far.
 
 ### Evidence preserved at the freeze

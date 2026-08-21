@@ -55,6 +55,11 @@ vars:
   prior_publication_id: "pub:v1"
   new_publication_id: "pub:v2"
   prior_attribution_run_id: "attr:83c013596d1d3da3"
+  # The LEGACY identifier, kept on purpose: it is what the 5,925,913 published rows of pub:v2
+  # actually carry, and fct_restatements is keyed on it. It was hashed from the versions alone, so
+  # it does not distinguish the cohort that was published from the one that was rejected --
+  # restatement_run_registry maps it to the canonical `restate:v1:2f08f786d0d3e552`. Changing this
+  # var would not correct history; it would orphan the published rows.
   restatement_run_id: "restate:6b3923771883e860"
   trigger_reason: "TRANSLITERATION_KOREAN_JAPANESE_TITLES"
   prior_normalization_version: "1.0.0+0bc0dd643e06"

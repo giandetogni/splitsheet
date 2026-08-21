@@ -39,6 +39,7 @@ import time
 sys.path.insert(0, str(pathlib.Path(__file__).parents[1]))
 from payout.digest import publication_digest_sql
 from payout.policy import attribution_run_id, load_payout_policy
+from restatement.identity import LEGACY_RUN_ID, inputs_for_published_restatement
 
 PROJECT = "ss-de-944054e7"
 DATASET = "splitsheet_dbt"
@@ -56,12 +57,27 @@ RESTATED_MATCHES = f"{PROJECT}.splitsheet_silver.silver_listen_matches_restated"
 PRIOR_PUBLICATION_ID = "pub:v1"
 NEW_PUBLICATION_ID = "pub:v2"
 TRIGGER_REASON = "TRANSLITERATION_KOREAN_JAPANESE_TITLES"
+MANIFEST = pathlib.Path(__file__).parents[2] / "config/frozen_versions.yml"
+
+
+def published_run_identity() -> dict:
+    """What pub:v2 actually carries, read from the freeze manifest rather than assumed."""
+    import yaml
+    return yaml.safe_load(MANIFEST.read_text())["restatement"]["published_run_identity"]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
-    ap.add_argument("--restatement-run-id", required=True)
+    # DEFAULTS TO THE IDENTIFIER THE PUBLISHED ROWS ALREADY CARRY, not to the canonical one, and
+    # the reason is the guard below: attribution_run_id is derived from this string, so swapping in a
+    # better identifier for the SAME restatement would mint a different publication. The canonical
+    # identity is recorded in the run registry instead of being retrofitted onto published rows.
+    ap.add_argument("--restatement-run-id", default=None,
+                    help="defaults to the published run's identifier from config/frozen_versions.yml")
+    ap.add_argument("--allow-new-publication", action="store_true",
+                    help="required to publish under any identity other than the one already "
+                         "published; without it a re-run cannot invent a successor publication")
     ap.add_argument("--new-normalization-version", required=True)
     args = ap.parse_args()
 
@@ -69,11 +85,35 @@ def main() -> None:
 
     policy = load_payout_policy()
     prior_run = attribution_run_id(policy, "PUBLISHED")
+
+    # IDENTITY, IN THREE PARTS THAT MUST NOT BE CONFLATED.
+    #   canonical  the cohort-aware identity of this restatement, derived from configuration
+    #   published  the identifier the pub:v2 rows carry, from a scheme that could not see cohorts
+    #   run_id     what THIS invocation will write
+    published = published_run_identity()
+    canonical = inputs_for_published_restatement()
+    if canonical.run_id != published["canonical_run_id"]:
+        raise SystemExit(
+            f"config/frozen_versions.yml records canonical id {published['canonical_run_id']} but "
+            f"the cohort config and identity module compute {canonical.run_id}")
+    restatement_run_id = args.restatement_run_id or published["legacy_run_id"]
+
     # The restated publication's id includes the normalization version, so it is deterministic and
     # cannot collide with v1 even though the payout policy is identical.
     new_run = "attr:" + hashlib.sha256(
-        f"{policy.version}|{args.new_normalization_version}|{args.restatement_run_id}"
+        f"{policy.version}|{args.new_normalization_version}|{restatement_run_id}"
         f"|RESTATED".encode()).hexdigest()[:16]
+    # THE GUARD AGAINST AN ACCIDENTAL SUCCESSOR PUBLICATION. Because attribution_run_id is a hash of
+    # the restatement id, republishing the SAME restatement under its canonical identity would
+    # produce attr:a0d886e62446344e -- a third publication describing a restatement that already
+    # happened. That is a decision, not a side effect of tidying up an identifier.
+    if new_run != published["attribution_run_id"] and not args.allow_new_publication:
+        raise SystemExit(
+            f"REFUSED: restatement id {restatement_run_id} derives attribution_run_id {new_run}, "
+            f"but the published restatement is {published['attribution_run_id']} "
+            f"({published['publication_id']}). Publishing this would create a successor "
+            f"publication. Pass --allow-new-publication if that is genuinely intended; to reproduce "
+            f"the published statement, omit --restatement-run-id.")
     client = bigquery.Client(project=PROJECT)
     stats: list = []
     t0 = time.time()
@@ -149,7 +189,7 @@ def main() -> None:
         "prior_publication_id": PRIOR_PUBLICATION_ID,
         "new_publication_id": NEW_PUBLICATION_ID,
         "prior_attribution_run_id": prior_run,
-        "restatement_run_id": args.restatement_run_id,
+        "restatement_run_id": restatement_run_id,
         "trigger_reason": TRIGGER_REASON,
         "prior_normalization_version": baseline.get("normalization_version")
             or "1.0.0+0bc0dd643e06",
@@ -215,7 +255,7 @@ def main() -> None:
                       'PUBLISHED' AS publication_status,
                       '{args.new_normalization_version}' AS normalization_version,
                       '{policy.scoring_version}' AS scoring_version,
-                      '{args.restatement_run_id}' AS match_run_id,
+                      '{restatement_run_id}' AS match_run_id,
                       '{policy.version}' AS payout_policy_version,
                       '{policy.rights_version}' AS rights_version,
                       '{policy.rule_version_id}' AS rule_version_id,
@@ -259,7 +299,20 @@ def main() -> None:
             "amounts": "illustrative modeled amounts over real listening events",
         },
         "trigger_reason": TRIGGER_REASON,
-        "restatement_run_id": args.restatement_run_id,
+        "restatement_run_id": restatement_run_id,
+        "identity": {
+            "written_run_id": restatement_run_id,
+            "canonical_run_id": canonical.run_id,
+            "canonical_inputs": canonical.canonical_payload(),
+            "inputs_digest": canonical.inputs_digest,
+            "cohort_key": published["cohort_key"],
+            "cohort_sha256": published["cohort_sha256"],
+            "legacy_run_id": LEGACY_RUN_ID.run_id,
+            "legacy_scheme": LEGACY_RUN_ID.scheme,
+            "why_legacy_insufficient": LEGACY_RUN_ID.why_insufficient,
+            "legacy_id_preserved_not_rewritten": LEGACY_RUN_ID.published_rows_carry_it,
+            "mapping": "dbt/models/finance/restatement_run_registry.sql",
+        },
         "prior": {"publication_id": PRIOR_PUBLICATION_ID, "attribution_run_id": prior_run,
                   "row_count": int(baseline["row_count"]),
                   "portfolio_paid": str(baseline["portfolio_paid"]),

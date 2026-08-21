@@ -117,3 +117,32 @@ restatement:
     unique_candidate_rate: 0.9997
     keys_over_100_candidates: 0
     conservative_alternative_keyed: 441869
+
+  # ---------------------------------------------------------------------------------------
+  # THE IDENTITY OF THE RUN THAT PRODUCED pub:v2, recorded after the fact and ADDITIVELY.
+  #
+  # `legacy_run_id` is what the 5,925,913 published rows actually carry. It was hashed from the
+  # versions alone, so it did not include WHICH RECORDS were restated: the rejected 1,377,862-listen
+  # cohort and the published 982,322-listen cohort produced the same string. `canonical_run_id`
+  # is the cohort-aware identity of the same run, computed by src/restatement/identity.py from the
+  # inputs below plus the cohort digest.
+  #
+  # The published rows are NOT rewritten to carry it. dbt/models/finance/restatement_run_registry.sql
+  # resolves one to the other, because a published figure -- its identity included -- is corrected by
+  # a new statement, never by an edit. Note the consequence, stated rather than hidden:
+  # attribution_run_id was derived from the legacy string, so publishing the same restatement under
+  # the canonical id would mint a DIFFERENT publication. publish_restatement.py refuses to do that
+  # without --allow-new-publication.
+  # ---------------------------------------------------------------------------------------
+  published_run_identity:
+    publication_id: "pub:v2"
+    attribution_run_id: "attr:fb74b680430fa0b2"
+    legacy_run_id: "restate:6b3923771883e860"
+    legacy_scheme: "legacy-unversioned"
+    canonical_run_id: "restate:v1:2f08f786d0d3e552"
+    identity_scheme: "v1"
+    cohort_key: "partial-empty-hangul-kana"
+    cohort_sha256: "cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5"
+    cohort_config: "config/restatement_cohorts.yml"
+    rejected_cohort_key: "script-only-no-failure-reason-restriction"
+    rejected_cohort_canonical_run_id: "restate:v1:67646757af1bf447"

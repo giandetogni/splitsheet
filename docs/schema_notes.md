@@ -1571,7 +1571,7 @@ whole reason and 1.01 % of the entire corpus.** The pattern is a Latin artist wi
 title: the artist half of the key survives, the title half does not, and the combined key is
 never emitted because emitting half a key would collide every unromanisable title by that
 artist into one bucket. That rule is correct and is not being relaxed here — but it means one
-transliteration path for Korean and Japanese titles would recover more listens than any scoring
+transliteration path for Korean and Japanese titles would newly match more listens than any scoring
 change now available.
 
 `BELOW_THRESHOLD` is next: 20 combinations account for 17.91 % of it, led by titles carrying
@@ -2128,8 +2128,8 @@ new candidates are decided structurally: a single candidate is accepted, several
 `AMBIGUOUS_TIE`. The frozen scorer is NOT re-run over them, because scoring new candidates would
 require extending the feature table (text similarity for recordings that were never in the scored
 universe) and that is a larger change than the trigger justifies. The consequence is stated rather
-than hidden: newly ambiguous listens are **refused, not scored**, so the recovered coverage reported
-below is a **lower bound**. Refusing cannot pay the wrong holder; scoring might.
+than hidden: newly ambiguous listens are **refused, not scored**, so the newly-matched count
+reported below is a **lower bound**. Refusing cannot pay the wrong holder; scoring might.
 
 `scoring_version` is therefore untouched at `1.0.0+cb21f9704ff0`, which is what lets the financial
 delta be attributed to normalization alone.
@@ -2187,7 +2187,20 @@ restated matches. Payout policy `1.0.0+84b4b68a37c9`, scoring `1.0.0+cb21f9704ff
 | content digest | `51193c1f2c4e…` | `1acd4e4fa032…` |
 | normalization | 1.0.0+0bc0dd643e06 | 1.1.0+b3253b155934 |
 
-**570,735 listens gained a match. The money moved $0.86.**
+**THREE QUANTITIES, KEPT SEPARATE.** Collapsing them into one sentence is how a restatement gets
+oversold, so they are named individually everywhere in this repository:
+
+| term | meaning | measured |
+|---|---|---|
+| **newly matched listens** | unmatched under pub:v1, matched under pub:v2. A *technical* match, and nothing more | **570,735** |
+| **newly attributable listens** | newly matched AND passing every payout gate: trusted match path, ownership valid on the listen date, a rate resolvable on that date | **228** |
+| **modeled payout delta** | the change in published illustrative modeled amounts, at cent precision | **\$0.86** |
+
+None of these implies the next one. "Recovered" is not used for any of them: nothing was lost and
+then retrieved, and no money was recovered at all.
+
+**570,735 listens became newly matched under normalization v2. 228 of them became newly attributable.
+The modeled payout delta was \$0.86.**
 
 That is not a bug and it is the most instructive result in this phase, so here is the whole chain:
 
@@ -2198,9 +2211,9 @@ That is not a bug and it is the most instructive result in this phase, so here i
 | **of those, recordings with MODELED ownership** | **35** |
 | recordings with **no** ownership record | **26,665** |
 | newly matched listens ending as `DEFECTIVE_OWNERSHIP` / `OWNERSHIP_MISSING` | **570,493** |
-| newly matched listens ending as `ATTRIBUTABLE` | 228 |
+| **newly attributable listens** (newly matched, and through every payout gate) | **228** |
 | newly matched listens landing in the rate-card gap | 14 |
-| unrounded value of 570,735 streams at ~$0.0036 | ≈ 2,054.65 |
+| counterfactual: unrounded value if all 570,735 had been attributable and priced at ~$0.0036 | ≈ 2,054.65 |
 | actual published delta | **0.86** |
 
 **Two independent reasons, both of them the pipeline behaving correctly.**
@@ -2213,13 +2226,14 @@ That is not a bug and it is the most instructive result in this phase, so here i
    are frozen and regenerating them was out of scope, so this is the correct outcome under the
    constraints rather than something to work around.
 
-2. **Cent rounding destroys small recoveries.** Even where ownership existed, the newly attributable
+2. **Cent rounding destroys small newly attributable amounts.** Even where ownership existed, the newly attributable
    groups are tiny. Across the whole v2 publication the unrounded gross is 103,180.51 against 98,285.08
    published: **1,569,327 of 3,153,014 financial groups still round to $0.00**.
 
-So the honest headline is: **the restatement recovered 570,735 listens of attribution (1.4941 % of the
-corpus) and almost no money.** Fixing matching does not produce payouts on its own — the reference
-data has its own universe, and the financial layer is right to refuse what it cannot attribute.
+So the honest headline is: **570,735 listens became newly matched under normalization v2 (1.4941 %
+of the corpus), 228 became newly attributable, and the modeled payout delta was \$0.86.** Fixing
+matching does not produce payouts on its own — the reference data has its own universe, and the
+financial layer is right to refuse what it cannot attribute.
 
 **A restatement that only ADDS streams can still REDUCE a holder's payout.** Measured, one case:
 `MRH-028402` went from 686 streams / \$0.15 to 712 streams / \$0.14, a delta of **−\$0.01**. Nothing
@@ -2400,3 +2414,74 @@ The dbt defaults were also wrong in a way that mattered: with `prior_attribution
 between a publication and itself reconciles trivially. The defaults now describe the current state
 (`pub:v2` current, restated matches as the source), so a standalone `dbt build` validates the real
 restatement. Re-publishing under those defaults is safe: the fact refuses a run id it already holds.
+
+### 24.13 The run identity was wrong, and the fix is additive
+
+**The defect.** `restatement_run_id` was `sha256(normalization_version | scoring_version |
+prior_match_run_id | blocking_version)[:16]`. Read the inputs and the hole is obvious once seen: the
+identity did not include **which records were restated**. It also omitted the period, the prior
+publication, the payout policy version, the rights version, the rate rule and the trigger.
+
+This was not hypothetical. Section 24.4 records that I built the cohort twice — once with the script
+test alone (1,377,862 listens, rejected before publication) and once with the frozen definition
+(982,322 listens, published). Both produced **`restate:6b3923771883e860`**, because neither cohort
+appeared in the hash. An identifier that cannot distinguish the run that was published from the run
+that was thrown away cannot support an audit trail at all.
+
+**The cohort is now a structured predicate, hashed.** `config/restatement_cohorts.yml` holds a
+closed-vocabulary predicate per cohort — `period_start`, `period_end`, `prior_failure_reasons`,
+`string_fields_examined`, `required_scripts_any` — and a SHA-256 over its canonical form. Two things
+were deliberately refused as the identity:
+
+* **prose**, because two sentences can describe the same set and one sentence can be rewritten
+  without changing what it selects;
+* **arbitrary SQL**, because whitespace, aliases and formatting change the text without changing the
+  rows. Hashing a query would make identity depend on how somebody typed it.
+
+The direction of dependency is now one-way: the predicate is the identity, and the SQL that selects
+the rows is **generated from** it (`CohortDefinition.sql_predicate`). `reprocess_cohort.py` no longer
+carries its own copy of the cohort, so the predicate that selects the rows and the hash that names
+the run cannot disagree.
+
+| | |
+|---|---|
+| canonical inputs | period_start, period_end, prior_publication_id, prior/new normalization_version, scoring_version, payout_policy_version, rights_version, rule_version_id, trigger_reason, canonical_snapshot_date, **cohort_digest** |
+| canonical form | JSON, sorted keys, no whitespace, every set-valued list sorted |
+| id | `restate:v1:<first 16 hex of sha256>` — the scheme is *in* the identifier |
+| published cohort | `partial-empty-hangul-kana` → `restate:v1:2f08f786d0d3e552` |
+| rejected cohort | `script-only-no-failure-reason-restriction` → `restate:v1:67646757af1bf447` |
+| both, under the old scheme | `restate:6b3923771883e860` |
+
+Human fields — `status`, `measured_listens`, `measured_distinct_pairs`, `notes` — are excluded **by
+construction** rather than by convention: the hash reads a fixed field list, so a note cannot reach
+it. Twelve unit tests hold the properties directly: same inputs give the same id; changing only the
+cohort, only a version or only `prior_publication_id` changes it; reordering YAML keys, reordering
+set-valued lists, adding comments and rewriting notes do not; and a predicate edited without
+updating its recorded digest refuses to load.
+
+**The legacy identifier is preserved, not corrected.** The tempting fix — `UPDATE` the 5,925,913
+published rows to carry `restate:v1:2f08f786d0d3e552` — would destroy the exact property this phase
+exists to demonstrate. A published figure is corrected by a **new statement**, and that applies to
+its identity as much as to its amount. There is also arithmetic in the way, which is worth stating
+because it makes the point concrete:
+
+```
+attribution_run_id = sha256(payout_policy_version | normalization_version | restatement_run_id | RESTATED)
+  legacy    restate:6b3923771883e860   -> attr:fb74b680430fa0b2   <- what pub:v2 actually is
+  canonical restate:v1:2f08f786d0d3e552 -> attr:a0d886e62446344e   <- would be a THIRD publication
+```
+
+So the correction is additive: `dbt/models/finance/restatement_run_registry.sql` (generated from
+`src/restatement/registry.py`, with a test that fails if it goes stale) records both runs, their
+canonical ids, their cohort digests, the shared legacy id, `legacy_id_is_ambiguous = TRUE` and the
+reason it was insufficient. `publish_restatement.py` now defaults to the identifier the published
+rows carry and **refuses** any identity that would mint a successor publication unless
+`--allow-new-publication` is passed explicitly. `config/frozen_versions.yml` gained a
+`published_run_identity` block, and `test_frozen.py` fails if it drifts from what the identity module
+computes.
+
+**Language.** Section 24.7 previously said the restatement "recovered 570,735 listens". Three
+different quantities were hiding inside that verb, and they are now always named separately:
+**570,735 listens became newly matched** under normalization v2, **228 became newly attributable**,
+and the **modeled payout delta was \$0.86**. Nothing was lost and then retrieved, and no money was
+recovered.

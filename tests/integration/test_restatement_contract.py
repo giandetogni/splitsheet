@@ -225,3 +225,52 @@ def test_the_restated_matches_carry_the_new_normalization_and_the_frozen_scoring
     assert r["normalization_version"] == R["new_normalization_version"]
     assert r["scoring_version"] == R["scoring_version"]
     assert int(r["norm_versions"]) == int(r["scoring_versions"]) == 1
+
+
+# --- run identity: the warehouse can tell the two cohorts apart ------------------------------
+
+@pytest.mark.integration_readonly
+def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq):
+    """The published rows keep the identifier they were published with, and the registry explains it.
+
+    Two things are asserted together on purpose. The rows of pub:v2 must still carry the legacy
+    string -- if they ever carry the canonical one, someone rewrote a published statement -- and the
+    registry must map that string to the canonical identity of the run that produced them.
+    """
+    ident = R["published_run_identity"]
+    reg = one(bq, f"""
+        SELECT canonical_run_id, legacy_run_id, cohort_key, cohort_sha256, cohort_status,
+               new_publication_id
+        FROM `{PROJECT}.{DATASET}.restatement_run_registry`
+        WHERE cohort_status = 'PUBLISHED'
+    """)
+    assert reg["canonical_run_id"] == ident["canonical_run_id"]
+    assert reg["legacy_run_id"] == ident["legacy_run_id"]
+    assert reg["cohort_sha256"] == ident["cohort_sha256"]
+    assert reg["new_publication_id"] == ident["publication_id"]
+
+    published_rows = one(bq, f"""
+        SELECT COUNT(DISTINCT restatement_run_id) AS distinct_ids,
+               ANY_VALUE(restatement_run_id) AS carried_id, COUNT(*) AS n
+        FROM `{RESTATEMENTS}`
+    """)
+    assert published_rows["distinct_ids"] == 1
+    assert published_rows["carried_id"] == ident["legacy_run_id"], (
+        "the published restatement rows carry an identifier other than the one they were published "
+        "with; a published statement was rewritten")
+
+
+@pytest.mark.integration_readonly
+def test_the_rejected_cohort_has_a_different_identity_in_the_warehouse(bq):
+    """The collision, closed and observable: same legacy string, two canonical ids, two cohorts."""
+    reg = rows(bq, f"""
+        SELECT canonical_run_id, legacy_run_id, cohort_sha256, cohort_status, measured_listens
+        FROM `{PROJECT}.{DATASET}.restatement_run_registry` ORDER BY canonical_run_id
+    """)
+    assert len(reg) == 2
+    assert len({r["canonical_run_id"] for r in reg}) == 2
+    assert len({r["cohort_sha256"] for r in reg}) == 2
+    assert len({r["legacy_run_id"] for r in reg}) == 1
+    by_status = {r["cohort_status"]: r for r in reg}
+    assert by_status["PUBLISHED"]["measured_listens"] == 982_322
+    assert by_status["REJECTED_BEFORE_PUBLICATION"]["measured_listens"] == 1_377_862

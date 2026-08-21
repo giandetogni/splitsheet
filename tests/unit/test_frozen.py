@@ -116,3 +116,51 @@ def test_restatement_register_keeps_the_transliteration_evidence():
     for required in ("해금", "384,926", "1,164,629", "NO_LOOKUP_KEY_PARTIAL",
                      "1.0.0+0bc0dd643e06", "1.0.0+cb21f9704ff0"):
         assert required in text, f"restatement evidence lost: {required}"
+
+
+def test_the_published_run_identity_matches_the_identity_module(frozen):
+    """The manifest may not drift from the code that computes identity.
+
+    Both directions matter: the manifest records what pub:v2 carries, and identity.py computes what
+    it should be called. If either moves without the other, the run registry would map a published
+    identifier onto the wrong canonical one.
+    """
+    from restatement.identity import (
+        LEGACY_RUN_ID,
+        REJECTED_COHORT_KEY,
+        canonical_id_for_published_run,
+        inputs_for_published_restatement,
+        load_cohorts,
+    )
+
+    ident = frozen["restatement"]["published_run_identity"]
+    cohorts = load_cohorts()
+    assert ident["canonical_run_id"] == canonical_id_for_published_run()
+    assert ident["legacy_run_id"] == LEGACY_RUN_ID.run_id
+    assert ident["cohort_sha256"] == cohorts[ident["cohort_key"]].digest
+    assert ident["rejected_cohort_key"] == REJECTED_COHORT_KEY
+    assert ident["rejected_cohort_canonical_run_id"] == \
+        inputs_for_published_restatement(cohorts, REJECTED_COHORT_KEY).run_id
+    assert ident["canonical_run_id"] != ident["rejected_cohort_canonical_run_id"]
+
+
+def test_the_published_attribution_run_id_derives_from_the_legacy_restatement_id(frozen):
+    """Why the legacy id cannot simply be replaced, expressed as arithmetic.
+
+    attribution_run_id is a hash of the restatement id, so pub:v2's attr id is only reproducible
+    from the LEGACY string. Rewriting the identifier would either invalidate the published
+    attribution id or mint a successor publication -- which is exactly why the correction is a
+    registry entry rather than an edit.
+    """
+    import hashlib
+
+    r = frozen["restatement"]
+    ident = r["published_run_identity"]
+    payload = (f"{r['payout_policy_version']}|{r['new_normalization_version']}"
+               f"|{ident['legacy_run_id']}|RESTATED")
+    assert "attr:" + hashlib.sha256(payload.encode()).hexdigest()[:16] == \
+        ident["attribution_run_id"]
+    canonical_payload = (f"{r['payout_policy_version']}|{r['new_normalization_version']}"
+                        f"|{ident['canonical_run_id']}|RESTATED")
+    assert "attr:" + hashlib.sha256(canonical_payload.encode()).hexdigest()[:16] != \
+        ident["attribution_run_id"]

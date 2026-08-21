@@ -1,0 +1,75 @@
+# RESTATEMENT COHORT REGISTRY — structured, versioned, and hashable.
+#
+# ==========================================================================================
+# WHY THIS FILE EXISTS. A restatement's identity has to include WHICH RECORDS it touched, and
+# the Phase 6 identifier did not: `restatement_run_id` was hashed from the versions alone, so
+# two runs over completely different cohorts under the same versions collided on one id. That
+# actually happened during Phase 6 -- the first (wrong) cohort of 1,377,862 listens and the
+# published cohort of 982,322 both produced `restate:6b3923771883e860`.
+#
+# A cohort is therefore represented HERE as a structured predicate with a SHA-256 over its
+# canonical form. Never as a prose description and never as a SQL string:
+#
+#   * prose is not comparable -- two different sentences can describe the same set, and one
+#     sentence can be edited without changing what it selects;
+#   * arbitrary SQL is not an identity either -- whitespace, aliases and formatting change the
+#     text without changing the rows, and a semantically different query can look almost the
+#     same. Hashing SQL would make identity depend on how the query was typed.
+#
+# The predicate below is a small, closed vocabulary that both the reprocessing code and the
+# identity hash read from. Anything a human wants to say about the cohort goes in fields that
+# are DELIBERATELY EXCLUDED from the hash: status, measured counts, notes.
+# ==========================================================================================
+
+cohort_config_version: "1.0.0"
+
+# The vocabulary a predicate may use. A cohort naming anything outside it fails to load, so a
+# new kind of selection has to be added here on purpose rather than smuggled in as free text.
+predicate_schema:
+  period_start: "date, inclusive"
+  period_end: "date, EXCLUSIVE (half-open, like every interval in this project)"
+  prior_failure_reasons: "list of failure_reason values in the PRIOR publication's match result; empty list means no restriction"
+  string_fields_examined: "list of raw listen fields the script test is applied to"
+  required_scripts_any: "list of script names; the listen qualifies if ANY of them appears"
+
+cohorts:
+  # ---------------------------------------------------------------------------------------
+  # The cohort the Phase 6 restatement actually published.
+  # ---------------------------------------------------------------------------------------
+  - cohort_key: "partial-empty-hangul-kana"
+    status: "PUBLISHED"
+    predicate:
+      period_start: "2026-06-01"
+      period_end: "2026-07-01"
+      prior_failure_reasons: ["NO_LOOKUP_KEY_PARTIAL", "NO_LOOKUP_KEY_EMPTY"]
+      string_fields_examined: ["artist_name", "recording_name"]
+      required_scripts_any: ["hangul", "kana"]
+    # Excluded from the hash. Recorded because it is the evidence, not the identity.
+    measured_listens: 982322
+    measured_distinct_pairs: 147599
+    notes: >-
+      exactly the definition frozen in config/restatement_trigger.yml. Every listen in scope was
+      unmatched under pub:v1, so no v1 match can be lost.
+    cohort_sha256: "cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5"
+
+  # ---------------------------------------------------------------------------------------
+  # The cohort that was built first and REJECTED before publication. Kept because a rejected
+  # cohort is the only way to prove the identity actually distinguishes cohorts, and because
+  # it is the evidence for a real property of the transliteration rule.
+  # ---------------------------------------------------------------------------------------
+  - cohort_key: "script-only-no-failure-reason-restriction"
+    status: "REJECTED_BEFORE_PUBLICATION"
+    predicate:
+      period_start: "2026-06-01"
+      period_end: "2026-07-01"
+      prior_failure_reasons: []
+      string_fields_examined: ["artist_name", "recording_name"]
+      required_scripts_any: ["hangul", "kana"]
+    measured_listens: 1377862
+    measured_distinct_pairs: 204902
+    notes: >-
+      dropped the failure-reason half of the frozen predicate, pulling in 395,540 listens that
+      already had a lookup key and costing 29,954 previously matched ones, because
+      transliteration CHANGES existing keys for mixed Latin/CJK strings as well as adding new
+      ones. Never published.
+    cohort_sha256: "90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3"
