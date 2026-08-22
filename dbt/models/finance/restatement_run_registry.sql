@@ -4,7 +4,7 @@
 -- tests/unit/test_restatement_identity.py fails if this file stops matching the
 -- generator, so a cohort or identity change cannot leave the warehouse behind.
 --
--- THE RESTATEMENT RUN REGISTRY. Legacy identifiers resolved to canonical ones, additively.
+-- THE RESTATEMENT RUN REGISTRY. Every identifier the warehouse contains, explained once.
 --
 -- The published rows of pub:v2 carry `restate:6b3923771883e860`, produced by a scheme that
 -- hashed the versions alone: the cohort was not part of the hash, so the rejected
@@ -12,75 +12,130 @@
 -- identifier under the same versions.
 --
 -- They are NOT rewritten. A published figure is corrected by a new statement, never by an
--- edit, and that applies to its identity as much as to its amount. Both rows below carry
--- the same legacy_run_id and different canonical_run_ids: the collision recorded as data.
+-- edit, and that applies to its identity as much as to its amount. The two cohort rows
+-- carry the same legacy_run_id and different canonical_run_ids: the collision as data.
 --
 -- canonical_run_id = restate:v1:<first 16 hex of sha256(canonical inputs)>,
 -- whose inputs include the cohort digest -- the term the legacy scheme was missing.
+--
+-- mart_run_id is the RESOLUTION KEY: the identifier as it appears in fct_restatements, and
+-- NULL for a run that never wrote a row. It is what lets the invariant be stated with no
+-- exceptions -- every id in the delta mart joins to exactly one row here, including the
+-- LEGACY_REHEARSAL placeholder, whose entry says plainly that it is not an identity.
 
 with runs as (
     select
+        'partial-empty-hangul-kana' as registry_key,
+        'PUBLISHED_RESTATEMENT' as run_type,
+        false as is_legacy,
+        true as is_financially_effective,
+        'restate:6b3923771883e860' as mart_run_id,
         'restate:v1:2f08f786d0d3e552' as canonical_run_id,
         'v1' as identity_scheme,
         '2f08f786d0d3e55244e2278557c7a713a855b33a83271c041a8bb608abb5fc44' as inputs_digest,
+        true as canonical_inputs_available,
+        '{"canonical_snapshot_date":"2026-07-17","cohort_digest":"cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5","identity_scheme":"v1","new_normalization_version":"1.1.0+b3253b155934","payout_policy_version":"1.0.0+84b4b68a37c9","period_end":"2026-07-01","period_start":"2026-06-01","prior_normalization_version":"1.0.0+0bc0dd643e06","prior_publication_id":"pub:v1","rights_version":"1.0.0+47f801102e17","rule_version_id":"rc-1.0.0","scoring_version":"1.0.0+cb21f9704ff0","trigger_reason":"TRANSLITERATION_KOREAN_JAPANESE_TITLES"}' as canonical_inputs,
         'restate:6b3923771883e860' as legacy_run_id,
         'legacy-unversioned' as legacy_scheme,
         true as legacy_id_is_ambiguous,
         'partial-empty-hangul-kana' as cohort_key,
         'cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5' as cohort_sha256,
+        '{"period_end":"2026-07-01","period_start":"2026-06-01","prior_failure_reasons":["NO_LOOKUP_KEY_EMPTY","NO_LOOKUP_KEY_PARTIAL"],"required_scripts_any":["hangul","kana"],"string_fields_examined":["artist_name","recording_name"]}' as cohort_predicate,
         'PUBLISHED' as cohort_status,
         'pub:v2' as new_publication_id,
-        true as published_rows_carry_legacy_id,
         982322 as measured_listens,
         147599 as measured_distinct_pairs,
-        '{"canonical_snapshot_date":"2026-07-17","cohort_digest":"cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5","identity_scheme":"v1","new_normalization_version":"1.1.0+b3253b155934","payout_policy_version":"1.0.0+84b4b68a37c9","period_end":"2026-07-01","period_start":"2026-06-01","prior_normalization_version":"1.0.0+0bc0dd643e06","prior_publication_id":"pub:v1","rights_version":"1.0.0+47f801102e17","rule_version_id":"rc-1.0.0","scoring_version":"1.0.0+cb21f9704ff0","trigger_reason":"TRANSLITERATION_KOREAN_JAPANESE_TITLES"}' as canonical_inputs,
-        '{"period_end":"2026-07-01","period_start":"2026-06-01","prior_failure_reasons":["NO_LOOKUP_KEY_EMPTY","NO_LOOKUP_KEY_PARTIAL"],"required_scripts_any":["hangul","kana"],"string_fields_examined":["artist_name","recording_name"]}' as cohort_predicate,
+        numeric '0.86' as recorded_delta,
+        4416901 as rows_in_delta_mart,
+        'the restatement that produced pub:v2. Its rows carry the legacy identifier because that is what they were published with; the canonical identity is recorded here rather than written back over them. exactly the definition frozen in config/restatement_trigger.yml. Every listen in scope was unmatched under pub:v1, so no v1 match can be lost.' as provenance,
         'the cohort was not part of the hash, so the rejected 1,377,862-listen cohort and the published 982,322-listen cohort produced the SAME identifier under the same versions' as why_legacy_insufficient,
-        '["period","prior_publication_id","prior_normalization_version","payout_policy_version","rights_version","rule_version_id","trigger_reason","canonical_snapshot_date","cohort_definition"]' as legacy_missing_inputs,
-        'exactly the definition frozen in config/restatement_trigger.yml. Every listen in scope was unmatched under pub:v1, so no v1 match can be lost.' as cohort_notes
+        '["period","prior_publication_id","prior_normalization_version","payout_policy_version","rights_version","rule_version_id","trigger_reason","canonical_snapshot_date","cohort_definition"]' as legacy_missing_inputs
 
     union all
 
     select
+        'restate:pending' as registry_key,
+        'LEGACY_REHEARSAL' as run_type,
+        true as is_legacy,
+        false as is_financially_effective,
+        'restate:pending' as mart_run_id,
+        cast(null as string) as canonical_run_id,
+        cast(null as string) as identity_scheme,
+        cast(null as string) as inputs_digest,
+        false as canonical_inputs_available,
+        cast(null as string) as canonical_inputs,
+        'restate:pending' as legacy_run_id,
+        'placeholder-literal' as legacy_scheme,
+        false as legacy_id_is_ambiguous,
+        cast(null as string) as cohort_key,
+        cast(null as string) as cohort_sha256,
+        cast(null as string) as cohort_predicate,
+        cast(null as string) as cohort_status,
+        cast(null as string) as new_publication_id,
+        cast(null as int64) as measured_listens,
+        cast(null as int64) as measured_distinct_pairs,
+        numeric '0.00' as recorded_delta,
+        4416901 as rows_in_delta_mart,
+        'written by an early build of fct_restatements, before the restatement was published and before restatement identity was canonical. The dbt vars for the two sides of the delta resolved to the same attribution run, so the mart compared pub:v1 with itself and every delta is exactly 0.00 -- the vacuous-defaults rehearsal recorded in docs/schema_notes.md section 24.12. `restate:pending` was a placeholder literal, never an identity: it names no cohort, no period and no publication, which is the same defect the canonical scheme fixes. The rows are retained because the mart is append-only; they are financially inert.' as provenance,
+        'it is not an identity at all: a placeholder literal that names no cohort, no period and no publication, so nothing about the run can be recovered from it' as why_legacy_insufficient,
+        '["period","prior_publication_id","prior_normalization_version","payout_policy_version","rights_version","rule_version_id","trigger_reason","canonical_snapshot_date","cohort_definition"]' as legacy_missing_inputs
+
+    union all
+
+    select
+        'script-only-no-failure-reason-restriction' as registry_key,
+        'REJECTED_BEFORE_PUBLICATION' as run_type,
+        false as is_legacy,
+        false as is_financially_effective,
+        cast(null as string) as mart_run_id,
         'restate:v1:67646757af1bf447' as canonical_run_id,
         'v1' as identity_scheme,
         '67646757af1bf447e4002a8504a57bf4467b8b29d47bd42728350f0297c61460' as inputs_digest,
+        true as canonical_inputs_available,
+        '{"canonical_snapshot_date":"2026-07-17","cohort_digest":"90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3","identity_scheme":"v1","new_normalization_version":"1.1.0+b3253b155934","payout_policy_version":"1.0.0+84b4b68a37c9","period_end":"2026-07-01","period_start":"2026-06-01","prior_normalization_version":"1.0.0+0bc0dd643e06","prior_publication_id":"pub:v1","rights_version":"1.0.0+47f801102e17","rule_version_id":"rc-1.0.0","scoring_version":"1.0.0+cb21f9704ff0","trigger_reason":"TRANSLITERATION_KOREAN_JAPANESE_TITLES"}' as canonical_inputs,
         'restate:6b3923771883e860' as legacy_run_id,
         'legacy-unversioned' as legacy_scheme,
         true as legacy_id_is_ambiguous,
         'script-only-no-failure-reason-restriction' as cohort_key,
         '90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3' as cohort_sha256,
+        '{"period_end":"2026-07-01","period_start":"2026-06-01","prior_failure_reasons":[],"required_scripts_any":["hangul","kana"],"string_fields_examined":["artist_name","recording_name"]}' as cohort_predicate,
         'REJECTED_BEFORE_PUBLICATION' as cohort_status,
-        '' as new_publication_id,
-        false as published_rows_carry_legacy_id,
+        cast(null as string) as new_publication_id,
         1377862 as measured_listens,
         204902 as measured_distinct_pairs,
-        '{"canonical_snapshot_date":"2026-07-17","cohort_digest":"90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3","identity_scheme":"v1","new_normalization_version":"1.1.0+b3253b155934","payout_policy_version":"1.0.0+84b4b68a37c9","period_end":"2026-07-01","period_start":"2026-06-01","prior_normalization_version":"1.0.0+0bc0dd643e06","prior_publication_id":"pub:v1","rights_version":"1.0.0+47f801102e17","rule_version_id":"rc-1.0.0","scoring_version":"1.0.0+cb21f9704ff0","trigger_reason":"TRANSLITERATION_KOREAN_JAPANESE_TITLES"}' as canonical_inputs,
-        '{"period_end":"2026-07-01","period_start":"2026-06-01","prior_failure_reasons":[],"required_scripts_any":["hangul","kana"],"string_fields_examined":["artist_name","recording_name"]}' as cohort_predicate,
+        cast(null as numeric) as recorded_delta,
+        cast(null as int64) as rows_in_delta_mart,
+        'built first and rejected before publication: dropping the failure-reason half of the frozen predicate pulled in listens that already had a lookup key. It wrote no rows to the delta mart and produced no publication. It is kept because a rejected cohort is the only proof that the run identity actually distinguishes cohorts -- under the superseded scheme this run and the published one shared a single identifier. dropped the failure-reason half of the frozen predicate, pulling in 395,540 listens that already had a lookup key and costing 29,954 previously matched ones, because transliteration CHANGES existing keys for mixed Latin/CJK strings as well as adding new ones. Never published.' as provenance,
         'the cohort was not part of the hash, so the rejected 1,377,862-listen cohort and the published 982,322-listen cohort produced the SAME identifier under the same versions' as why_legacy_insufficient,
-        '["period","prior_publication_id","prior_normalization_version","payout_policy_version","rights_version","rule_version_id","trigger_reason","canonical_snapshot_date","cohort_definition"]' as legacy_missing_inputs,
-        'dropped the failure-reason half of the frozen predicate, pulling in 395,540 listens that already had a lookup key and costing 29,954 previously matched ones, because transliteration CHANGES existing keys for mixed Latin/CJK strings as well as adding new ones. Never published.' as cohort_notes
+        '["period","prior_publication_id","prior_normalization_version","payout_policy_version","rights_version","rule_version_id","trigger_reason","canonical_snapshot_date","cohort_definition"]' as legacy_missing_inputs
 )
 
 select
+    registry_key,
+    run_type,
+    is_legacy,
+    is_financially_effective,
+    mart_run_id,
     canonical_run_id,
     identity_scheme,
     inputs_digest,
+    canonical_inputs_available,
+    canonical_inputs,
     legacy_run_id,
     legacy_scheme,
     legacy_id_is_ambiguous,
     cohort_key,
     cohort_sha256,
+    cohort_predicate,
     cohort_status,
     new_publication_id,
-    published_rows_carry_legacy_id,
     measured_listens,
     measured_distinct_pairs,
-    canonical_inputs,
-    cohort_predicate,
+    recorded_delta,
+    rows_in_delta_mart,
+    provenance,
     why_legacy_insufficient,
     legacy_missing_inputs,
-    cohort_notes,
     current_timestamp() as measured_at
 from runs
-order by canonical_run_id
+order by registry_key

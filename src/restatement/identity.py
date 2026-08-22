@@ -84,7 +84,8 @@ SCRIPT_PATTERNS = {
 #: Fields deliberately NOT hashed. Present so the exclusion is a declaration rather than an
 #: accident of which keys the code happened to read.
 COHORT_FIELDS_EXCLUDED_FROM_HASH = ("status", "measured_listens", "measured_distinct_pairs",
-                                    "notes", "cohort_sha256", "cohort_key")
+                                    "notes", "cohort_sha256", "cohort_key", "mart_run_id",
+                                    "rows_in_delta_mart", "recorded_delta")
 
 #: The canonical inputs, in the order they are documented. Hashing reads this tuple, so adding an
 #: input is a visible change to identity rather than a silent one.
@@ -124,6 +125,11 @@ class CohortDefinition:
     measured_listens: int = field(default=0, compare=False)
     measured_distinct_pairs: int = field(default=0, compare=False)
     notes: str = field(default="", compare=False)
+    #: What the run wrote into the delta mart, if it ever ran. Empty for a cohort that was built
+    #: and rejected before publication -- a run that produced no rows has no mart identifier.
+    mart_run_id: str = field(default="", compare=False)
+    rows_in_delta_mart: int = field(default=0, compare=False)
+    recorded_delta: str = field(default="", compare=False)
 
     def canonical_predicate(self) -> dict:
         """Only the predicate, with set-valued fields sorted so order cannot carry identity."""
@@ -257,6 +263,51 @@ LEGACY_RUN_ID = LegacyRunId(
 )
 
 
+@dataclass(frozen=True)
+class LegacyRun:
+    """A run present in the delta mart that is NOT a cohort restatement.
+
+    It exists so the registry can explain every identifier the warehouse actually contains. The
+    fields that were never recorded stay empty rather than being reconstructed: a rehearsal that
+    compared a publication with itself had no cohort and no canonical inputs, and inventing them
+    would make the registry a story instead of a record.
+    """
+
+    restatement_run_id: str
+    run_type: str
+    is_legacy: bool
+    is_financially_effective: bool
+    recorded_delta: str
+    rows_in_delta_mart: int
+    canonical_inputs_available: bool
+    provenance: str
+
+
+def load_legacy_runs(path: str | pathlib.Path | None = None) -> list[LegacyRun]:
+    """Load the declared non-cohort runs. Absent section means none are declared."""
+    import yaml
+
+    p = pathlib.Path(path) if path is not None else DEFAULT_COHORT_CONFIG
+    raw = yaml.safe_load(p.read_text()) or {}
+    out = []
+    for entry in raw.get("legacy_runs", []) or []:
+        if entry.get("canonical_inputs_available"):
+            raise ValueError(
+                f"{entry['restatement_run_id']!r} claims canonical inputs are available; a run with "
+                f"canonical inputs belongs in the cohort registry, not among the legacy runs")
+        out.append(LegacyRun(
+            restatement_run_id=entry["restatement_run_id"],
+            run_type=entry["run_type"],
+            is_legacy=bool(entry["is_legacy"]),
+            is_financially_effective=bool(entry["is_financially_effective"]),
+            recorded_delta=str(entry["recorded_delta"]),
+            rows_in_delta_mart=int(entry["rows_in_delta_mart"]),
+            canonical_inputs_available=False,
+            provenance=" ".join(str(entry["provenance"]).split()),
+        ))
+    return out
+
+
 def load_cohorts(path: str | pathlib.Path | None = None) -> dict[str, CohortDefinition]:
     """Load the cohort registry and verify each recorded digest against the recomputed one."""
     import yaml
@@ -287,6 +338,9 @@ def load_cohorts(path: str | pathlib.Path | None = None) -> dict[str, CohortDefi
             measured_listens=int(entry.get("measured_listens") or 0),
             measured_distinct_pairs=int(entry.get("measured_distinct_pairs") or 0),
             notes=entry.get("notes", ""),
+            mart_run_id=entry.get("mart_run_id", ""),
+            rows_in_delta_mart=int(entry.get("rows_in_delta_mart") or 0),
+            recorded_delta=str(entry.get("recorded_delta", "")),
         )
         recorded = str(entry.get("cohort_sha256", ""))
         if recorded not in ("", "PLACEHOLDER") and recorded != cohort.digest:

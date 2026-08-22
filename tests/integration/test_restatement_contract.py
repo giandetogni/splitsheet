@@ -239,17 +239,19 @@ def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq
     """
     ident = R["published_run_identity"]
     reg = one(bq, f"""
-        SELECT canonical_run_id, legacy_run_id, cohort_key, cohort_sha256, cohort_status,
-               new_publication_id
+        SELECT canonical_run_id, legacy_run_id, mart_run_id, cohort_key, cohort_sha256,
+               new_publication_id, is_financially_effective
         FROM `{PROJECT}.{DATASET}.restatement_run_registry`
-        WHERE cohort_status = 'PUBLISHED'
+        WHERE run_type = 'PUBLISHED_RESTATEMENT'
     """)
     assert reg["canonical_run_id"] == ident["canonical_run_id"]
     assert reg["legacy_run_id"] == ident["legacy_run_id"]
+    assert reg["mart_run_id"] == ident["legacy_run_id"]
     assert reg["cohort_sha256"] == ident["cohort_sha256"]
     assert reg["new_publication_id"] == ident["publication_id"]
+    assert reg["is_financially_effective"] is True
 
-    # The rows that actually reconcile to the published delta must still carry the legacy string.
+    # The rows that reconcile to the published delta must still carry the legacy string.
     carried = rows(bq, f"""
         SELECT restatement_run_id, COUNT(*) AS n, SUM(delta) AS summed_delta
         FROM `{RESTATEMENTS}` GROUP BY 1 ORDER BY n DESC
@@ -265,36 +267,58 @@ def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq
 
 
 @pytest.mark.integration_readonly
-def test_every_identifier_in_the_delta_mart_is_accounted_for(bq):
-    """No orphan run ids. The one that is not a real run is named, not tolerated silently.
+def test_every_identifier_in_the_delta_mart_resolves_to_exactly_one_entry(bq):
+    """No orphans, no duplicate claims, and -- deliberately -- no exception by name.
 
-    `restate:pending` is a placeholder from the rehearsal built under the vacuous dbt defaults
-    (section 24.12): 4,416,901 rows whose deltas are all zero because prior and new pointed at the
-    same publication. It is not deleted -- fct_restatements is append-only and deleting from it to
-    tidy the mart would be exactly the kind of edit this phase refuses -- but it is a second symptom
-    of the same defect the registry fixes: a string that names no cohort, no period and no
-    publication is not an identity.
+    An earlier version of this test allowed `restate:pending` explicitly. That is a note, not an
+    invariant: it cannot fail on the NEXT unexplained identifier. The placeholder now has its own
+    registry entry classifying it as a LEGACY_REHEARSAL with no canonical inputs, so the assertion
+    is the plain one.
     """
-    known = {r["legacy_run_id"] for r in rows(bq, f"""
-        SELECT DISTINCT legacy_run_id FROM `{PROJECT}.{DATASET}.restatement_run_registry`
-    """)} | {"restate:pending"}
-    present = {r["restatement_run_id"] for r in rows(bq, f"""
-        SELECT DISTINCT restatement_run_id FROM `{RESTATEMENTS}`
-    """)}
-    assert present <= known, f"restatement ids in the mart that no registry row explains: {present - known}"
+    resolution = rows(bq, f"""
+        WITH mart AS (
+          SELECT restatement_run_id, COUNT(*) AS rows_in_mart, SUM(delta) AS summed_delta
+          FROM `{RESTATEMENTS}` GROUP BY 1
+        )
+        SELECT m.restatement_run_id, m.rows_in_mart, m.summed_delta,
+               COUNT(r.registry_key) AS entries,
+               MIN(r.recorded_delta) AS recorded_delta,
+               MIN(r.rows_in_delta_mart) AS recorded_rows,
+               MIN(r.run_type) AS run_type,
+               MIN(r.is_financially_effective) AS is_financially_effective
+        FROM mart m
+        LEFT JOIN `{PROJECT}.{DATASET}.restatement_run_registry` r
+          ON r.mart_run_id = m.restatement_run_id
+        GROUP BY 1, 2, 3 ORDER BY 1
+    """)
+    assert resolution, "the delta mart is empty"
+    for r in resolution:
+        assert r["entries"] == 1, f"{r['restatement_run_id']} resolves to {r['entries']} entries"
+        assert r["recorded_delta"] == r["summed_delta"], r["restatement_run_id"]
+        assert r["recorded_rows"] == r["rows_in_mart"], r["restatement_run_id"]
+
+    by_id = {r["restatement_run_id"]: r for r in resolution}
+    rehearsal = by_id["restate:pending"]
+    assert rehearsal["run_type"] == "LEGACY_REHEARSAL"
+    assert rehearsal["is_financially_effective"] is False
+    assert rehearsal["summed_delta"] == 0
+    effective = [r for r in resolution if r["is_financially_effective"]]
+    assert len(effective) == 1
+    assert effective[0]["summed_delta"] == Decimal("0.86")
 
 
 @pytest.mark.integration_readonly
 def test_the_rejected_cohort_has_a_different_identity_in_the_warehouse(bq):
     """The collision, closed and observable: same legacy string, two canonical ids, two cohorts."""
     reg = rows(bq, f"""
-        SELECT canonical_run_id, legacy_run_id, cohort_sha256, cohort_status, measured_listens
-        FROM `{PROJECT}.{DATASET}.restatement_run_registry` ORDER BY canonical_run_id
+        SELECT canonical_run_id, legacy_run_id, cohort_sha256, run_type, measured_listens
+        FROM `{PROJECT}.{DATASET}.restatement_run_registry`
+        WHERE cohort_sha256 IS NOT NULL ORDER BY canonical_run_id
     """)
     assert len(reg) == 2
     assert len({r["canonical_run_id"] for r in reg}) == 2
     assert len({r["cohort_sha256"] for r in reg}) == 2
     assert len({r["legacy_run_id"] for r in reg}) == 1
-    by_status = {r["cohort_status"]: r for r in reg}
-    assert by_status["PUBLISHED"]["measured_listens"] == 982_322
-    assert by_status["REJECTED_BEFORE_PUBLICATION"]["measured_listens"] == 1_377_862
+    by_type = {r["run_type"]: r for r in reg}
+    assert by_type["PUBLISHED_RESTATEMENT"]["measured_listens"] == 982_322
+    assert by_type["REJECTED_BEFORE_PUBLICATION"]["measured_listens"] == 1_377_862

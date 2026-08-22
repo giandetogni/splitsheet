@@ -2489,10 +2489,38 @@ placeholder that names no cohort, no period and no publication is not an identit
 in the mart unnoticed because nothing ever checked that a run id could be explained.
 
 Those rows are **not deleted**. `fct_restatements` is append-only, and deleting from it to tidy the
-mart would be precisely the edit this phase refuses. Instead the placeholder is named: the singular
-test `assert_restatement_identity_separates_cohorts` now fails on any run id in the delta mart that
-no registry row explains, with `restate:pending` allowed **by name and only by name**. The next
-orphan will not be tolerated silently.
+mart would be precisely the edit this phase refuses.
+
+The first fix allowed `restate:pending` by name in the test, and that was the wrong shape. An
+invariant that reads *"every run id must be explained, except this one"* explains nothing and cannot
+fail on the **next** unexplained identifier — it is a note wearing a test's clothes. So the
+placeholder was given a real registry entry instead, declared in `config/restatement_cohorts.yml`
+under `legacy_runs`:
+
+| | |
+|---|---|
+| `run_type` | `LEGACY_REHEARSAL` |
+| `is_legacy` / `is_financially_effective` | `TRUE` / `FALSE` |
+| `recorded_delta` / `rows_in_delta_mart` | `0.00` / 4,416,901 |
+| `canonical_inputs_available` | `FALSE` |
+| canonical id, cohort key, cohort digest, predicate, publication | **NULL** |
+
+The NULLs are the honest part: nothing about this run was recorded, so nothing is reconstructed.
+Its `why_legacy_insufficient` says what the entry is for — *it is not an identity at all: a
+placeholder literal that names no cohort, no period and no publication*. Worse than the ambiguous
+legacy id, which at least names two runs.
+
+Resolution goes through a new column, **`mart_run_id`**: the identifier as it appears in
+`fct_restatements`, `NULL` for a run that never wrote a row. That column is what lets the invariant
+be stated without exceptions, and the choice matters — the legacy string is *shared* by two cohort
+runs, so joining on `legacy_run_id` would resolve the published id to two entries and make "exactly
+one" unsatisfiable without rewriting history. Only one of those runs actually wrote the rows, and
+only that one claims the mart id; the rejected cohort claims none.
+
+The invariant is now plain, in `assert_every_restatement_run_id_is_explained.sql`: **every
+`restatement_run_id` in the delta mart resolves to exactly one registry entry**, and the entry's
+recorded delta and row count must equal what the mart actually holds — so the registry's numbers are
+self-checking rather than asserted. Zero orphans, zero double claims.
 
 **Language.** Section 24.7 previously said the restatement "recovered 570,735 listens". Three
 different quantities were hiding inside that verb, and they are now always named separately:

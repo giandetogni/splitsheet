@@ -282,22 +282,86 @@ def test_the_legacy_id_resolves_to_the_canonical_id_of_the_published_run():
 
 def test_the_registry_maps_one_legacy_id_to_two_canonical_ids():
     from restatement.registry import registry_rows
-    rows = registry_rows(COHORTS)
-    assert len({r["legacy_run_id"] for r in rows}) == 1
-    assert len({r["canonical_run_id"] for r in rows}) == len(rows) == 2
-    assert len({r["cohort_sha256"] for r in rows}) == 2
-    assert all(r["legacy_id_is_ambiguous"] for r in rows)
+    cohort_rows = [r for r in registry_rows() if r["cohort_sha256"]]
+    assert len({r["legacy_run_id"] for r in cohort_rows}) == 1
+    assert len({r["canonical_run_id"] for r in cohort_rows}) == len(cohort_rows) == 2
+    assert len({r["cohort_sha256"] for r in cohort_rows}) == 2
+    assert all(r["legacy_id_is_ambiguous"] for r in cohort_rows)
 
 
 def test_the_registry_records_which_run_was_published_and_which_was_rejected():
     from restatement.registry import registry_rows
-    by_key = {r["cohort_key"]: r for r in registry_rows(COHORTS)}
-    assert by_key[PUBLISHED_COHORT_KEY]["new_publication_id"] == "pub:v2"
-    assert by_key[PUBLISHED_COHORT_KEY]["published_rows_carry_legacy_id"] is True
-    rejected_row = by_key[REJECTED_COHORT_KEY]
-    assert rejected_row["cohort_status"] == "REJECTED_BEFORE_PUBLICATION"
-    assert rejected_row["new_publication_id"] == ""
-    assert rejected_row["published_rows_carry_legacy_id"] is False
+    by_key = {r["registry_key"]: r for r in registry_rows()}
+    published = by_key[PUBLISHED_COHORT_KEY]
+    assert published["run_type"] == "PUBLISHED_RESTATEMENT"
+    assert published["new_publication_id"] == "pub:v2"
+    assert published["mart_run_id"] == LEGACY_RUN_ID.run_id
+    assert published["is_financially_effective"] is True
+    rejected = by_key[REJECTED_COHORT_KEY]
+    assert rejected["run_type"] == "REJECTED_BEFORE_PUBLICATION"
+    assert rejected["new_publication_id"] is None
+    assert rejected["mart_run_id"] is None, "a run that wrote no rows must claim no mart identifier"
+    assert rejected["is_financially_effective"] is False
+
+
+# --- the pre-canonical placeholder is registered, not excepted ----------------------------
+
+def test_the_rehearsal_placeholder_has_its_own_registry_entry():
+    """`restate:pending` is explained by data, so no test needs to name it as an exception."""
+    from restatement.registry import registry_rows
+    row = next(r for r in registry_rows() if r["registry_key"] == "restate:pending")
+    assert row["run_type"] == "LEGACY_REHEARSAL"
+    assert row["is_legacy"] is True
+    assert row["is_financially_effective"] is False
+    assert row["mart_run_id"] == "restate:pending"
+    assert row["recorded_delta"] == "0.00"
+    assert row["rows_in_delta_mart"] == 4_416_901
+    assert "vacuous" in row["provenance"] and "24.12" in row["provenance"]
+
+
+def test_the_placeholder_claims_no_identity_it_never_had():
+    """Unrecorded is recorded as unrecorded. Reconstructing inputs would make this fiction."""
+    from restatement.registry import registry_rows
+    row = next(r for r in registry_rows() if r["registry_key"] == "restate:pending")
+    assert row["canonical_inputs_available"] is False
+    for absent in ("canonical_run_id", "identity_scheme", "inputs_digest", "canonical_inputs",
+                   "cohort_key", "cohort_sha256", "cohort_predicate", "new_publication_id"):
+        assert row[absent] is None, absent
+
+
+def test_a_legacy_run_claiming_canonical_inputs_is_refused():
+    """The two kinds of entry stay apart: anything with canonical inputs is a cohort run."""
+    import yaml
+
+    from restatement.identity import load_legacy_runs
+    raw = yaml.safe_load(CONFIG.read_text())
+    raw["legacy_runs"][0]["canonical_inputs_available"] = True
+    p = pathlib.Path(__file__).parent / "_tmp_legacy.yml"
+    try:
+        p.write_text(yaml.safe_dump(raw))
+        with pytest.raises(ValueError, match="belongs in the cohort registry"):
+            load_legacy_runs(p)
+    finally:
+        p.unlink(missing_ok=True)
+
+
+def test_every_identifier_that_reaches_the_mart_has_exactly_one_entry():
+    """The registry-side half of the warehouse invariant, checkable without a warehouse."""
+    from restatement.registry import registry_rows
+    mart_ids = [r["mart_run_id"] for r in registry_rows() if r["mart_run_id"]]
+    assert sorted(mart_ids) == ["restate:6b3923771883e860", "restate:pending"]
+    assert len(set(mart_ids)) == len(mart_ids), "two entries claim the same mart identifier"
+
+
+def test_the_cohort_digests_did_not_move_when_provenance_was_added():
+    """mart_run_id, recorded_delta and rows_in_delta_mart are provenance, not identity."""
+    assert COHORTS[PUBLISHED_COHORT_KEY].digest == \
+        "cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5"
+    assert COHORTS[REJECTED_COHORT_KEY].digest == \
+        "90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3"
+    assert published().run_id == EXPECTED_PUBLISHED_RUN_ID
+    for f in ("mart_run_id", "rows_in_delta_mart", "recorded_delta"):
+        assert f in COHORT_FIELDS_EXCLUDED_FROM_HASH, f
 
 
 def test_the_generated_dbt_model_is_current():
@@ -313,3 +377,6 @@ def test_the_generated_model_contains_both_identities_and_neither_is_the_legacy_
     sql = MODEL_PATH.read_text()
     assert EXPECTED_PUBLISHED_RUN_ID in sql and EXPECTED_REJECTED_RUN_ID in sql
     assert sql.count(f"'{LEGACY_RUN_ID.run_id}' as legacy_run_id") == 2
+    assert "'restate:pending' as registry_key" in sql
+    # Absent inputs are typed NULLs, not empty strings pretending to be values.
+    assert "cast(null as string) as canonical_run_id" in sql

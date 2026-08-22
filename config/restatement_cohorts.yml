@@ -47,6 +47,11 @@ cohorts:
     # Excluded from the hash. Recorded because it is the evidence, not the identity.
     measured_listens: 982322
     measured_distinct_pairs: 147599
+    # What this run actually wrote into fct_restatements, and under which identifier. The id is
+    # the LEGACY one because that is what the published rows carry; it is not corrected here.
+    mart_run_id: "restate:6b3923771883e860"
+    rows_in_delta_mart: 4416901
+    recorded_delta: "0.86"
     notes: >-
       exactly the definition frozen in config/restatement_trigger.yml. Every listen in scope was
       unmatched under pub:v1, so no v1 match can be lost.
@@ -73,3 +78,37 @@ cohorts:
       transliteration CHANGES existing keys for mixed Latin/CJK strings as well as adding new
       ones. Never published.
     cohort_sha256: "90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3"
+
+# ==========================================================================================
+# HISTORICAL RUNS THAT ARE NOT COHORT RESTATEMENTS.
+#
+# The delta mart contains rows written before the canonical identity scheme existed. They
+# cannot be deleted -- fct_restatements is append-only and deleting from it to tidy the mart
+# would be exactly the edit this project refuses -- so they are DECLARED here instead.
+#
+# The point of declaring them is to remove an exception from a test. An invariant that reads
+# "every run id must be explained, except this one" explains nothing; an invariant that reads
+# "every run id must be explained" is only enforceable if every run id actually has an entry.
+#
+# Fields that were never recorded are left ABSENT, not invented. A rehearsal that compared a
+# publication with itself had no cohort, no canonical inputs and no identity worth the name,
+# and saying so is the entry's whole content.
+# ==========================================================================================
+
+legacy_runs:
+  - restatement_run_id: "restate:pending"
+    run_type: "LEGACY_REHEARSAL"
+    is_legacy: true
+    is_financially_effective: false
+    # Measured in the mart, at the grain where a delta means something: one run.
+    recorded_delta: "0.00"
+    rows_in_delta_mart: 4416901
+    canonical_inputs_available: false
+    provenance: >-
+      written by an early build of fct_restatements, before the restatement was published and
+      before restatement identity was canonical. The dbt vars for the two sides of the delta
+      resolved to the same attribution run, so the mart compared pub:v1 with itself and every
+      delta is exactly 0.00 -- the vacuous-defaults rehearsal recorded in docs/schema_notes.md
+      section 24.12. `restate:pending` was a placeholder literal, never an identity: it names no
+      cohort, no period and no publication, which is the same defect the canonical scheme fixes.
+      The rows are retained because the mart is append-only; they are financially inert.
