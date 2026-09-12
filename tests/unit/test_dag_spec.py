@@ -151,7 +151,7 @@ def _mounts() -> dict[str, tuple[str, str]]:
     """
     out: dict[str, tuple[str, str]] = {}
     for entry in _compose()["services"]["airflow"]["volumes"]:
-        m = re.fullmatch(r"(?P<source>.*?):(?P<target>/opt/[^:]*)(?::(?P<mode>[a-z,]+))?", entry)
+        m = re.fullmatch(r"(?P<source>.*?):(?P<target>/[^:]*)(?::(?P<mode>[a-z,]+))?", entry)
         assert m, f"unparsed volume entry {entry}"
         out[m["target"]] = (m["source"], m["mode"] or "rw")
     return out
@@ -191,6 +191,49 @@ def test_only_the_init_service_is_root_and_it_reaches_only_the_venv_volume():
     assert "user" not in services["airflow"], "the Airflow service must not be given root"
     assert init["volumes"] == [f"venv-linux:{CONTAINER_VENV}"], (
         "the init service mounts the venv volume and nothing else")
+
+
+ADC_TARGET = "/home/airflow/.config/gcloud/application_default_credentials.json"
+
+
+def test_only_the_adc_file_is_mounted_and_it_is_read_only():
+    """The GCS preflight tasks need Application Default Credentials. Mounting the whole
+    ~/.config/gcloud would hand the container every other credential stored beside it, and
+    a writable mount would let it rewrite the host's copy."""
+    source, mode = _mounts()[ADC_TARGET]
+    assert source.endswith("/application_default_credentials.json"), (
+        f"the ADC mount must name the file, not a directory: {source}")
+    assert not source.rstrip("/").endswith(".config/gcloud")
+    assert mode == "ro"
+    assert source.startswith("${HOME}/"), "use ${HOME}; YAML does not expand ~"
+
+
+def test_the_credentials_variable_points_at_that_exact_file():
+    env = _compose()["services"]["airflow"]["environment"]
+    assert env["GOOGLE_APPLICATION_CREDENTIALS"] == ADC_TARGET
+
+
+def test_the_project_is_named_because_the_credential_file_does_not_carry_one():
+    """`google.auth.default()` resolves a project from the gcloud config directory, which
+    is deliberately not mounted. Without this the client raises `Project was not passed and
+    could not be determined from the environment`."""
+    env = _compose()["services"]["airflow"]["environment"]
+    assert env["GOOGLE_CLOUD_PROJECT"] == "ss-de-944054e7"
+    assert env["GOOGLE_APPLICATION_CREDENTIALS"] == ADC_TARGET
+    source, mode = _mounts()[ADC_TARGET]
+    assert source.endswith("/application_default_credentials.json")
+    assert not source.rstrip("/").endswith(".config/gcloud")
+    assert mode == "ro"
+
+
+def test_no_credential_material_is_committed_to_the_repo():
+    """The credential is mounted from the host at run time and never copied in."""
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True)
+    offenders = [f for f in tracked.stdout.split()
+                 if "application_default_credentials" in f or f.endswith(".p12")]
+    assert offenders == [], offenders
+    assert "refresh_token" not in COMPOSE.read_text()
 
 
 def test_airflow_waits_for_the_init_service_to_finish_successfully():

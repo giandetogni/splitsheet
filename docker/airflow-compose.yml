@@ -47,6 +47,13 @@ services:
       # Named explicitly rather than left to uv's default, so the environment uv builds
       # is the masked path below and not whatever `.venv` the bind happens to expose.
       UV_PROJECT_ENVIRONMENT: /opt/splitsheet/.venv
+      # The preflight tasks read GCS. Points at the single mounted file below, so the
+      # library never falls back to searching a gcloud config directory that is not there.
+      GOOGLE_APPLICATION_CREDENTIALS: /home/airflow/.config/gcloud/application_default_credentials.json
+      # The credential file carries identity, not a default project: mounting it alone
+      # leaves out the gcloud config the host resolves the project from, and
+      # `storage.Client()` takes no project argument. Named here instead.
+      GOOGLE_CLOUD_PROJECT: ss-de-944054e7
     volumes:
       - ../:/opt/splitsheet
       # The bind above carries the host's .venv into the container, and that venv is
@@ -63,6 +70,10 @@ services:
       # separately rather than widening the parent, so raw/ stays read-only no matter
       # what derived/ needs. One mount for both is what made the two share a mode.
       - ${SPLITSHEET_DATA:-~/splitsheet-data}/derived:/opt/splitsheet-data/derived
+      # Application Default Credentials, one file and read-only. Deliberately not the
+      # whole ~/.config/gcloud: the container needs this credential and nothing else that
+      # lives beside it, and it must never be able to rewrite the host's copy.
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/home/airflow/.config/gcloud/application_default_credentials.json:ro
       - airflow-db:/opt/airflow
 
 volumes:
