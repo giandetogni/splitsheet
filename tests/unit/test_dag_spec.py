@@ -1,0 +1,178 @@
+"""The DAG's shape, asserted without an Airflow installation.
+
+The import test proper (DagBag) needs Airflow and is skipped when it is absent; these
+checks do not, and they are the ones that catch the failure modes that matter here: a
+task that invokes a CLI which does not exist, a run that could overwrite committed
+evidence, and a publication that could happen without someone asking for it.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import pipeline_spec as spec
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_task_ids_are_unique_and_every_upstream_exists():
+    ids = [t.task_id for t in spec.TASKS]
+    assert len(ids) == len(set(ids))
+    for task in spec.TASKS:
+        for upstream in task.upstream:
+            assert upstream in ids, f"{task.task_id} depends on unknown {upstream}"
+
+
+def test_graph_is_acyclic_and_has_one_entry_point():
+    seen: list[str] = []
+    for task in spec.TASKS:
+        for upstream in task.upstream:
+            assert upstream in seen, f"{task.task_id} precedes its upstream {upstream}"
+        seen.append(task.task_id)
+    assert [t.task_id for t in spec.TASKS if not t.upstream] == ["verify_source_slice"]
+
+
+def test_every_stage_is_declared_and_all_four_boundaries_are_present():
+    stages = {t.stage for t in spec.TASKS}
+    assert stages <= set(spec.STAGES)
+    assert {"preflight", "compute", "validation", "publication"} <= stages
+
+
+def test_every_python_cli_a_task_invokes_actually_exists():
+    """No decorative wrappers: a task names a script or the test fails."""
+    referenced = set()
+    for task in spec.TASKS:
+        referenced.update(re.findall(r"src/[\w/]+\.py", task.command))
+    assert len(referenced) >= 8
+    for path in sorted(referenced):
+        assert (REPO_ROOT / path).is_file(), f"task references missing CLI {path}"
+
+
+def test_no_task_writes_into_the_committed_evidence_directory():
+    for task in spec.TASKS:
+        for flag in ("--out", "--work-dir", "--raw-dir"):
+            for match in re.findall(rf"{flag} (\S+)", task.command):
+                if flag == "--out":
+                    assert "evidence_dir" not in match, task.task_id
+
+
+def test_publication_is_off_by_default_and_never_retried():
+    assert spec.DEFAULT_PARAMS["allow_publication"] is False
+    publish = next(t for t in spec.TASKS if t.stage == "publication")
+    assert publish.retries == 0
+    assert publish.command.startswith(spec.PUBLISH_GUARD)
+
+
+@pytest.mark.parametrize(
+    ("allow_publication", "expected_exit"), [("False", 1), ("True", 0)]
+)
+def test_publish_guard_refuses_unless_explicitly_enabled(allow_publication, expected_exit):
+    """The guard is shell, so it is proved by running the shell, not by reading it."""
+    guard = spec.PUBLISH_GUARD.replace("{{ params.allow_publication }}", allow_publication)
+    result = subprocess.run(
+        ["bash", "-c", guard], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == expected_exit
+    assert ("refusing to publish" in result.stdout) == (expected_exit == 1)
+
+
+def test_importing_the_spec_reaches_neither_airflow_nor_gcp():
+    probe = (
+        "import sys; sys.path.insert(0, 'dags'); import pipeline_spec;"
+        " print([m for m in sys.modules if m.startswith(('airflow', 'google'))])"
+    )
+    loaded = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+    )
+    assert loaded.returncode == 0, loaded.stderr
+    assert loaded.stdout.strip() == "[]"
+
+
+def test_dag_file_imports_under_airflow():
+    """The real import test. Skipped, never silently passed, when Airflow is absent."""
+    pytest.importorskip("airflow", reason="apache-airflow is not installed locally")
+    from airflow.models.dagbag import DagBag
+
+    bag = DagBag(dag_folder=str(REPO_ROOT / "dags"), include_examples=False)
+    assert bag.import_errors == {}
+    dag = bag.get_dag(spec.DAG_ID)
+    assert dag is not None
+    assert {t.task_id for t in dag.tasks} == {t.task_id for t in spec.TASKS}
+    for task in spec.TASKS:
+        assert set(dag.get_task(task.task_id).upstream_task_ids) == set(task.upstream)
+
+
+def _render(command: str, **overrides) -> str:
+    """Render a task command the way Airflow will, so parameter plumbing is testable."""
+    from jinja2 import Template
+
+    params = dict(spec.DEFAULT_PARAMS) | overrides
+    return Template(command).render(params=params, ts_nodash="20260705T030000")
+
+
+def test_defaults_render_the_frozen_identities_and_a_run_scoped_output_directory():
+    rendered = _render(next(t for t in spec.TASKS if t.task_id == "build_match_results").command)
+    assert "--norm-version '1.0.0+0bc0dd643e06'" in rendered
+    assert "--candidate-run-id 'blk:c005e9a56b1ec542'" in rendered
+    assert "--out artifacts/airflow/20260705T030000/match_results.json" in rendered
+
+
+COMPOSE = REPO_ROOT / "docker/airflow-compose.yml"
+CONTAINER_VENV = "/opt/splitsheet/.venv"
+
+
+def _compose() -> dict:
+    import yaml
+
+    return yaml.safe_load(COMPOSE.read_text())
+
+
+def _mounts() -> dict[str, tuple[str, str]]:
+    """target -> (source, mode), from the short syntax.
+
+    Parsed rather than shelled out to `docker compose config`, so the assertions hold on a
+    machine with no Docker. The source may itself contain a colon, inside `${VAR:-default}`,
+    so the split anchors on the target being an absolute /opt path.
+    """
+    out: dict[str, tuple[str, str]] = {}
+    for entry in _compose()["services"]["airflow"]["volumes"]:
+        m = re.fullmatch(r"(?P<source>.*?):(?P<target>/opt/[^:]*)(?::(?P<mode>[a-z,]+))?", entry)
+        assert m, f"unparsed volume entry {entry}"
+        out[m["target"]] = (m["source"], m["mode"] or "rw")
+    return out
+
+
+def test_the_container_venv_is_isolated_from_the_host_one():
+    """The repo bind carries the host's macOS .venv in; a named volume has to mask it."""
+    mounts = _mounts()
+    assert mounts["/opt/splitsheet"][0] == "../", "the repo is expected to stay bind-mounted"
+    source, _mode = mounts[CONTAINER_VENV]
+    assert "/" not in source and "$" not in source, (
+        f"{CONTAINER_VENV} must be a named volume, not a host path: {source}")
+    assert source in (_compose()["volumes"] or {}), f"named volume {source} is not declared"
+
+
+def test_uv_is_told_to_build_its_environment_in_that_volume():
+    env = _compose()["services"]["airflow"]["environment"]
+    assert env["UV_PROJECT_ENVIRONMENT"] == CONTAINER_VENV
+
+
+def test_the_preserved_slice_stays_read_only_while_derived_can_be_written():
+    """B1: the two halves of the data directory are separate mounts with separate modes."""
+    mounts = _mounts()
+    assert "/opt/splitsheet-data" not in mounts, "raw and derived must not share one mount"
+    assert mounts["/opt/splitsheet-data/raw"][1] == "ro"
+    assert mounts["/opt/splitsheet-data/derived"][1] == "rw"
+
+
+def test_overrides_reach_the_command_including_the_period_derived_manifest_path():
+    task = next(t for t in spec.TASKS if t.task_id == "verify_source_slice")
+    rendered = _render(task.command, period="2026-07", raw_dir="/tmp/slice")
+    assert "--manifest docs/phase0/period_2026_07_manifest.json" in rendered
+    assert "--raw-dir /tmp/slice" in rendered
+    assert "2026_06" not in rendered

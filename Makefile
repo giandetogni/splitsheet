@@ -387,3 +387,26 @@ phase6-case:
 phase6-evaluate:
 	.venv/bin/python src/restatement/evaluate_restatement.py \
 	  --out $(OUT_DIR)/restatement_evaluation.json
+
+# ---------------------------------------------------------------------------
+# Phase 7A: orchestration foundation. The DAG coordinates the CLIs above; it
+# contains no matching, payout or restatement logic.
+#
+# `dag-graph` and `dag-check` need no Airflow install and no credentials: the
+# task graph lives in dags/pipeline_spec.py, which imports neither.
+# ---------------------------------------------------------------------------
+.PHONY: dag-graph dag-check airflow-up airflow-down
+
+dag-graph:
+	@uv run python -c "import sys; sys.path.insert(0,'dags'); import pipeline_spec as s; \
+	[print(f'{t.stage:<12} {t.task_id:<28} retries={t.retries}  <- {\", \".join(t.upstream) or \"(entry)\"}') for t in s.TASKS]"
+
+dag-check:
+	uv run pytest tests/unit/test_dag_spec.py -q
+
+# Pulls ~1 GiB of image on first run. Check free disk before invoking.
+airflow-up:
+	docker compose -f docker/airflow-compose.yml up -d
+
+airflow-down:
+	docker compose -f docker/airflow-compose.yml down

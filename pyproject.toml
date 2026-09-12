@@ -31,7 +31,7 @@ target-version = "py312"
 # default unit-test run and must never be reported as unit tests.
 testpaths = ["tests/unit"]
 # So tests import the libraries by package name instead of manipulating sys.path.
-pythonpath = ["src", "src/ingestion"]
+pythonpath = ["src", "src/ingestion", "dags"]
 markers = [
     "integration: requires a live GCP project and Application Default Credentials",
     "slow: invokes the real loader end to end",

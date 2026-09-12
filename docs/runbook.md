@@ -416,3 +416,64 @@ apart today; folding it into the hash is a small, worthwhile change for the next
 Use `.venv/bin/dbt` and `.venv/bin/python` rather than `uv run` for long commands: several `uv run`
 invocations stalled in startup under memory pressure with no BigQuery job issued. A timeout is never
 read as success here — check `ps` and the job list before concluding anything.
+
+---
+
+## Phase 7A — orchestration foundation
+
+```bash
+make dag-graph      # task ids, stages, retries and edges. No Airflow, no credentials.
+make dag-check      # the DAG's shape, asserted by the unit suite
+make airflow-up     # local UI at :8080. Pulls ~1 GiB of image; check disk first.
+```
+
+The graph lives in `dags/pipeline_spec.py`, which imports neither Airflow nor any Google
+library. `dags/splitsheet_monthly_pipeline.py` is a thin adapter that turns each declared
+task into a `BashOperator`. That split is what lets `make dag-check` assert the task ids,
+the edges, the retry policy and the rendered commands on a machine with no Airflow
+installed — the DagBag import test is present but skips when Airflow is absent, and is
+never reported as a pass it did not earn.
+
+Every task invokes a CLI that already exists and is already documented above. The DAG
+owns ordering, parameters, retries and run identity, and nothing else. A test asserts
+that each `src/**.py` a task names is a real file, so a decorative wrapper fails the suite.
+
+One deliberate deviation from the suggested task list in `PROJECT_SPEC.md`: its item 13,
+`generate_quality_report`, is here `verify_rights_layer`. The CLI it maps to,
+`src/rights/verify_rights.py`, verifies the Phase 5A rights layer — reproducibility,
+reconciliation, temporal proof, cost — and produces no quality report. The quality report
+is `dbt/models/quality/quality_report.sql`, already materialised by `run_dbt_build`
+upstream. The task is named for what it does; writing a second generator to justify the
+original name would have been a wrapper, which is the thing this phase is not allowed.
+
+### What the DAG may not do
+
+- **Publication is off by default.** `publish_period_results` begins with a shell guard
+  that exits 1 unless `allow_publication` is set to `True` for that run. It fails loudly
+  rather than skipping: a run that silently declined to publish would be indistinguishable
+  from one that published. `retries=0`, so no scheduler can repeat it.
+- **`validate_scoring.py` is deliberately not in the graph.** It may run once per
+  `scoring_version` — re-running it does not make the validation partition blind again,
+  so it is not a thing a retrying scheduler may hold. `top_unmatched.py`, which is
+  read-only, covers `validate_match_completeness` instead.
+- **No download tasks.** The 2026-06 slice is preserved and immutable; re-fetching it
+  monthly would re-derive an artifact whose whole point is that it does not change.
+  `verify_source_slice` and `verify_gcs_slice` cover source availability.
+- **Writes are *directed* to `artifacts/airflow/<ts_nodash>/`, not confined there.**
+  Every task's `--out` renders under that directory and `evidence_dir` is only ever read,
+  as `--manifest`; the render tests assert both. That is a property of the declared
+  commands, not a boundary: the repo is bind-mounted read-write, so a task that named
+  `docs/phase0` in its `--out` would succeed, and the current test would not catch it.
+  What protects committed evidence today is that no task names it, plus `artifacts/` in
+  `.gitignore` keeping run output out of the tree. An enforced boundary is 7B's.
+
+Known gap for 7B: the tasks call `uv run python`, while the dbt note above records that
+`uv run` stalled under host memory pressure. Inside the container that pressure does not
+apply, but the first real container run is what settles it.
+
+Two things remain **unproven for want of a dependency and of disk**, and are not claimed
+either way: `dags/splitsheet_monthly_pipeline.py` has never been imported under Airflow
+(the DagBag test skips, and `apache-airflow` is deliberately not installed here), and the
+container has never been started (`make airflow-up` wants ~1 GiB of image against 1.9 GiB
+free). Both close in 7B, on a host with room. Until then the honest claim is a tested task
+graph, not a running DAG.

@@ -1,0 +1,49 @@
+# Minimal local Airflow. One container, SQLite metadata DB, LocalExecutor.
+#
+# Cloud Composer is out of the MVP on cost, and the upstream reference compose file is
+# ~300 lines of Postgres, Redis, CeleryExecutor, triggerer and flower -- none of which
+# this project needs to demonstrate orchestration for a monthly pipeline with one active
+# run. That is a documented trade-off, not a gap: the DAG is executor-agnostic, so
+# moving to a real executor is a compose change and not a code change.
+#
+# The image is NOT pulled by the test suite. tests/unit/test_dag_spec.py asserts the
+# graph without Airflow; `make airflow-up` is what a human runs to see the UI.
+services:
+  airflow:
+    image: apache/airflow:2.10.5-python3.12
+    command: standalone
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      # The DAG folder is the repo's, so what runs here is what is committed.
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/splitsheet/dags
+      # uv is how every CLI in this repo is invoked; the tasks are `uv run python ...`.
+      _PIP_ADDITIONAL_REQUIREMENTS: uv
+      # Named explicitly rather than left to uv's default, so the environment uv builds
+      # is the masked path below and not whatever `.venv` the bind happens to expose.
+      UV_PROJECT_ENVIRONMENT: /opt/splitsheet/.venv
+    volumes:
+      - ../:/opt/splitsheet
+      # The bind above carries the host's .venv into the container, and that venv is
+      # macOS: Mach-O interpreters, darwin .so files and shebangs naming /Users paths.
+      # This empty named volume masks it, so uv builds a Linux environment at the same
+      # path. The host copy is neither read nor written from in here -- nothing in the
+      # container can reach it, and `publish.py`'s DBT_BIN resolves to the Linux one
+      # without the financial code needing to know a container exists.
+      - venv-linux:/opt/splitsheet/.venv
+      # raw/ is the one irreplaceable input. Read-only, always.
+      - ${SPLITSHEET_DATA:-~/splitsheet-data}/raw:/opt/splitsheet-data/raw:ro
+      # derived/ has to be writable: build_canonical_texts.py writes
+      # canonical_match_texts.tsv.gz into --work-dir before uploading it. Mounted
+      # separately rather than widening the parent, so raw/ stays read-only no matter
+      # what derived/ needs. One mount for both is what made the two share a mode.
+      - ${SPLITSHEET_DATA:-~/splitsheet-data}/derived:/opt/splitsheet-data/derived
+      - airflow-db:/opt/airflow
+
+volumes:
+  airflow-db:
+  # Deliberately anonymous of host path: it exists only inside Docker, so it cannot
+  # alias the host's .venv even by accident.
+  venv-linux:

@@ -37,3 +37,7 @@ venv/
 dbt/target/
 dbt/logs/
 dbt/dbt_packages/
+
+### Airflow run output. Every DAG run writes under artifacts/airflow/<ts_nodash>/ so it
+### can never overwrite the committed evidence in docs/phase0.
+artifacts/
