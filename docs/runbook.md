@@ -471,9 +471,9 @@ Known gap for 7B: the tasks call `uv run python`, while the dbt note above recor
 `uv run` stalled under host memory pressure. Inside the container that pressure does not
 apply, but the first real container run is what settles it.
 
-Two things remain **unproven for want of a dependency and of disk**, and are not claimed
-either way: `dags/splitsheet_monthly_pipeline.py` has never been imported under Airflow
-(the DagBag test skips, and `apache-airflow` is deliberately not installed here), and the
-container has never been started (`make airflow-up` wants ~1 GiB of image against 1.9 GiB
-free). Both close in 7B, on a host with room. Until then the honest claim is a tested task
-graph, not a running DAG.
+Two things were left **unproven for want of a dependency and of disk** when this phase
+shipped: `dags/splitsheet_monthly_pipeline.py` had never been imported under Airflow (the
+DagBag test skips, and `apache-airflow` is deliberately not installed here), and the
+container had never been started, because the host had too little free space at the time
+to pull the ~1 GiB image. Both were closed in 7B. The DagBag test still skips on a machine
+without Airflow, so that proof lives in the container rather than in the suite.
