@@ -122,6 +122,35 @@ def test_defaults_render_the_frozen_identities_and_a_run_scoped_output_directory
     assert "--out artifacts/airflow/20260705T030000/match_results.json" in rendered
 
 
+# Every task whose output identity depends on the normalization rules. Resolving those
+# rules from whatever file happens to be current is what rebuilt canonical_match_texts
+# under 1.1.0 while this DAG was pinned to 1.0.0.
+NORM_VERSION_TASKS = ("run_normalization_job", "run_blocking_job",
+                      "build_candidate_features", "build_match_results")
+
+
+def test_every_task_that_depends_on_normalization_is_given_the_version():
+    by_id = {t.task_id: t for t in spec.TASKS}
+    for task_id in NORM_VERSION_TASKS:
+        command = by_id[task_id].command
+        assert "--norm-version '{{ params.norm_version }}'" in command, (
+            f"{task_id} must be told which normalization version to use")
+
+
+def test_no_task_leaves_the_normalization_version_to_be_resolved_implicitly():
+    """A task may name the version through params and nothing else: no literal, no flag
+    that asks for the current or latest rules."""
+    for task_id in NORM_VERSION_TASKS:
+        command = {t.task_id: t for t in spec.TASKS}[task_id].command
+        for hint in ("--latest", "latest", "--rules-version", "default"):
+            assert hint not in command, f"{task_id} resolves normalization implicitly: {hint}"
+        assert "--norm-version 1." not in command, f"{task_id} hardcodes a version"
+
+
+def test_the_normalization_version_default_is_still_the_frozen_one():
+    assert spec.DEFAULT_PARAMS["norm_version"] == "1.0.0+0bc0dd643e06"
+
+
 def test_the_dbt_task_shells_out_to_the_venv_dbt_rather_than_uv_run():
     """N6: publish.py already runs `.venv/bin/dbt`, so the dbt task matches it and the two
     agree on one toolchain. Scoped to this task deliberately: the python tasks still use

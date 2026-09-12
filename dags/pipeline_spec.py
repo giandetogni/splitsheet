@@ -95,6 +95,7 @@ TASKS: tuple[Task, ...] = (
         "run_normalization_job", "compute",
         "uv run python src/normalization/build_canonical_texts.py"
         " --candidate-run-id '{{ params.candidate_run_id }}' --bucket {{ params.gcs_bucket }}"
+        " --norm-version '{{ params.norm_version }}'"
         " --work-dir {{ params.derived_dir }}"
         " --out " + RUN_OUT + "/canonical_texts.json",
         retries=2, upstream=("load_bronze_tables",),

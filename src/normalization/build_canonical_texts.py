@@ -38,6 +38,31 @@ MAX_BYTES = 200 * 1024**3
 GCS_PREFIX = "derived/canonical_texts"
 
 
+def rules_for_version(requested: str):
+    """Load the rules file that DECLARES `requested`, never whatever is current.
+
+    Frozen copies live at config/normalization_rules_v<semver>.yml and the working file at
+    config/normalization_rules.yml. Both are candidates, but the one that gets used has to
+    declare the version that was asked for, so naming a version can never quietly resolve
+    to a different one -- which is how this table was once rebuilt under 1.1.0 while the
+    DAG was pinned to 1.0.0.
+    """
+    cfg = pathlib.Path(__file__).parents[2] / "config"
+    semver = requested.split("+", 1)[0]
+    candidates = [cfg / f"normalization_rules_v{semver}.yml", cfg / "normalization_rules.yml"]
+    found = []
+    for path in candidates:
+        if not path.exists():
+            continue
+        rules = load_rules(path)
+        if rules.version == requested:
+            return rules, path
+        found.append(f"{path.name} declares {rules.version}")
+    raise SystemExit(
+        f"no rules file declares normalization version {requested}. "
+        f"expected {requested}, found: {found or 'no rules file at all'}")
+
+
 def source_rows(client, candidate_run_id: str):
     """Distinct canonical recordings that are a candidate for a listen needing a score.
 
@@ -78,6 +103,10 @@ def source_rows(client, candidate_run_id: str):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate-run-id", required=True)
+    ap.add_argument("--norm-version", required=True,
+                    help="the frozen normalization version to build under, e.g. "
+                         "1.0.0+0bc0dd643e06. The rules file that declares it is "
+                         "the one that is loaded; there is no latest fallback.")
     ap.add_argument("--bucket", required=True)
     ap.add_argument("--work-dir", required=True, help="local scratch, outside the repo")
     ap.add_argument("--out", required=True)
@@ -85,7 +114,8 @@ def main() -> None:
 
     from google.cloud import bigquery, storage
 
-    rules = load_rules()
+    rules, rules_path = rules_for_version(args.norm_version)
+    print(f"normalization {rules.version} from {rules_path.name}", flush=True)
     client = bigquery.Client(project=PROJECT)
     t0 = time.time()
     local = pathlib.Path(args.work_dir) / "canonical_match_texts.tsv.gz"
