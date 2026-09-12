@@ -177,6 +177,35 @@ def test_uv_is_told_to_build_its_environment_in_that_volume():
 EXECUTORS_SQLITE_REFUSES = ("LocalExecutor", "CeleryExecutor", "KubernetesExecutor")
 
 
+INIT_SERVICE = "venv-init"
+AIRFLOW_UID = "50000"
+
+
+def test_only_the_init_service_is_root_and_it_reaches_only_the_venv_volume():
+    """Docker creates the venv volume root-owned and Airflow runs as uid 50000, so
+    something has to fix the owner. That something is root exactly once, and it is mounted
+    on one directory -- not the repo, not the preserved slice, not the metadata DB."""
+    services = _compose()["services"]
+    init = services[INIT_SERVICE]
+    assert init["user"] in ("0:0", "0", "root")
+    assert "user" not in services["airflow"], "the Airflow service must not be given root"
+    assert init["volumes"] == [f"venv-linux:{CONTAINER_VENV}"], (
+        "the init service mounts the venv volume and nothing else")
+
+
+def test_airflow_waits_for_the_init_service_to_finish_successfully():
+    depends = _compose()["services"]["airflow"]["depends_on"]
+    assert depends[INIT_SERVICE]["condition"] == "service_completed_successfully"
+
+
+def test_the_volume_is_fixed_by_ownership_not_by_widening_permissions():
+    """`chmod 777` would also make the sync work, and would hand every process in the
+    container write access to the environment it runs from."""
+    assert "chmod" not in COMPOSE.read_text()
+    command = " ".join(_compose()["services"][INIT_SERVICE]["command"])
+    assert f"chown -R {AIRFLOW_UID}:0" in command
+
+
 def test_the_executor_is_one_sqlite_can_actually_run():
     """`LocalExecutor` on SQLite is accepted by compose and rejected by Airflow, so the
     container exits 1 before the scheduler starts. A file read catches it; a pull does not."""
