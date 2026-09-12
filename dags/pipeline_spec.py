@@ -132,7 +132,7 @@ TASKS: tuple[Task, ...] = (
     ),
     Task(
         "run_dbt_build", "dbt",
-        "cd dbt && DBT_PROFILES_DIR=$(pwd) uv run dbt build",
+        "cd dbt && DBT_PROFILES_DIR=$(pwd) ../.venv/bin/dbt build",
         retries=1, upstream=("validate_match_completeness",),
     ),
     Task(

@@ -122,6 +122,16 @@ def test_defaults_render_the_frozen_identities_and_a_run_scoped_output_directory
     assert "--out artifacts/airflow/20260705T030000/match_results.json" in rendered
 
 
+def test_the_dbt_task_shells_out_to_the_venv_dbt_rather_than_uv_run():
+    """N6: publish.py already runs `.venv/bin/dbt`, so the dbt task matches it and the two
+    agree on one toolchain. Scoped to this task deliberately: the python tasks still use
+    `uv run python`, and changing them is not what this asserts."""
+    task = next(t for t in spec.TASKS if t.task_id == "run_dbt_build")
+    assert "uv run dbt" not in task.command
+    # The command cds into dbt/ first, so the venv is one level up from there.
+    assert "../.venv/bin/dbt" in task.command
+
+
 COMPOSE = REPO_ROOT / "docker/airflow-compose.yml"
 CONTAINER_VENV = "/opt/splitsheet/.venv"
 
