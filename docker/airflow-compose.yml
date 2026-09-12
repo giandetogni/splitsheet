@@ -1,4 +1,9 @@
-# Minimal local Airflow. One container, SQLite metadata DB, LocalExecutor.
+# Minimal local Airflow. One container, SQLite metadata DB, SequentialExecutor.
+#
+# The executor is not a free choice here: Airflow validates it against the metadata
+# backend and refuses LocalExecutor on SQLite, exiting 1 before the scheduler starts.
+# SequentialExecutor is the one that pairs with SQLite, and one task at a time is what
+# a monthly pipeline with max_active_runs=1 needs anyway.
 #
 # Cloud Composer is out of the MVP on cost, and the upstream reference compose file is
 # ~300 lines of Postgres, Redis, CeleryExecutor, triggerer and flower -- none of which
@@ -15,12 +20,10 @@ services:
     ports:
       - "8080:8080"
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       # The DAG folder is the repo's, so what runs here is what is committed.
       AIRFLOW__CORE__DAGS_FOLDER: /opt/splitsheet/dags
-      # uv is how every CLI in this repo is invoked; the tasks are `uv run python ...`.
-      _PIP_ADDITIONAL_REQUIREMENTS: uv
       # Named explicitly rather than left to uv's default, so the environment uv builds
       # is the masked path below and not whatever `.venv` the bind happens to expose.
       UV_PROJECT_ENVIRONMENT: /opt/splitsheet/.venv

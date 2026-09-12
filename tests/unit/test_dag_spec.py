@@ -162,6 +162,22 @@ def test_uv_is_told_to_build_its_environment_in_that_volume():
     assert env["UV_PROJECT_ENVIRONMENT"] == CONTAINER_VENV
 
 
+# Airflow validates the executor against the metadata backend and exits 1 at bootstrap on
+# a mismatch. These are the executors it refuses on SQLite.
+EXECUTORS_SQLITE_REFUSES = ("LocalExecutor", "CeleryExecutor", "KubernetesExecutor")
+
+
+def test_the_executor_is_one_sqlite_can_actually_run():
+    """`LocalExecutor` on SQLite is accepted by compose and rejected by Airflow, so the
+    container exits 1 before the scheduler starts. A file read catches it; a pull does not."""
+    env = _compose()["services"]["airflow"]["environment"]
+    assert "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN" not in env, (
+        "this compose is the SQLite one; naming a real backend changes which executors are legal")
+    executor = env["AIRFLOW__CORE__EXECUTOR"]
+    assert executor not in EXECUTORS_SQLITE_REFUSES, f"{executor} cannot run against SQLite"
+    assert executor == "SequentialExecutor"
+
+
 def test_the_preserved_slice_stays_read_only_while_derived_can_be_written():
     """B1: the two halves of the data directory are separate mounts with separate modes."""
     mounts = _mounts()
