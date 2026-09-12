@@ -5,14 +5,18 @@ derivable from the code, and they decide what does *not* get built.
 
 ## B.6 — time and scope
 
-Answered 2026-08-02.
+Answered 2026-08-02. **Closed 2026-09-04** with the two figures that were open:
 
-- **No fixed weekly hour budget.**
-- **No deadline.**
+- **10 hours per week.**
+- **Delivery date: 2026-09-30.**
 - Priorities are **quality, evidence and ROI**.
-- **The absence of a deadline does not authorise scope expansion.** Nothing is implemented
-  merely because there is time available.
+- **A deadline does not authorise scope expansion either.** Nothing is implemented merely
+  because there is time available, and nothing is skipped merely because there is not.
 - **Every expansion still requires measurable evidence** that it is worth doing.
+
+The figures change the arithmetic, not the rule. Roughly four working weeks remain for
+Phase 7 and Phase 8 together, which is what makes Phase 7 deliberately thin: orchestration
+has to be demonstrated, not platformed, so that Phase 8 still has room.
 
 ### Why this is written down
 
