@@ -18,6 +18,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "dbt-bigquery>=1.8,<2.0",
+    # The DAG spec tests render task commands the way Airflow will. dbt pulls Jinja2 in
+    # anyway, but our own code imports it, so it is declared rather than inherited.
+    "jinja2>=3.1,<4",
     "pytest>=8,<9",
     "ruff>=0.6,<1.0",
 ]

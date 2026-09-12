@@ -41,7 +41,7 @@ jobs:
         run: uv sync --frozen --all-groups
 
       - name: Lint
-        run: uv run ruff check src tests
+        run: uv run ruff check src tests dags
 
       # Unit tests only. tests/integration is excluded by testpaths in pyproject.toml
       # and additionally requires credentials this job does not have.
