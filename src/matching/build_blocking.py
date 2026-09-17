@@ -92,6 +92,38 @@ def main() -> None:
     ).hexdigest()[:16]
     print(f"candidate_run_id = {run_id}")
 
+    # Before staging, before the two index joins and before the published tables: if the
+    # candidates already carry this run id under the same versions and snapshot, the work
+    # would reproduce what is already there and rewrite every row for a fresh timestamp.
+    current = run(c, f"""
+        SELECT COUNT(*) AS n,
+               COUNT(DISTINCT candidate_run_id) AS runs, MIN(candidate_run_id) AS run_id,
+               COUNT(DISTINCT normalization_version) AS nvers,
+               MIN(normalization_version) AS nver,
+               COUNT(DISTINCT blocking_version) AS bvers, MIN(blocking_version) AS bver,
+               COUNT(DISTINCT snapshot_date) AS snaps, MIN(snapshot_date) AS snap
+        FROM `{p}.splitsheet_silver.silver_match_candidates`
+    """, "inspect_target", stats)[0]
+    already = (int(current["n"]) > 0 and int(current["runs"]) == 1
+               and current["run_id"] == run_id
+               and int(current["nvers"]) == 1 and current["nver"] == args.norm_version
+               and int(current["bvers"]) == 1 and current["bver"] == args.blocking_version
+               and int(current["snaps"]) == 1 and str(current["snap"]) == SNAPSHOT)
+    if already:
+        print(f"target already holds {run_id}: nothing written")
+        report = {
+            "candidate_run_id": run_id, "skipped": True,
+            "normalization_version": args.norm_version,
+            "blocking_version": args.blocking_version,
+            "candidate_rows": int(current["n"]),
+            "total_bytes_billed": sum(s["bytes_billed"] or 0 for s in stats),
+            "wall_seconds": round(time.time() - t0, 1),
+        }
+        with open(args.out, "w") as fh:
+            json.dump(report, fh, indent=1)
+        print(json.dumps(report, indent=1))
+        return
+
     stg_norm = f"{p}.splitsheet_silver.stg_listens_normalized"
     stg_cand = f"{p}.splitsheet_silver.stg_match_candidates"
 
