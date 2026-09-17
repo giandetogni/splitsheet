@@ -23,6 +23,7 @@ import argparse
 import csv
 import gzip
 import hashlib
+import io
 import json
 import pathlib
 import sys
@@ -89,6 +90,7 @@ def source_rows(client, candidate_run_id: str):
     FROM `{PROJECT}.splitsheet_bronze.bronze_canonical_recordings` k
     JOIN mbids USING (recording_mbid)
     WHERE k.snapshot_date = DATE '{SNAPSHOT}'
+    ORDER BY k.recording_mbid
     """
     cfg = bigquery.QueryJobConfig(
         maximum_bytes_billed=MAX_BYTES,
@@ -98,6 +100,35 @@ def source_rows(client, candidate_run_id: str):
     print(f"  source query billed={job.total_bytes_billed or 0:,} "
           f"rows={rows.total_rows:,}", flush=True)
     return rows, job
+
+
+def published_identity(client, rules, candidate_run_id: str):
+    """The identity already published for exactly these frozen inputs, or None.
+
+    `ingestion_run_id` is derived from the payload, so it cannot be known before building.
+    What can be checked first is whether the published rows already carry the inputs being
+    asked for: the candidate universe, the canonical snapshot and the normalization rules.
+    Those three are frozen upstream, so together they determine the payload -- which makes
+    a rerun on unchanged inputs a no-op instead of a new key for the same content.
+    """
+    row = next(iter(client.query(f"""
+        SELECT COUNT(*) AS n,
+               COUNT(DISTINCT ingestion_run_id) AS runs, MIN(ingestion_run_id) AS run_id,
+               COUNT(DISTINCT normalization_version) AS versions,
+               MIN(normalization_version) AS version,
+               MIN(normalization_rules_sha256) AS rules_digest,
+               COUNT(DISTINCT source_universe) AS universes,
+               MIN(source_universe) AS universe,
+               COUNT(DISTINCT snapshot_date) AS snapshots, MIN(snapshot_date) AS snapshot
+        FROM `{PROJECT}.splitsheet_bronze.canonical_match_texts`
+    """).result()))
+    matches = (int(row["n"]) > 0 and int(row["runs"]) == 1 and int(row["versions"]) == 1
+               and int(row["universes"]) == 1 and int(row["snapshots"]) == 1
+               and row["version"] == rules.version
+               and row["rules_digest"] == rules.rules_digest
+               and row["universe"] == candidate_run_id
+               and str(row["snapshot"]) == SNAPSHOT)
+    return dict(row) if matches else None
 
 
 def main() -> None:
@@ -118,13 +149,37 @@ def main() -> None:
     print(f"normalization {rules.version} from {rules_path.name}", flush=True)
     client = bigquery.Client(project=PROJECT)
     t0 = time.time()
+
+    # Before the source query, before the local file, before GCS and before the target.
+    published = published_identity(client, rules, args.candidate_run_id)
+    if published:
+        print(f"target already holds {published['run_id']} for these inputs: nothing written",
+              flush=True)
+        report = {
+            "artifact": "canonical_match_texts", "skipped": True,
+            "source_universe": args.candidate_run_id, "snapshot_date": SNAPSHOT,
+            "recordings": int(published["n"]),
+            "ingestion_run_id": published["run_id"],
+            "normalization_version": rules.version,
+            "normalization_rules_sha256": rules.rules_digest,
+            "wall_seconds": round(time.time() - t0, 1),
+        }
+        with open(args.out, "w") as fh:
+            json.dump(report, fh, indent=1)
+        print(json.dumps(report, indent=1))
+        return
+
     local = pathlib.Path(args.work_dir) / "canonical_match_texts.tsv.gz"
     local.parent.mkdir(parents=True, exist_ok=True)
 
     rows, src_job = source_rows(client, args.candidate_run_id)
     n = 0
     empty_artist = empty_recording = no_release = 0
-    with gzip.open(local, "wt", encoding="utf-8", newline="") as fh:
+    # mtime=0 and an empty filename: the gzip header must not carry a timestamp, or the
+    # digest below -- and so the run id -- would change for identical content.
+    with open(local, "wb") as raw, \
+            gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz, \
+            io.TextIOWrapper(gz, encoding="utf-8", newline="") as fh:
         w = csv.writer(fh, delimiter="\t", lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
         for r in rows:
             artist = normalized_unicode(r["artist_credit_name"] or "", rules=rules)
