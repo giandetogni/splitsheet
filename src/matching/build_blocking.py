@@ -101,7 +101,8 @@ def main() -> None:
                COUNT(DISTINCT normalization_version) AS nvers,
                MIN(normalization_version) AS nver,
                COUNT(DISTINCT blocking_version) AS bvers, MIN(blocking_version) AS bver,
-               COUNT(DISTINCT snapshot_date) AS snaps, MIN(snapshot_date) AS snap
+               COUNT(DISTINCT canonical_snapshot_date) AS snaps,
+               MIN(canonical_snapshot_date) AS snap
         FROM `{p}.splitsheet_silver.silver_match_candidates`
     """, "inspect_target", stats)[0]
     already = (int(current["n"]) > 0 and int(current["runs"]) == 1

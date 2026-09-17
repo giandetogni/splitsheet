@@ -11,6 +11,7 @@ import hashlib
 import inspect
 import json
 import pathlib
+import re
 import sys
 
 import pytest
@@ -36,10 +37,12 @@ class ReachedHeavyWork(Exception):
 def drive(monkeypatch, tmp_path, target_row):
     """Run main() with the cloud replaced by a fake, and report which steps it reached."""
     calls: list[str] = []
+    sqls: dict[str, str] = {}
     out = tmp_path / "blocking.json"
 
     def fake_run(client, sql, label, stats):
         calls.append(label)
+        sqls[label] = sql
         if label == "inspect_target":
             stats.append({"step": label, "bytes_billed": 0, "slot_ms": 0})
             return [dict(target_row)] if target_row is not None else [
@@ -54,26 +57,26 @@ def drive(monkeypatch, tmp_path, target_row):
         "--norm-version", NORM, "--blocking-version", BLOCKING, "--out", str(out)])
     try:
         mod.main()
-        return calls, json.loads(out.read_text())
+        return calls, json.loads(out.read_text()), sqls
     except ReachedHeavyWork as reached:
-        return calls, reached
+        return calls, reached, sqls
 
 
 def test_an_existing_output_under_the_same_run_id_satisfies_the_guard(monkeypatch, tmp_path):
-    _calls, report = drive(monkeypatch, tmp_path, PUBLISHED)
+    _calls, report, _sqls = drive(monkeypatch, tmp_path, PUBLISHED)
     assert isinstance(report, dict), "the guard should have returned before any heavy work"
     assert report["skipped"] is True
 
 
 def test_the_guard_reaches_no_generation_and_no_write(monkeypatch, tmp_path):
-    calls, _ = drive(monkeypatch, tmp_path, PUBLISHED)
+    calls, _report, _sqls = drive(monkeypatch, tmp_path, PUBLISHED)
     assert calls == ["inspect_target"], f"the builder went past the guard: {calls}"
     for step in ("stage_normalized", "stage_candidates", "publish_atomic", "drop_staging"):
         assert step not in calls
 
 
 def test_the_guard_returns_the_identity_already_published(monkeypatch, tmp_path):
-    _, report = drive(monkeypatch, tmp_path, PUBLISHED)
+    _calls, report, _sqls = drive(monkeypatch, tmp_path, PUBLISHED)
     assert report["candidate_run_id"] == EXPECTED_RUN_ID
     assert report["normalization_version"] == NORM
     assert report["blocking_version"] == BLOCKING
@@ -81,13 +84,13 @@ def test_the_guard_returns_the_identity_already_published(monkeypatch, tmp_path)
 
 
 def test_a_different_run_id_does_not_satisfy_the_guard(monkeypatch, tmp_path):
-    calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, "run_id": "blk:0000000000000000"})
+    calls, outcome, _sqls = drive(monkeypatch, tmp_path, {**PUBLISHED, "run_id": "blk:0000000000000000"})
     assert isinstance(outcome, ReachedHeavyWork)
     assert calls == ["inspect_target", "stage_normalized"]
 
 
 def test_an_absent_output_does_not_satisfy_the_guard(monkeypatch, tmp_path):
-    calls, outcome = drive(monkeypatch, tmp_path, None)
+    calls, outcome, _sqls = drive(monkeypatch, tmp_path, None)
     assert isinstance(outcome, ReachedHeavyWork)
     assert "stage_normalized" in calls
 
@@ -98,7 +101,7 @@ def test_an_absent_output_does_not_satisfy_the_guard(monkeypatch, tmp_path):
     {"n": 0},
 ])
 def test_any_mismatched_invariant_does_not_satisfy_the_guard(monkeypatch, tmp_path, broken):
-    calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, **broken})
+    calls, outcome, _sqls = drive(monkeypatch, tmp_path, {**PUBLISHED, **broken})
     assert isinstance(outcome, ReachedHeavyWork), f"{broken} wrongly satisfied the guard"
     assert "stage_normalized" in calls
 
@@ -106,7 +109,7 @@ def test_any_mismatched_invariant_does_not_satisfy_the_guard(monkeypatch, tmp_pa
 def test_the_normal_path_is_still_reachable(monkeypatch, tmp_path):
     """When the guard does not fire the builder proceeds exactly as before, starting with
     the normalized staging table."""
-    _calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, "run_id": "blk:stale"})
+    _calls, outcome, _sqls = drive(monkeypatch, tmp_path, {**PUBLISHED, "run_id": "blk:stale"})
     assert isinstance(outcome, ReachedHeavyWork)
     assert str(outcome) == "stage_normalized"
 
@@ -121,3 +124,26 @@ def test_the_block_run_id_formula_is_unchanged():
     recomputed = "blk:" + hashlib.sha256(
         f"{NORM}|{BLOCKING}|{mod.SNAPSHOT}|{mod.EXPECTED_LISTENS}".encode()).hexdigest()[:16]
     assert recomputed == EXPECTED_RUN_ID
+
+
+# The columns silver_match_candidates actually has. The guard first shipped asking for
+# `snapshot_date`, which does not exist; the fakes could not catch it because they never
+# send the SQL anywhere, so the column names are checked against this list instead.
+CANDIDATE_COLUMNS = {
+    "listen_hash", "candidate_recording_mbid", "block_method", "block_key",
+    "canonical_snapshot_date", "blocking_version", "normalization_version",
+    "candidate_run_id", "created_at",
+}
+GUARD_ALIASES = {"n", "runs", "run_id", "nvers", "nver", "bvers", "bver", "snaps", "snap"}
+
+
+def test_the_guard_only_names_columns_the_table_has(monkeypatch, tmp_path):
+    _calls, _report, sqls = drive(monkeypatch, tmp_path, PUBLISHED)
+    sql = sqls["inspect_target"]
+    assert "canonical_snapshot_date" in sql
+    assert not re.search(r"\bsnapshot_date\b", sql), (
+        "the guard names a snapshot_date column that silver_match_candidates does not have")
+    # SQL keywords are written in caps, so the lowercase words are the identifiers.
+    selected = set(re.findall(r"\b[a-z_]+\b", sql.split("FROM")[0]))
+    unknown = selected - CANDIDATE_COLUMNS - GUARD_ALIASES
+    assert unknown == set(), f"guard references unknown columns: {sorted(unknown)}"
