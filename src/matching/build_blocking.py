@@ -32,6 +32,12 @@ import time
 PERIOD = ("listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
           "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'")
 EXPECTED_LISTENS = 38_199_641
+# The candidate count is not one of the run id's inputs, so it is pinned per run
+# rather than as a standing constant: 34,466,312 was measured for
+# blk:c005e9a56b1ec542 and says nothing about a run built from a different index.
+# A run id absent from here has no ratified cardinality, so it takes the normal
+# path and rebuilds rather than trusting a count nobody proved.
+EXPECTED_CANDIDATES = {"blk:c005e9a56b1ec542": 34_466_312}
 SNAPSHOT = "2026-07-17"
 MATCHER_SA = "splitsheet-matcher@ss-de-944054e7.iam.gserviceaccount.com"
 MAX_BYTES = 200 * 1024**3
@@ -105,7 +111,9 @@ def main() -> None:
                MIN(canonical_snapshot_date) AS snap
         FROM `{p}.splitsheet_silver.silver_match_candidates`
     """, "inspect_target", stats)[0]
-    already = (int(current["n"]) > 0 and int(current["runs"]) == 1
+    ratified = EXPECTED_CANDIDATES.get(run_id)
+    already = (ratified is not None and int(current["n"]) == ratified
+               and int(current["runs"]) == 1
                and current["run_id"] == run_id
                and int(current["nvers"]) == 1 and current["nver"] == args.norm_version
                and int(current["bvers"]) == 1 and current["bver"] == args.blocking_version

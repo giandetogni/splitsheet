@@ -34,7 +34,7 @@ class ReachedHeavyWork(Exception):
     """Raised by the fake as soon as the builder asks for anything past the guard."""
 
 
-def drive(monkeypatch, tmp_path, target_row):
+def drive(monkeypatch, tmp_path, target_row, blocking=BLOCKING):
     """Run main() with the cloud replaced by a fake, and report which steps it reached."""
     calls: list[str] = []
     sqls: dict[str, str] = {}
@@ -54,7 +54,7 @@ def drive(monkeypatch, tmp_path, target_row):
     monkeypatch.setattr(mod, "client_as_matcher", lambda project: object())
     monkeypatch.setattr(sys, "argv", [
         "build_blocking.py", "--project", "ss-de-944054e7",
-        "--norm-version", NORM, "--blocking-version", BLOCKING, "--out", str(out)])
+        "--norm-version", NORM, "--blocking-version", blocking, "--out", str(out)])
     try:
         mod.main()
         return calls, json.loads(out.read_text()), sqls
@@ -98,7 +98,7 @@ def test_an_absent_output_does_not_satisfy_the_guard(monkeypatch, tmp_path):
 @pytest.mark.parametrize("broken", [
     {"runs": 2}, {"nvers": 2}, {"bvers": 2}, {"snaps": 2},
     {"nver": "1.1.0+b3253b155934"}, {"bver": "staged-2.0.0"}, {"snap": "2020-01-01"},
-    {"n": 0},
+    {"n": 0}, {"n": 1}, {"n": 34_466_311}, {"n": 34_466_313},
 ])
 def test_any_mismatched_invariant_does_not_satisfy_the_guard(monkeypatch, tmp_path, broken):
     calls, outcome, _sqls = drive(monkeypatch, tmp_path, {**PUBLISHED, **broken})
@@ -147,3 +147,25 @@ def test_the_guard_only_names_columns_the_table_has(monkeypatch, tmp_path):
     selected = set(re.findall(r"\b[a-z_]+\b", sql.split("FROM")[0]))
     unknown = selected - CANDIDATE_COLUMNS - GUARD_ALIASES
     assert unknown == set(), f"guard references unknown columns: {sorted(unknown)}"
+
+
+def test_the_ratified_cardinality_is_pinned_to_the_proven_run():
+    """34,466,312 is the physical row count measured for blk:c005e9a56b1ec542. It is not a
+    standing expectation, and 3,045,208 -- the scored subset, which lives in another table
+    under another phase -- is not one either."""
+    assert mod.EXPECTED_CANDIDATES == {EXPECTED_RUN_ID: 34_466_312}
+
+
+def test_an_unratified_run_id_does_not_inherit_the_proven_cardinality(monkeypatch, tmp_path):
+    """A run built from different inputs derives a different id, and that id has no
+    ratified count -- so a table matching on every other invariant, holding exactly the
+    34,466,312 rows proven for the old run, still has to rebuild."""
+    other = "staged-2.0.0"
+    other_id = "blk:" + hashlib.sha256(
+        f"{NORM}|{other}|{mod.SNAPSHOT}|{mod.EXPECTED_LISTENS}".encode()).hexdigest()[:16]
+    assert other_id not in mod.EXPECTED_CANDIDATES
+    calls, outcome, _sqls = drive(
+        monkeypatch, tmp_path, {**PUBLISHED, "run_id": other_id, "bver": other},
+        blocking=other)
+    assert isinstance(outcome, ReachedHeavyWork)
+    assert "stage_normalized" in calls
