@@ -126,7 +126,7 @@ TASKS: tuple[Task, ...] = (
         retries=1, upstream=("build_candidate_features",),
     ),
     Task(
-        "validate_match_completeness", "validation",
+        "report_top_unmatched", "validation",
         "uv run python src/evaluation/top_unmatched.py"
         " --out " + RUN_OUT + "/top_unmatched.json",
         retries=2, upstream=("build_match_results",),
@@ -134,7 +134,7 @@ TASKS: tuple[Task, ...] = (
     Task(
         "run_dbt_build", "dbt",
         "cd dbt && DBT_PROFILES_DIR=$(pwd) ../.venv/bin/dbt build",
-        retries=1, upstream=("validate_match_completeness",),
+        retries=1, upstream=("report_top_unmatched",),
     ),
     Task(
         "verify_rights_layer", "validation",

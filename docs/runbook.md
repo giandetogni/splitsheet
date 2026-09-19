@@ -455,7 +455,8 @@ original name would have been a wrapper, which is the thing this phase is not al
 - **`validate_scoring.py` is deliberately not in the graph.** It may run once per
   `scoring_version` — re-running it does not make the validation partition blind again,
   so it is not a thing a retrying scheduler may hold. `top_unmatched.py`, which is
-  read-only, covers `validate_match_completeness` instead.
+  read-only, covers the spec's suggested `validate_match_completeness` slot instead,
+  and the task is named `report_top_unmatched` for what it actually produces.
 - **No download tasks.** The 2026-06 slice is preserved and immutable; re-fetching it
   monthly would re-derive an artifact whose whole point is that it does not change.
   `verify_source_slice` and `verify_gcs_slice` cover source availability.
