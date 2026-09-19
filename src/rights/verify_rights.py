@@ -316,6 +316,23 @@ def main() -> None:
           f"~ ${report['cost']['list_price_equivalent_usd']} list-price equivalent "
           f"(actual monetary cost UNKNOWN)")
 
+    # THE GATE. The generator injected a known number of defects and the quality layer counted
+    # them independently; disagreement means the rights layer is not verified. This task is the
+    # last step before publication, so it has to fail rather than report -- a green step here is
+    # read as a clearance. The report and the summary above are already written, so the evidence
+    # of the divergence survives the exit.
+    diverged = [f"{k} injected={v['injected']} detected={v['detected']}"
+                for k, v in sorted(reconciliation.items())
+                if isinstance(v, dict) and not v["agrees"]]
+    # The two reproducibility booleans are flat, not injected/detected pairs. They belong in the
+    # same gate: rights that no longer regenerate from the declared seed cannot support a
+    # published payout, whatever the defect counts say.
+    diverged += [k for k in ("row_counts_match", "second_pass_identical")
+                 if not reproducibility[k]]
+    if diverged:
+        raise SystemExit("rights verification diverged, refusing to clear the rights layer: "
+                         + "; ".join(diverged))
+
 
 if __name__ == "__main__":
     main()
