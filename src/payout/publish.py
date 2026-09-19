@@ -186,6 +186,49 @@ def content_digest(client, run_id: str, stats, label: str) -> dict:
     return {k: (str(v) if v is not None else None) for k, v in out.items()}
 
 
+def existing_publication(client, run_id: str, stats) -> dict | None:
+    """Is this exact publication already on the fact table AND in the registry, agreeing on
+    every invariant either of them records?
+
+    Returns the publication when both sides agree, None when neither holds it, and refuses
+    everything in between. Half a publication -- rows with no registry entry, a registry entry
+    with no rows, a count, total or digest that disagrees -- is a state to stop on, not a state
+    to rebuild over. The run id comes from the frozen policy, never from the pointer: which
+    publication is in force has no bearing on which one this policy describes.
+    """
+    fact = content_digest(client, run_id, stats, "existing publication digest")
+    registered = run_query(client, f"""
+        SELECT publication_id, row_count, portfolio_paid, content_digest, frozen
+        FROM `{PROJECT}.{DATASET}.publication_registry`
+        WHERE attribution_run_id = '{run_id}'
+    """, "existing publication registry", stats)
+
+    rows = int(fact["rows_published"])
+    if rows == 0 and not registered:
+        return None
+    if rows == 0 or not registered:
+        raise SystemExit(
+            f"{run_id} is half published: {rows:,} fact rows against {len(registered)} registry "
+            f"entries. Refusing to build over an inconsistent publication.")
+    if len(registered) != 1:
+        raise SystemExit(f"{run_id} maps to {len(registered)} registry entries: "
+                         f"{[r['publication_id'] for r in registered]}")
+
+    entry = registered[0]
+    mismatch = {name: {"published": str(a), "registered": str(b)}
+                for name, a, b in (("row_count", rows, entry["row_count"]),
+                                   ("portfolio_paid", fact["total_holder_payout"],
+                                    entry["portfolio_paid"]),
+                                   ("content_digest", fact["content_digest"],
+                                    entry["content_digest"]))
+                if str(a) != str(b)}
+    if mismatch:
+        raise SystemExit(
+            f"{run_id} is already published as {entry['publication_id']} but does not match it: "
+            f"{mismatch}. Rebuilding would price a different result under a published identity.")
+    return {**fact, "publication_id": entry["publication_id"], "frozen": entry["frozen"]}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -217,6 +260,35 @@ def main() -> None:
     frozen = verify_frozen_inputs(client, policy, stats)
     print(f"  frozen inputs verified: {frozen['match_run_id']} / {frozen['rights_version']}",
           flush=True)
+
+    # Before any dbt work: this publication may already exist. Rebuilding it would rewrite the
+    # derived financial models under THIS run id's vars, which is how a rerun aimed at a prior
+    # publication left the restatement layer disagreeing with itself. Validate and stop.
+    already = existing_publication(client, run_id, stats)
+    if already:
+        print(f"  {run_id} already published as {already['publication_id']}: "
+              f"{int(already['rows_published']):,} rows, {already['total_holder_payout']} paid, "
+              f"digest {already['content_digest']}", flush=True)
+        if args.move_pointer:
+            set_pointer(client, run_id, policy.version,
+                        f"{args.label} under payout policy {policy.version}", stats)
+        else:
+            print(f"  pointer NOT moved: CURRENT is unchanged. Pass --move-pointer to promote "
+                  f"{run_id}.", flush=True)
+        report = {
+            "artifact": "royalty_attribution_publication", "skipped": True,
+            "payout_policy_version": policy.version, "publication_label": args.label,
+            "attribution_run_id": run_id, "publication_id": already["publication_id"],
+            "frozen_inputs_verified": frozen,
+            "existing_publication": already, "pointer_moved": args.move_pointer,
+            "bytes_billed_queries": sum(s.get("bytes_billed") or 0 for s in stats),
+            "wall_seconds": round(time.time() - t0, 1), "jobs": stats,
+        }
+        pathlib.Path(args.out).write_text(json.dumps(report, indent=1, default=str))
+        print(json.dumps({k: report[k] for k in
+                          ("attribution_run_id", "publication_id", "skipped", "pointer_moved")},
+                         indent=1))
+        return
 
     dbt_vars = {
         "payout_policy_version": policy.version,
