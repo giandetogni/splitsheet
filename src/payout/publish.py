@@ -195,7 +195,14 @@ def main() -> None:
                     help="re-run the publication and prove the content is unchanged")
     ap.add_argument("--prove-pointer-move", action="store_true",
                     help="move the pointer away and back, proving published rows are untouched")
+    ap.add_argument("--move-pointer", action="store_true",
+                    help="promote this publication: point CURRENT at this attribution_run_id. "
+                         "Publishing and validating never move the pointer on their own, so a "
+                         "scheduled run cannot change which publication is in force.")
     args = ap.parse_args()
+    if args.prove_pointer_move and not args.move_pointer:
+        ap.error("--prove-pointer-move moves the pointer away and restores it, so it needs "
+                 "--move-pointer: exactly one flag authorises touching CURRENT.")
 
     policy = load_payout_policy()
     run_id = attribution_run_id(policy, args.label)
@@ -235,10 +242,17 @@ def main() -> None:
     first = content_digest(client, run_id, stats, "publication content digest")
     if int(first["rows_published"]) == 0:
         raise SystemExit("publication produced no rows")
-    set_pointer(client, run_id, policy.version,
-                f"{args.label} under payout policy {policy.version}", stats)
+    # Publishing is not promoting. The pointer decides which immutable publication is in
+    # force, and a run that only materialises and validates must leave that decision alone --
+    # otherwise a scheduled publication silently changes what the business is standing behind.
+    if args.move_pointer:
+        set_pointer(client, run_id, policy.version,
+                    f"{args.label} under payout policy {policy.version}", stats)
+    else:
+        print(f"  pointer NOT moved: CURRENT is unchanged. Pass --move-pointer to promote "
+              f"{run_id}.", flush=True)
 
-    proofs: dict = {"first_publication": first}
+    proofs: dict = {"first_publication": first, "pointer_moved": args.move_pointer}
 
     # --- idempotency: same inputs, same run id, zero new rows ----------------------------
     if args.prove_idempotency:
