@@ -198,6 +198,46 @@ def main() -> None:
     print(f"scoring {rules.version}  feature {F.FEATURE_VERSION}  match_run_id {run_id}",
           flush=True)
 
+    # Before staging, before the scoring pass and before the transaction: the result is a
+    # function of the candidates, the features and the frozen rules alone, and all of them
+    # are in the run id. If the period already holds this identity at full size, rebuilding
+    # it would spend ~30.9 GB to reproduce what is there and rewrite every row for a fresh
+    # matched_at. The PERIOD filter is not optional: the table requires a partition filter,
+    # so a guard without it is rejected before it can read anything.
+    current = run(c, f"""
+        SELECT COUNT(*) AS n,
+               COUNT(DISTINCT match_run_id) AS mruns, MIN(match_run_id) AS mrun,
+               COUNT(DISTINCT candidate_run_id) AS cruns, MIN(candidate_run_id) AS crun,
+               COUNT(DISTINCT scoring_version) AS svers, MIN(scoring_version) AS sver,
+               COUNT(DISTINCT normalization_version) AS nvers,
+               MIN(normalization_version) AS nver,
+               COUNT(DISTINCT blocking_version) AS bvers, MIN(blocking_version) AS bver
+        FROM `{PROJECT}.splitsheet_silver.silver_listen_matches`
+        WHERE {PERIOD}
+    """, "inspect_target", stats)[0]
+    already = (int(current["n"]) == EXPECTED_LISTENS
+               and int(current["mruns"]) == 1 and current["mrun"] == run_id
+               and int(current["cruns"]) == 1 and current["crun"] == args.candidate_run_id
+               and int(current["svers"]) == 1 and current["sver"] == rules.version
+               and int(current["nvers"]) == 1 and current["nver"] == args.norm_version
+               and int(current["bvers"]) == 1 and current["bver"] == args.blocking_version)
+    if already:
+        print(f"period already holds {run_id}: nothing written")
+        report = {
+            "artifact": "silver_listen_matches", "match_run_id": run_id, "skipped": True,
+            "scoring_version": rules.version, "feature_version": F.FEATURE_VERSION,
+            "candidate_run_id": args.candidate_run_id,
+            "normalization_version": args.norm_version,
+            "blocking_version": args.blocking_version,
+            "matched_rows": int(current["n"]),
+            "total_bytes_billed": sum(s["bytes_billed"] or 0 for s in stats),
+            "wall_seconds": round(time.time() - t0, 1),
+        }
+        with open(args.out, "w") as fh:
+            json.dump(report, fh, indent=1)
+        print(json.dumps(report, indent=1))
+        return
+
     stg = f"{PROJECT}.splitsheet_silver.stg_listen_matches"
     run(c, f"CREATE OR REPLACE TABLE `{stg}` PARTITION BY DATE(listened_at) AS "
            + stage_sql(rules, args, run_id), "stage_matches", stats)
