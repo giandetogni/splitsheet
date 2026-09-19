@@ -132,6 +132,40 @@ def main() -> None:
     ).hexdigest()[:16]
     print(f"feature_version {F.FEATURE_VERSION}  feature_run_id {feature_run_id}", flush=True)
 
+    # Before staging, before the joins and before the transaction: the features are a
+    # function of the candidate set, the canonical texts and the feature version alone,
+    # and all three are in the run id. If the published table already carries this
+    # identity at the ratified size, rebuilding it would spend ~12.4 GB to reproduce
+    # what is there and rewrite every row for a fresh CURRENT_TIMESTAMP.
+    current = run(c, f"""
+        SELECT COUNT(*) AS n,
+               COUNT(DISTINCT feature_run_id) AS fruns, MIN(feature_run_id) AS frun,
+               COUNT(DISTINCT candidate_run_id) AS cruns, MIN(candidate_run_id) AS crun,
+               COUNT(DISTINCT normalization_version) AS nvers,
+               MIN(normalization_version) AS nver,
+               COUNT(DISTINCT feature_version) AS fvers, MIN(feature_version) AS fver
+        FROM `{PROJECT}.splitsheet_silver.silver_candidate_features`
+    """, "inspect_target", stats)[0]
+    already = (int(current["n"]) == EXPECTED_PAIRS
+               and int(current["fruns"]) == 1 and current["frun"] == feature_run_id
+               and int(current["cruns"]) == 1 and current["crun"] == args.candidate_run_id
+               and int(current["nvers"]) == 1 and current["nver"] == args.norm_version
+               and int(current["fvers"]) == 1 and current["fver"] == F.FEATURE_VERSION)
+    if already:
+        print(f"target already holds {feature_run_id}: nothing written")
+        report = {
+            "feature_version": F.FEATURE_VERSION, "feature_run_id": feature_run_id,
+            "candidate_run_id": args.candidate_run_id, "skipped": True,
+            "feature_rows": int(current["n"]),
+            "normalization_version": args.norm_version,
+            "total_bytes_billed": sum(s["bytes_billed"] or 0 for s in stats),
+            "wall_seconds": round(time.time() - t0, 1),
+        }
+        with open(args.out, "w") as fh:
+            json.dump(report, fh, indent=1)
+        print(json.dumps(report, indent=1))
+        return
+
     stg = f"{PROJECT}.splitsheet_silver.stg_candidate_features"
     run(c, f"CREATE OR REPLACE TABLE `{stg}` CLUSTER BY listen_hash AS "
            + feature_sql(args.candidate_run_id, feature_run_id, args.norm_version),
