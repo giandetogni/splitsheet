@@ -37,6 +37,79 @@ no MBID, and a recording-day covered by two valid ownership sets becomes `MULTIP
 with no owner. There is no `ANY_VALUE`, no arbitrary `MIN` and no `ROW_NUMBER() = 1` deciding
 either question.
 
+## Architecture
+
+```mermaid
+flowchart TB
+
+    subgraph SRC["1 · Source and ingestion"]
+        LB["ListenBrainz full export<br/>June 2026 slice — 38.2M listens"]
+        RAW["Local raw slice<br/>read-only + manifest checksums"]
+        GCS[("GCS raw bucket<br/>versioned, soft delete")]
+        BRZ[("BigQuery bronze")]
+        LB --> RAW
+        RAW --> GCS
+        GCS --> BRZ
+    end
+
+    subgraph MATCH["2 · Matching — frozen match run"]
+        NORM["normalization<br/>canonical match texts"]
+        BLK["blocking<br/>candidate generation"]
+        FEAT["candidate features<br/>label-blind scoring"]
+        MR[("match results<br/>one row per listen")]
+        NORM --> BLK
+        BLK --> FEAT
+        FEAT --> MR
+    end
+
+    subgraph RIGHTS["3 · Rights and payout — dbt"]
+        SEED["rights holders · ownership splits · rate card<br/>MODELED, from a versioned seed"]
+        SCD["SCD2 snapshot<br/>half-open validity intervals"]
+        ATTR["temporal ownership join<br/>payout eligibility · royalty attribution"]
+        GATE{{"verify_rights_layer<br/>reconciliation gate"}}
+        SEED --> SCD
+        SCD --> ATTR
+        ATTR --> GATE
+    end
+
+    subgraph PUB["4 · Publication"]
+        TASK["publish_period_results<br/>publication explicitly authorised"]
+        FCT[("royalty attribution fact<br/>append-only, never overwritten")]
+        REG[("publication registry")]
+        V1["pub:v1 — immutable"]
+        V2["pub:v2 — immutable restatement"]
+        PROMO["promotion<br/>separate, explicit act"]
+        CUR["CURRENT pointer<br/>names the publication in force"]
+        NOTE["Publishing does not change CURRENT"]
+        TASK --> FCT
+        FCT --> V1
+        FCT --> V2
+        V1 --> REG
+        V2 --> REG
+        PROMO --> CUR
+    end
+
+    BRZ --> NORM
+    MR --> ATTR
+    GATE -->|"gate passes"| TASK
+
+    AF["Apache Airflow 2.10.5 — local, Docker Compose<br/>splitsheet_monthly_pipeline · 11 explicit tasks<br/>orchestrates only — logic lives in src/ and dbt/"]
+    AF -.->|orchestrates| SRC
+    AF -.->|orchestrates| MATCH
+    AF -.->|orchestrates| RIGHTS
+    AF -.->|orchestrates| PUB
+
+    subgraph OPS["Infrastructure and quality"]
+        TF["Terraform<br/>isolated roots · no service-account key"]
+        GHA["GitHub Actions<br/>lint · format · tests · dbt parse<br/>terraform validate · real DAG import"]
+        EV["Runtime evidence<br/>idempotency · failure · recovery · measured cost"]
+    end
+
+    TF -.->|provisions| SRC
+    GHA -.->|validates| AF
+    EV -.->|recorded for| PUB
+```
+
 ## Where things are
 
 ```
