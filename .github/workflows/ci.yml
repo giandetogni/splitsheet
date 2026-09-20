@@ -100,6 +100,9 @@ jobs:
       - name: Import the DAG for real
         env:
           AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+          # Airflow puts the dags folder on sys.path from this setting, which is how the
+          # DAG file reaches pipeline_spec beside it. The compose file sets it the same way.
+          AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
         run: |
           python - <<'PY'
           from airflow.models.dagbag import DagBag
