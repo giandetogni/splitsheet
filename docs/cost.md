@@ -83,6 +83,61 @@ Verifying 2.67 GB of cloud data cost 2.89 MB of egress, because the check reads 
 footers by ranged GET and the `listened_at` column only for the two boundary members.
 Bucket created in `US-CENTRAL1`, class `STANDARD`, as planned.
 
+## Phase 7 — orchestration, measured per task
+
+Every task in the DAG was run once under real Airflow against the real warehouse. These are the
+bytes each run billed, read from the run artifacts under `artifacts/airflow/20260705T030000/` and
+from `INFORMATION_SCHEMA.JOBS_BY_PROJECT` for the execution window.
+
+| task | jobs | bytes billed | path taken |
+|---|---|---|---|
+| `run_normalization_job` | 1 | 0 (cache hit) | guard, no-op |
+| `run_blocking_job` | 1 | 0 (cache hit) | guard, no-op |
+| `build_candidate_features` | 1 | 220,200,960 | guard, no-op |
+| `build_match_results` | 1 | 4,126,146,560 | guard, no-op |
+| `report_top_unmatched` | 2 | 11,220,811,776 | full, read-only by design |
+| `run_dbt_build` | 118 | 65,014,857,728 | full rebuild |
+| `verify_rights_layer` | 8 | 4,023,386,112 | full, read-only by design |
+| `publish_period_results` | 4 | 3,394,240,512 | existing publication, no-op |
+| **total** | **136** | **87,999,643,648 = 0.0800 TiB** | |
+
+The two zeroes are cache hits, not free work: BigQuery served an identical query issued minutes
+earlier by the snapshot that preceded the run. The cold cost of the blocking guard was measured
+separately at **2,206,203,904** bytes, against a dry-run estimate of 2,205,843,968.
+
+### What the guards avoided, both sides measured
+
+Each guard reads the published target and returns when the identity and cardinality already match.
+The full-path figures are what the same stage billed when it last built the data, recorded in
+`docs/phase0/`.
+
+| stage | guard / no-op | full path | avoided |
+|---|---|---|---|
+| blocking | 2,206,203,904 | 42,752,540,672 | 94.8 % |
+| candidate features | 220,200,960 | 12,382,633,984 | 98.2 % |
+| match results | 4,126,146,560 | 30,855,397,376 | 86.6 % |
+| publication | 3,394,240,512 | 43,197,136,896 | 92.1 % |
+
+The publication figure is the only one whose full path was measured in this phase rather than an
+earlier one: a first run against the existing publication rebuilt the financial layer before it
+could recognise it, billed 43,197,136,896 bytes across 35 jobs and then failed a restatement test.
+The second run, after the publisher learned to check the registry first, billed 3,394,240,512
+across 4 jobs and completed. Both numbers come from the same task on the same inputs.
+
+`run_dbt_build` has no guard and none is claimed: eleven of its tables are rebuilt unconditionally,
+and of those only three carry a `measured_at` that changes. About 30 GB of its 65 GB reproduces
+byte-identical content. That is recorded, not optimised.
+
+**List-price equivalent of the whole phase ≈ $0.50.** Processing consumption, **not** money known
+to have been charged. **Actual monetary cost remains UNKNOWN without billing evidence.**
+
+Local Docker and Airflow are not billed by BigQuery and are not counted here: the container runs on
+the developer machine, and no Composer environment, cluster or managed scheduler exists in this
+project.
+
+Cumulative project consumption is now roughly **1.17 TiB** across all phases. **Whether anything
+was actually charged remains UNKNOWN without billing evidence.**
+
 ## Teardown
 
 `terraform destroy` **fails** on the raw bucket by design: `prevent_destroy = true`
