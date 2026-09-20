@@ -53,8 +53,9 @@ def main() -> None:
         n = pf.metadata.num_rows
         col = pf.read(columns=["listened_at"]).column(0)
         lo, hi = pc.min(col).as_py(), pc.max(col).as_py()
-        in_period = int(pc.sum(pc.and_(pc.greater_equal(col, start),
-                                       pc.less(col, end))).as_py() or 0)
+        in_period = int(
+            pc.sum(pc.and_(pc.greater_equal(col, start), pc.less(col, end))).as_py() or 0
+        )
         writable = os.access(path, os.W_OK)
 
         if size != e["size_bytes"]:
@@ -69,12 +70,22 @@ def main() -> None:
 
         rows_total += n
         in_period_total += in_period
-        per_member.append({"member": e["member"], "size_bytes": size,
-                           "sha256_ok": digest == e["sha256"], "read_only": not writable,
-                           "rows": n, "rows_in_period": in_period,
-                           "ts_min": lo.isoformat(), "ts_max": hi.isoformat()})
-        print(f"  {e['member']:<14} rows={n:>9,} in_period={in_period:>9,} "
-              f"{lo.date()}..{hi.date()} sha256={'ok' if digest == e['sha256'] else 'BAD'}")
+        per_member.append(
+            {
+                "member": e["member"],
+                "size_bytes": size,
+                "sha256_ok": digest == e["sha256"],
+                "read_only": not writable,
+                "rows": n,
+                "rows_in_period": in_period,
+                "ts_min": lo.isoformat(),
+                "ts_max": hi.isoformat(),
+            }
+        )
+        print(
+            f"  {e['member']:<14} rows={n:>9,} in_period={in_period:>9,} "
+            f"{lo.date()}..{hi.date()} sha256={'ok' if digest == e['sha256'] else 'BAD'}"
+        )
 
     expected = man["expected_rows_in_period"]
     if in_period_total != expected:

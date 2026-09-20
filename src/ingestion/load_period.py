@@ -49,16 +49,31 @@ HASH_EXPR = """TO_HEX(SHA256(CONCAT(CAST(user_id AS STRING), '|',
                        CAST(UNIX_MICROS(listened_at) AS STRING), '|',
                        recording_msid)))"""
 
-PERIOD_PREDICATE = (f"listened_at >= TIMESTAMP '{PERIOD_START}' "
-                    f"AND listened_at < TIMESTAMP '{PERIOD_END}'")
+PERIOD_PREDICATE = (
+    f"listened_at >= TIMESTAMP '{PERIOD_START}' " f"AND listened_at < TIMESTAMP '{PERIOD_END}'"
+)
 
 ALLOWED_BRONZE_COLUMNS = [
-    "listen_hash", "listened_at", "submitted_at", "recording_msid", "artist_name",
-    "recording_name", "release_name", "source_file", "dump_id", "ingestion_run_id",
+    "listen_hash",
+    "listened_at",
+    "submitted_at",
+    "recording_msid",
+    "artist_name",
+    "recording_name",
+    "release_name",
+    "source_file",
+    "dump_id",
+    "ingestion_run_id",
     "ingested_at",
 ]
-BANNED_COLUMNS = {"user_id", "recording_mbid", "release_mbid", "artist_credit_id",
-                  "artist_credit_mbids", "mapper_recording_mbid"}
+BANNED_COLUMNS = {
+    "user_id",
+    "recording_mbid",
+    "release_mbid",
+    "artist_credit_id",
+    "artist_credit_mbids",
+    "mapper_recording_mbid",
+}
 
 
 class ContractError(RuntimeError):
@@ -130,15 +145,17 @@ def verify_source_contract(man: dict, bucket_name: str) -> dict:
 def query(client, sql: str, label: str, stats: list) -> list:
     job = client.query(sql)
     rows = [dict(r) for r in job.result()]
-    stats.append({
-        "step": label,
-        "job_id": job.job_id,
-        "bytes_processed": job.total_bytes_processed,
-        "bytes_billed": job.total_bytes_billed,
-        "slot_ms": job.slot_millis,
-        "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
-        "dml_affected_rows": job.num_dml_affected_rows,
-    })
+    stats.append(
+        {
+            "step": label,
+            "job_id": job.job_id,
+            "bytes_processed": job.total_bytes_processed,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
+            "dml_affected_rows": job.num_dml_affected_rows,
+        }
+    )
     return rows
 
 
@@ -148,13 +165,19 @@ def main() -> None:
     ap.add_argument("--manifest", required=True)
     ap.add_argument("--bucket", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--fail-before-publish", action="store_true",
-                    help="inject a failure after staging is validated, to prove the "
-                         "published state survives a crash mid-run")
+    ap.add_argument(
+        "--fail-before-publish",
+        action="store_true",
+        help="inject a failure after staging is validated, to prove the "
+        "published state survives a crash mid-run",
+    )
     ap.add_argument("--force", action="store_true", help="reload even if already current")
-    ap.add_argument("--cleanup-orphan-staging", action="store_true",
-                    help="drop staging tables left behind by failed runs, listing each "
-                         "one dropped so the cleanup is auditable rather than silent")
+    ap.add_argument(
+        "--cleanup-orphan-staging",
+        action="store_true",
+        help="drop staging tables left behind by failed runs, listing each "
+        "one dropped so the cleanup is auditable rather than silent",
+    )
     args = ap.parse_args()
 
     from google.cloud import bigquery
@@ -170,52 +193,85 @@ def main() -> None:
 
     if args.cleanup_orphan_staging:
         dropped = []
-        for ds, pattern in (("splitsheet_bronze", "stg_bronze_listens_"),
-                            ("splitsheet_eval", "stg_labels_")):
-            rows = query(client, f"""
+        for ds, pattern in (
+            ("splitsheet_bronze", "stg_bronze_listens_"),
+            ("splitsheet_eval", "stg_labels_"),
+        ):
+            rows = query(
+                client,
+                f"""
                 SELECT table_name FROM `{args.project}.{ds}`.INFORMATION_SCHEMA.TABLES
                 WHERE table_name LIKE '{pattern}%'
-            """, f"list_staging_{ds}", stats)
+            """,
+                f"list_staging_{ds}",
+                stats,
+            )
             for r in rows:
                 name = r["table_name"]
-                query(client, f"DROP TABLE `{args.project}.{ds}.{name}`",
-                      "drop_orphan_staging", stats)
+                query(
+                    client, f"DROP TABLE `{args.project}.{ds}.{name}`", "drop_orphan_staging", stats
+                )
                 dropped.append(f"{ds}.{name}")
                 print(f"  dropped orphan staging: {ds}.{name}")
         if not dropped:
             print("  no orphan staging tables found")
         with open(args.out, "w") as fh:
-            json.dump({"action": "cleanup_orphan_staging", "dropped": dropped,
-                       "jobs": stats}, fh, indent=1)
+            json.dump(
+                {"action": "cleanup_orphan_staging", "dropped": dropped, "jobs": stats},
+                fh,
+                indent=1,
+            )
         return
 
     contract = verify_source_contract(man, args.bucket)
-    print(f"source contract OK: {contract['objects']} objects, "
-          f"{contract['total_bytes']:,} bytes, {contract['checksums_verified']} checksums")
+    print(
+        f"source contract OK: {contract['objects']} objects, "
+        f"{contract['total_bytes']:,} bytes, {contract['checksums_verified']} checksums"
+    )
 
-    recon = query(client, f"""
+    recon = query(
+        client,
+        f"""
         SELECT COUNT(*) AS source_total_rows,
                COUNTIF({PERIOD_PREDICATE}) AS in_period_rows,
                COUNTIF(NOT ({PERIOD_PREDICATE})) AS outside_target_period_rows,
                COUNTIF(listened_at IS NULL) AS unclassified_rows
         FROM `{args.project}.splitsheet_bronze.ext_listens_2026_06`
-    """, "reconcile_source", stats)[0]
-    total, inside, outside = (int(recon["source_total_rows"]), int(recon["in_period_rows"]),
-                              int(recon["outside_target_period_rows"]))
-    if (inside + outside != total or int(recon["unclassified_rows"]) != 0
-            or total != EXPECTED_SOURCE_TOTAL or inside != EXPECTED_IN_PERIOD
-            or outside != EXPECTED_OUTSIDE):
+    """,
+        "reconcile_source",
+        stats,
+    )[0]
+    total, inside, outside = (
+        int(recon["source_total_rows"]),
+        int(recon["in_period_rows"]),
+        int(recon["outside_target_period_rows"]),
+    )
+    if (
+        inside + outside != total
+        or int(recon["unclassified_rows"]) != 0
+        or total != EXPECTED_SOURCE_TOTAL
+        or inside != EXPECTED_IN_PERIOD
+        or outside != EXPECTED_OUTSIDE
+    ):
         raise ContractError(f"reconciliation failed: {recon}")
 
-    current = query(client, f"""
+    current = query(
+        client,
+        f"""
         SELECT COUNT(*) AS n, COUNT(DISTINCT listen_hash) AS distinct_hashes,
                COUNT(DISTINCT ingestion_run_id) AS run_ids, MIN(ingestion_run_id) AS run_id
         FROM `{args.project}.splitsheet_bronze.bronze_listens`
         WHERE {PERIOD_PREDICATE}
-    """, "inspect_target", stats)[0]
-    already = (int(current["n"]) == EXPECTED_IN_PERIOD
-               and int(current["distinct_hashes"]) == EXPECTED_IN_PERIOD
-               and int(current["run_ids"]) == 1 and current["run_id"] == run_id)
+    """,
+        "inspect_target",
+        stats,
+    )[0]
+    already = (
+        int(current["n"]) == EXPECTED_IN_PERIOD
+        and int(current["distinct_hashes"]) == EXPECTED_IN_PERIOD
+        and int(current["run_ids"]) == 1
+        and current["run_id"] == run_id
+    )
 
     inserted = skipped = failed = 0
     published = False
@@ -224,7 +280,9 @@ def main() -> None:
         print(f"target already holds run {run_id}: nothing written")
     else:
         # --- stage (targets untouched) ---
-        query(client, f"""
+        query(
+            client,
+            f"""
             CREATE OR REPLACE TABLE `{stg_bronze}`
             PARTITION BY DATE(listened_at) AS
             SELECT {HASH_EXPR} AS listen_hash, listened_at, created AS submitted_at,
@@ -233,17 +291,27 @@ def main() -> None:
                    '{run_id}' AS ingestion_run_id, CURRENT_TIMESTAMP() AS ingested_at
             FROM `{args.project}.splitsheet_bronze.ext_listens_2026_06`
             WHERE {PERIOD_PREDICATE}
-        """, "stage_bronze", stats)
-        query(client, f"""
+        """,
+            "stage_bronze",
+            stats,
+        )
+        query(
+            client,
+            f"""
             CREATE OR REPLACE TABLE `{stg_labels}` AS
             SELECT {HASH_EXPR} AS listen_hash, recording_mbid AS mapper_recording_mbid,
                    recording_mbid IS NOT NULL AS label_available
             FROM `{args.project}.splitsheet_bronze.ext_listens_2026_06`
             WHERE {PERIOD_PREDICATE}
-        """, "stage_labels", stats)
+        """,
+            "stage_labels",
+            stats,
+        )
 
         # --- validate staging completely, before anything is published ---
-        v = query(client, f"""
+        v = query(
+            client,
+            f"""
             SELECT
               (SELECT COUNT(*) FROM `{stg_bronze}`) AS bronze_rows,
               (SELECT COUNT(DISTINCT listen_hash) FROM `{stg_bronze}`) AS bronze_hashes,
@@ -252,11 +320,22 @@ def main() -> None:
               (SELECT COUNTIF(label_available) FROM `{stg_labels}`) AS labels_present,
               (SELECT COUNT(*) FROM `{stg_bronze}` b
                  JOIN `{stg_labels}` l USING (listen_hash)) AS joined_rows
-        """, "validate_staging", stats)[0]
-        stg_cols = [r["column_name"] for r in query(client, f"""
+        """,
+            "validate_staging",
+            stats,
+        )[0]
+        stg_cols = [
+            r["column_name"]
+            for r in query(
+                client,
+                f"""
             SELECT column_name FROM `{args.project}.splitsheet_bronze`.INFORMATION_SCHEMA.COLUMNS
             WHERE table_name = 'stg_bronze_listens_{suffix}'
-        """, "validate_staging_schema", stats)]
+        """,
+                "validate_staging_schema",
+                stats,
+            )
+        ]
         checks = {
             "bronze_rows": int(v["bronze_rows"]) == EXPECTED_IN_PERIOD,
             "bronze_hashes_unique": int(v["bronze_hashes"]) == EXPECTED_IN_PERIOD,
@@ -274,10 +353,13 @@ def main() -> None:
         if args.fail_before_publish:
             raise SystemExit(
                 "INJECTED FAILURE after staging validation and before publication. "
-                "Published tables are untouched.")
+                "Published tables are untouched."
+            )
 
         # --- atomic swap: both targets or neither ---
-        query(client, f"""
+        query(
+            client,
+            f"""
             BEGIN TRANSACTION;
             DELETE FROM `{args.project}.splitsheet_bronze.bronze_listens`
               WHERE {PERIOD_PREDICATE};
@@ -290,7 +372,10 @@ def main() -> None:
               (listen_hash, mapper_recording_mbid, label_available)
               SELECT listen_hash, mapper_recording_mbid, label_available FROM `{stg_labels}`;
             COMMIT TRANSACTION;
-        """, "publish_atomic", stats)
+        """,
+            "publish_atomic",
+            stats,
+        )
         inserted = EXPECTED_IN_PERIOD
         published = True
 
@@ -299,7 +384,9 @@ def main() -> None:
         for tbl in (stg_bronze, stg_labels):
             query(client, f"DROP TABLE IF EXISTS `{tbl}`", "drop_staging", stats)
 
-    final = query(client, f"""
+    final = query(
+        client,
+        f"""
         SELECT (SELECT COUNT(*) FROM `{args.project}.splitsheet_bronze.bronze_listens`
                   WHERE {PERIOD_PREDICATE}) AS bronze_rows,
                (SELECT COUNT(DISTINCT listen_hash)
@@ -310,19 +397,27 @@ def main() -> None:
                (SELECT COUNTIF(label_available)
                   FROM `{args.project}.splitsheet_eval.mapper_reference_labels`)
                  AS labels_present
-    """, "verify_published", stats)[0]
+    """,
+        "verify_published",
+        stats,
+    )[0]
 
     report = {
         "ingestion_run_id": run_id,
         "source_contract": contract,
         "reconciliation": {
-            "source_total_rows": total, "in_period_rows": inside,
+            "source_total_rows": total,
+            "in_period_rows": inside,
             "outside_target_period_rows": outside,
             "classified_sum_equals_total": inside + outside == total,
             "unclassified_rows": int(recon["unclassified_rows"]),
         },
-        "outcome": {"inserted": inserted, "skipped": skipped, "failed": failed,
-                    "published": published},
+        "outcome": {
+            "inserted": inserted,
+            "skipped": skipped,
+            "failed": failed,
+            "published": published,
+        },
         "bronze_rows": int(final["bronze_rows"]),
         "bronze_distinct_hashes": int(final["bronze_distinct_hashes"]),
         "label_rows": int(final["label_rows"]),
@@ -334,10 +429,26 @@ def main() -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1)
-    print(json.dumps({k: report[k] for k in
-                      ("ingestion_run_id", "source_contract", "reconciliation", "outcome",
-                       "bronze_rows", "bronze_distinct_hashes", "label_rows",
-                       "labels_present", "total_bytes_billed", "total_slot_ms")}, indent=1))
+    print(
+        json.dumps(
+            {
+                k: report[k]
+                for k in (
+                    "ingestion_run_id",
+                    "source_contract",
+                    "reconciliation",
+                    "outcome",
+                    "bronze_rows",
+                    "bronze_distinct_hashes",
+                    "label_rows",
+                    "labels_present",
+                    "total_bytes_billed",
+                    "total_slot_ms",
+                )
+            },
+            indent=1,
+        )
+    )
 
 
 if __name__ == "__main__":

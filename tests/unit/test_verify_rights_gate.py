@@ -41,7 +41,8 @@ SEVEN = [
 ]
 
 GENERATION = json.loads(
-    (pathlib.Path(__file__).parents[2] / "docs/phase0/rights_generation.json").read_text())
+    (pathlib.Path(__file__).parents[2] / "docs/phase0/rights_generation.json").read_text()
+)
 INJECTED = GENERATION["defects_injected"]
 
 
@@ -96,31 +97,67 @@ class FakeClient:
         if "matched_recording_mbid" in sql:
             return FakeJob([{"recording_mbid": f"mbid-{i}"} for i in range(2)])
         if "defect_share_sum_not_100" in sql:
-            return FakeJob([{
-                "share_sum_sets": d["share_sum_sets"],
-                "overlap_recordings": d["overlap_recordings"],
-                "gap_recordings": d["gap_recordings"],
-                "invalid_interval_sets": d["invalid_interval_sets"],
-                "missing_holder_sets": d["missing_holder_sets"],
-                "orphan_recordings": d["orphan_recordings"],
-                "total_sets": 2_522_403, "valid_sets": 2_519_953}])
+            return FakeJob(
+                [
+                    {
+                        "share_sum_sets": d["share_sum_sets"],
+                        "overlap_recordings": d["overlap_recordings"],
+                        "gap_recordings": d["gap_recordings"],
+                        "invalid_interval_sets": d["invalid_interval_sets"],
+                        "missing_holder_sets": d["missing_holder_sets"],
+                        "orphan_recordings": d["orphan_recordings"],
+                        "total_sets": 2_522_403,
+                        "valid_sets": 2_519_953,
+                    }
+                ]
+            )
         if "holders_without_split" in sql:
             return FakeJob([{"holders_without_split": d["holders_without_split"]}])
         if "recordings_probed" in sql:
-            return FakeJob([{"recordings_probed": 200, "holders_changed": 200,
-                             "holders_unchanged": 0}])
+            return FakeJob(
+                [{"recordings_probed": 200, "holders_changed": 200, "holders_unchanged": 0}]
+            )
         if "resolution_status" in sql:
-            return FakeJob([{"resolution_status": "RESOLVED", "recording_days": 1,
-                             "streams": 1, "attributable": 1, "priced": 1}])
+            return FakeJob(
+                [
+                    {
+                        "resolution_status": "RESOLVED",
+                        "recording_days": 1,
+                        "streams": 1,
+                        "attributable": 1,
+                        "priced": 1,
+                    }
+                ]
+            )
         if "payout_eligible" in sql:
             return FakeJob([{"payout_eligible": True, "hold_reason": None, "listens": 1}])
         if "dbt_valid_to" in sql:
-            return FakeJob([{"versions": 60_250, "holders": 60_000, "current_versions": 60_000,
-                             "closed_versions": 250, "holders_with_history": 250}])
+            return FakeJob(
+                [
+                    {
+                        "versions": 60_250,
+                        "holders": 60_000,
+                        "current_versions": 60_000,
+                        "closed_versions": 250,
+                        "holders_with_history": 250,
+                    }
+                ]
+            )
         if "failure_rate" in sql:
-            return FakeJob([{"rule": "r", "severity": "ERROR", "status": "PASS",
-                             "failed_records": 0, "total_records": 1, "failure_rate": 0.0,
-                             "business_impact": "b", "expectation": "e"}])
+            return FakeJob(
+                [
+                    {
+                        "rule": "r",
+                        "severity": "ERROR",
+                        "status": "PASS",
+                        "failed_records": 0,
+                        "total_records": 1,
+                        "failure_rate": 0.0,
+                        "business_impact": "b",
+                        "expectation": "e",
+                    }
+                ]
+            )
         raise AssertionError(f"unmatched query: {sql[:120]}")
 
 
@@ -139,15 +176,22 @@ def drive(monkeypatch, tmp_path, detected, row_counts_ok=True, second_pass_ok=Tr
     defects = select_defects(small, mbids)
     splits = sum(1 for m in mbids for _ in ownership_rows(small, m, defects.get(m)))
     splits += sum(1 for _ in orphan_rows(small))
-    landed = {"rights_holders": small.holder_count,
-              "ownership_splits": splits if row_counts_ok else splits + 1,
-              "rate_card": len(rate_card_rows(small))}
+    landed = {
+        "rights_holders": small.holder_count,
+        "ownership_splits": splits if row_counts_ok else splits + 1,
+        "rate_card": len(rate_card_rows(small)),
+    }
     repo = tmp_path / "repo"
     (repo / "docs/phase0").mkdir(parents=True)
-    (repo / "docs/phase0/rights_generation.json").write_text(json.dumps({
-        "generation_run_id": GENERATION["generation_run_id"],
-        "files": {k: {"rows": v} for k, v in landed.items()},
-        "defects_injected": INJECTED}))
+    (repo / "docs/phase0/rights_generation.json").write_text(
+        json.dumps(
+            {
+                "generation_run_id": GENERATION["generation_run_id"],
+                "files": {k: {"rows": v} for k, v in landed.items()},
+                "defects_injected": INJECTED,
+            }
+        )
+    )
     monkeypatch.setattr(mod, "REPO", repo)
 
     if not second_pass_ok:
@@ -167,10 +211,10 @@ def drive(monkeypatch, tmp_path, detected, row_counts_ok=True, second_pass_ok=Tr
         monkeypatch.setattr(mod, "digest_of", drifting)
 
     client = FakeClient(detected)
-    fake_bq = types.SimpleNamespace(Client=lambda project: client,
-                                    QueryJobConfig=lambda **k: None)
+    fake_bq = types.SimpleNamespace(Client=lambda project: client, QueryJobConfig=lambda **k: None)
     monkeypatch.setitem(sys.modules, "google.cloud.bigquery", fake_bq)
     import google.cloud
+
     monkeypatch.setattr(google.cloud, "bigquery", fake_bq, raising=False)
 
     monkeypatch.setattr(sys, "argv", ["verify_rights.py", "--out", str(out)])
@@ -192,10 +236,18 @@ def test_all_nine_conditions_holding_exits_cleanly(monkeypatch, tmp_path):
 def test_the_successful_run_still_writes_the_whole_report(monkeypatch, tmp_path):
     """The success path is unchanged: same sections, same seven reconciliations."""
     _failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts())
-    for section in ("declaration", "versions", "reproducibility",
-                    "reconciliation_injected_vs_detected", "temporal_proof",
-                    "resolution_status", "payout_eligibility", "scd2", "quality_report",
-                    "cost"):
+    for section in (
+        "declaration",
+        "versions",
+        "reproducibility",
+        "reconciliation_injected_vs_detected",
+        "temporal_proof",
+        "resolution_status",
+        "payout_eligibility",
+        "scd2",
+        "quality_report",
+        "cost",
+    ):
         assert section in report
     rec = report["reconciliation_injected_vs_detected"]
     assert sorted(k for k in rec if k != "all_agree") == sorted(SEVEN)
@@ -258,8 +310,14 @@ def test_the_reconciliation_sql_is_unchanged(monkeypatch, tmp_path):
     """The gate reads the seven counts; it does not rewrite the queries that produce them."""
     _failure, _report, client = drive(monkeypatch, tmp_path, agreeing_counts())
     defects_sql = next(s for s in client.sqls if "defect_share_sum_not_100" in s)
-    for column in ("defect_temporal_overlap", "defect_temporal_gap", "defect_invalid_interval",
-                   "defect_missing_rights_holder", "defect_orphan_recording", "is_valid_set"):
+    for column in (
+        "defect_temporal_overlap",
+        "defect_temporal_gap",
+        "defect_invalid_interval",
+        "defect_missing_rights_holder",
+        "defect_orphan_recording",
+        "is_valid_set",
+    ):
         assert column in defects_sql
     assert "splitsheet_dbt.int_ownership_validity" in defects_sql
     holders_sql = next(s for s in client.sqls if "holders_without_split" in s)
@@ -271,18 +329,15 @@ def test_the_reconciliation_sql_is_unchanged(monkeypatch, tmp_path):
 def test_row_counts_not_matching_fails_even_when_all_seven_reconcile(monkeypatch, tmp_path):
     """Rights that no longer regenerate to the landed size cannot support a published payout,
     whatever the defect counts say."""
-    failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(),
-                                     row_counts_ok=False)
+    failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(), row_counts_ok=False)
     assert failure is not None
     assert "row_counts_match" in failure
     assert report["reproducibility"]["row_counts_match"] is False
     assert report["reconciliation_injected_vs_detected"]["all_agree"] is True
 
 
-def test_a_non_deterministic_second_pass_fails_even_when_all_seven_reconcile(
-        monkeypatch, tmp_path):
-    failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(),
-                                     second_pass_ok=False)
+def test_a_non_deterministic_second_pass_fails_even_when_all_seven_reconcile(monkeypatch, tmp_path):
+    failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(), second_pass_ok=False)
     assert failure is not None
     assert "second_pass_identical" in failure
     assert report["reproducibility"]["second_pass_identical"] is False
@@ -290,8 +345,9 @@ def test_a_non_deterministic_second_pass_fails_even_when_all_seven_reconcile(
 
 
 def test_both_reproducibility_failures_are_named_together(monkeypatch, tmp_path):
-    failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(),
-                                     row_counts_ok=False, second_pass_ok=False)
+    failure, report, _client = drive(
+        monkeypatch, tmp_path, agreeing_counts(), row_counts_ok=False, second_pass_ok=False
+    )
     assert failure is not None
     assert "row_counts_match" in failure and "second_pass_identical" in failure
     assert report is not None
@@ -299,11 +355,12 @@ def test_both_reproducibility_failures_are_named_together(monkeypatch, tmp_path)
 
 def test_the_report_survives_a_reproducibility_failure(monkeypatch, tmp_path):
     """Same contract as for the seven: the evidence is on disk before the gate runs."""
-    _failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(),
-                                      row_counts_ok=False)
+    _failure, report, _client = drive(monkeypatch, tmp_path, agreeing_counts(), row_counts_ok=False)
     assert report is not None
-    assert report["reproducibility"]["row_counts_regenerated"] != \
-        report["reproducibility"]["row_counts_landed"]
+    assert (
+        report["reproducibility"]["row_counts_regenerated"]
+        != report["reproducibility"]["row_counts_landed"]
+    )
 
 
 def test_a_reconciliation_and_a_reproducibility_failure_are_both_named(monkeypatch, tmp_path):

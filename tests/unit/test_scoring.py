@@ -33,9 +33,12 @@ RULES = load_scoring_rules()
 EXPECTED_SCORING_VERSION = "1.0.0+cb21f9704ff0"
 
 ALL_FEATURES = {
-    "artist_unicode_exact": True, "recording_unicode_exact": True,
-    "artist_token_similarity": 1.0, "recording_token_similarity": 1.0,
-    "artist_string_similarity": 1.0, "recording_string_similarity": 1.0,
+    "artist_unicode_exact": True,
+    "recording_unicode_exact": True,
+    "artist_token_similarity": 1.0,
+    "recording_token_similarity": 1.0,
+    "artist_string_similarity": 1.0,
+    "recording_string_similarity": 1.0,
     "release_lower_exact": True,
 }
 
@@ -54,27 +57,36 @@ def _write(tmp_path, raw: dict, name: str = "changed.yml"):
 
 # --- versioning, proven by mutation -----------------------------------------------------
 
+
 def test_scoring_version_is_pinned():
     assert RULES.version == EXPECTED_SCORING_VERSION, (
         "scoring rules changed without updating EXPECTED_SCORING_VERSION. If the change was "
         f"intended, set EXPECTED_SCORING_VERSION to {RULES.version!r} in the same commit, "
-        "bump scoring_version, and re-run validation under a NEW version.")
+        "bump scoring_version, and re-run validation under a NEW version."
+    )
 
 
 def test_recorded_digest_matches_the_file_contents():
     assert _raw()["rules_sha256"] == RULES.rules_digest
 
 
-@pytest.mark.parametrize("mutate", [
-    pytest.param(lambda r: r["features"]["recording_token_similarity"].update({"weight": 0.9}),
-                 id="weight"),
-    pytest.param(lambda r: r["thresholds"].update({"fallback": 0.80}), id="fallback_threshold"),
-    pytest.param(lambda r: r["thresholds"].update({"exact": 0.60}), id="exact_threshold"),
-    pytest.param(lambda r: r.update({"minimum_score_margin": 0.05}), id="margin"),
-    pytest.param(lambda r: r.update({"tie_epsilon": 0.005}), id="tie_epsilon"),
-    pytest.param(lambda r: r["low_information_policy"].update({"suppress_candidates": True}),
-                 id="low_information_policy"),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(
+            lambda r: r["features"]["recording_token_similarity"].update({"weight": 0.9}),
+            id="weight",
+        ),
+        pytest.param(lambda r: r["thresholds"].update({"fallback": 0.80}), id="fallback_threshold"),
+        pytest.param(lambda r: r["thresholds"].update({"exact": 0.60}), id="exact_threshold"),
+        pytest.param(lambda r: r.update({"minimum_score_margin": 0.05}), id="margin"),
+        pytest.param(lambda r: r.update({"tie_epsilon": 0.005}), id="tie_epsilon"),
+        pytest.param(
+            lambda r: r["low_information_policy"].update({"suppress_candidates": True}),
+            id="low_information_policy",
+        ),
+    ],
+)
 def test_editing_a_rule_without_updating_the_digest_fails_the_load(tmp_path, mutate):
     """THE MUTATION TEST. A changed rule with a stale digest must stop the pipeline."""
     raw = copy.deepcopy(_raw())
@@ -128,13 +140,16 @@ def test_load_refuses_a_feature_the_feature_table_does_not_have(tmp_path):
 
 # --- score combination -------------------------------------------------------------------
 
+
 def test_all_features_present_and_perfect_scores_one():
     assert RULES.score(ALL_FEATURES) == pytest.approx(1.0)
 
 
 def test_all_features_absent_of_similarity_scores_zero():
-    assert RULES.score({k: (False if isinstance(v, bool) else 0.0)
-                        for k, v in ALL_FEATURES.items()}) == 0.0
+    assert (
+        RULES.score({k: (False if isinstance(v, bool) else 0.0) for k, v in ALL_FEATURES.items()})
+        == 0.0
+    )
 
 
 def test_score_is_the_configured_weighted_mean():
@@ -158,6 +173,7 @@ def test_score_is_none_when_nothing_could_be_compared():
 
 # --- decision policy ---------------------------------------------------------------------
 
+
 def test_exact_unique_is_not_this_functions_business():
     """Structural acceptance happens before scoring; decide() only sees scored paths."""
     assert RULES.decide("EXACT", 0, None, None) == NO_BLOCK_CANDIDATES
@@ -168,8 +184,7 @@ def test_fallback_unique_above_threshold_is_accepted():
 
 
 def test_fallback_unique_below_threshold_is_below_threshold_not_a_tie():
-    assert RULES.decide("FALLBACK", 1, RULES.fallback_threshold - 0.01, None) \
-        == BELOW_THRESHOLD
+    assert RULES.decide("FALLBACK", 1, RULES.fallback_threshold - 0.01, None) == BELOW_THRESHOLD
 
 
 def test_a_single_candidate_can_never_be_an_ambiguous_tie():
@@ -219,6 +234,7 @@ def test_no_outcome_depends_on_candidate_order():
     """decide() cannot see order: it takes only the two scores. This test documents that the
     signature is the guarantee -- there is no argument through which order could enter."""
     import inspect
+
     params = set(inspect.signature(RULES.decide).parameters)
     assert params == {"block_method", "candidate_count", "top1", "top2"}
     for banned in ("row_number", "rn", "candidate_recording_mbid", "order", "index"):
@@ -226,6 +242,7 @@ def test_no_outcome_depends_on_candidate_order():
 
 
 # --- generated SQL carries the same numbers ----------------------------------------------
+
 
 def test_sql_decision_contains_the_configured_numbers():
     sql = RULES.sql_decision()

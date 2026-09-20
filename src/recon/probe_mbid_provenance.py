@@ -57,16 +57,21 @@ def main() -> None:
             "mapper_mbid": mm.get("recording_mbid"),
         }
     c["jsonl_join_keys"] = len(events)
-    print(f"JSONL side: {c['jsonl_events_in_period']:,} events in {args.period}, "
-          f"{len(events):,} join keys")
+    print(
+        f"JSONL side: {c['jsonl_events_in_period']:,} events in {args.period}, "
+        f"{len(events):,} join keys"
+    )
 
-    files = sorted((f for f in os.listdir(args.slice_dir) if f.endswith(".parquet")),
-                   key=lambda f: int(f.split(".")[0]))
+    files = sorted(
+        (f for f in os.listdir(args.slice_dir) if f.endswith(".parquet")),
+        key=lambda f: int(f.split(".")[0]),
+    )
     matches = []
     for fname in files:
-        tbl = pq.read_table(os.path.join(args.slice_dir, fname),
-                            columns=["user_id", "listened_at", "recording_msid",
-                                     "recording_mbid"])
+        tbl = pq.read_table(
+            os.path.join(args.slice_dir, fname),
+            columns=["user_id", "listened_at", "recording_msid", "recording_mbid"],
+        )
         c["parquet_rows_scanned"] += tbl.num_rows
         uids = tbl.column("user_id").to_pylist()
         tss = tbl.column("listened_at").to_pylist()
@@ -76,9 +81,13 @@ def main() -> None:
             key = (uid, calendar.timegm(ts.utctimetuple()), msid)
             hit = events.get(key)
             if hit is not None:
-                matches.append({"client_mbid": hit["client_mbid"],
-                                "mapper_mbid": hit["mapper_mbid"],
-                                "parquet_mbid": mbid})
+                matches.append(
+                    {
+                        "client_mbid": hit["client_mbid"],
+                        "mapper_mbid": hit["mapper_mbid"],
+                        "parquet_mbid": mbid,
+                    }
+                )
         print(f"  scanned {fname} ({tbl.num_rows:,} rows), matches so far: {len(matches):,}")
 
     c["matched_events"] = len(matches)
@@ -90,7 +99,8 @@ def main() -> None:
         if pq_has and cl_has:
             c["both_have_mbid"] += 1
             c["client_agrees_with_parquet"] += int(
-                m["client_mbid"].lower() == m["parquet_mbid"].lower())
+                m["client_mbid"].lower() == m["parquet_mbid"].lower()
+            )
         if not pq_has and cl_has:
             c["client_has_mbid_parquet_did_not"] += 1
         if not pq_has and not cl_has:
@@ -98,16 +108,21 @@ def main() -> None:
         if isinstance(m["mapper_mbid"], str) and pq_has:
             c["mapper_label_present_both"] += 1
             c["mapper_agrees_with_parquet"] += int(
-                m["mapper_mbid"].lower() == m["parquet_mbid"].lower())
+                m["mapper_mbid"].lower() == m["parquet_mbid"].lower()
+            )
 
     verdict = "inconclusive: no overlapping events between artifacts"
     if c["matched_events"]:
         if c["parquet_has_mbid_client_did_not"] > 0:
-            verdict = ("strong evidence consistent with ListenBrainz-derived mapping: "
-                       "Parquet reports MBIDs where no client MBID exists")
+            verdict = (
+                "strong evidence consistent with ListenBrainz-derived mapping: "
+                "Parquet reports MBIDs where no client MBID exists"
+            )
         else:
-            verdict = ("no derived MBIDs observed in the matched sample; consistent with "
-                       "client-supplied only")
+            verdict = (
+                "no derived MBIDs observed in the matched sample; consistent with "
+                "client-supplied only"
+            )
     report = {"period": args.period, "counts": dict(c), "verdict": verdict}
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1)

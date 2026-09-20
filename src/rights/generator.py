@@ -107,6 +107,7 @@ class RightsModel:
 
 # --- deterministic primitives -------------------------------------------------------------
 
+
 def digest_int(seed: str, *parts: object) -> int:
     payload = "\x1f".join([seed, *(str(p) for p in parts)])
     return int.from_bytes(hashlib.sha256(payload.encode()).digest()[:8], "big")
@@ -129,6 +130,7 @@ def weighted_choice(values: tuple, weights: tuple[float, ...], u: float):
 
 # --- holders -------------------------------------------------------------------------------
 
+
 def holder_id(model: RightsModel, index: int) -> str:
     return f"{model.holder_id_prefix}{index:0{model.holder_id_digits}d}"
 
@@ -138,10 +140,14 @@ def holder_row(model: RightsModel, index: int) -> dict:
     return {
         "holder_id": holder_id(model, index),
         "display_name": f"Modeled Rights Holder {index:06d}",
-        "holder_type": weighted_choice(model.holder_types, model.holder_type_weights,
-                                       unit(model.seed, "holder_type", index)),
-        "payee_status": weighted_choice(model.payee_statuses, model.payee_status_weights,
-                                        unit(model.seed, "payee_status", index)),
+        "holder_type": weighted_choice(
+            model.holder_types, model.holder_type_weights, unit(model.seed, "holder_type", index)
+        ),
+        "payee_status": weighted_choice(
+            model.payee_statuses,
+            model.payee_status_weights,
+            unit(model.seed, "payee_status", index),
+        ),
         "model_scope": model.rate_model_scope,
         "is_modeled": True,
     }
@@ -154,7 +160,7 @@ def assign_holder_index(model: RightsModel, recording_mbid: str, slot: int) -> i
     a formula rather than a table so that the choice is reproducible and inspectable.
     """
     u = unit(model.seed, "holder_slot", recording_mbid, slot)
-    return int(model.assignable_holders * (u ** model.assignment_power))
+    return int(model.assignable_holders * (u**model.assignment_power))
 
 
 def holders_for(model: RightsModel, recording_mbid: str, count: int, salt: str = "") -> list[int]:
@@ -173,8 +179,10 @@ def holders_for(model: RightsModel, recording_mbid: str, count: int, salt: str =
 
 # --- shares --------------------------------------------------------------------------------
 
-def shares_for(model: RightsModel, recording_mbid: str, count: int,
-               salt: str = "") -> list[Decimal]:
+
+def shares_for(
+    model: RightsModel, recording_mbid: str, count: int, salt: str = ""
+) -> list[Decimal]:
     """`count` shares summing to EXACTLY 100.0000.
 
     Weights come from the hash, are scaled to 100 at the configured precision, and the residue
@@ -182,8 +190,10 @@ def shares_for(model: RightsModel, recording_mbid: str, count: int,
     a float sum of four shares is not.
     """
     quantum = Decimal(1).scaleb(-model.share_decimal_places)
-    weights = [Decimal(str(unit(model.seed, "share", recording_mbid, salt, i) + 0.05))
-               for i in range(count)]
+    weights = [
+        Decimal(str(unit(model.seed, "share", recording_mbid, salt, i) + 0.05))
+        for i in range(count)
+    ]
     total = sum(weights)
     minimum = model.minimum_share_pct
     parts = [max(minimum, (HUNDRED * w / total).quantize(quantum)) for w in weights[:-1]]
@@ -200,6 +210,7 @@ def shares_for(model: RightsModel, recording_mbid: str, count: int,
 
 # --- defect assignment ---------------------------------------------------------------------
 
+
 def defect_rank(model: RightsModel, recording_mbid: str) -> int:
     return digest_int(model.seed, "defect_rank", recording_mbid)
 
@@ -215,7 +226,7 @@ def select_defects(model: RightsModel, recording_mbids: list[str]) -> dict[str, 
     cursor = 0
     for kind in DEFECT_ORDER:
         quota = model.defect_counts[kind]
-        for mbid in ordered[cursor:cursor + quota]:
+        for mbid in ordered[cursor : cursor + quota]:
             out[mbid] = kind
         cursor += quota
     return out
@@ -239,11 +250,22 @@ def split_version_id(model: RightsModel, recording_mbid: str, valid_from: dt.dat
 
 # --- ownership rows ------------------------------------------------------------------------
 
-def _set_rows(model: RightsModel, recording_mbid: str, valid_from: dt.date, valid_to: dt.date,
-              salt: str, *, break_sum: bool = False,
-              break_holder: bool = False) -> list[dict]:
-    count = weighted_choice(model.holders_per_recording, model.holders_per_recording_weights,
-                            unit(model.seed, "holder_count", recording_mbid, salt))
+
+def _set_rows(
+    model: RightsModel,
+    recording_mbid: str,
+    valid_from: dt.date,
+    valid_to: dt.date,
+    salt: str,
+    *,
+    break_sum: bool = False,
+    break_holder: bool = False,
+) -> list[dict]:
+    count = weighted_choice(
+        model.holders_per_recording,
+        model.holders_per_recording_weights,
+        unit(model.seed, "holder_count", recording_mbid, salt),
+    )
     indexes = holders_for(model, recording_mbid, count, salt)
     shares = shares_for(model, recording_mbid, count, salt)
     if break_sum:
@@ -257,28 +279,33 @@ def _set_rows(model: RightsModel, recording_mbid: str, valid_from: dt.date, vali
         if break_holder and slot == 0:
             # DEFECT: reference a holder id that is not in rights_holders at all.
             hid = f"{model.holder_id_prefix}{'9' * model.holder_id_digits}"
-        rows.append({
-            "recording_mbid": recording_mbid,
-            "rights_holder_id": hid,
-            "share_pct": share,
-            "valid_from": valid_from,
-            "valid_to": valid_to,
-            "split_version_id": svid,
-        })
+        rows.append(
+            {
+                "recording_mbid": recording_mbid,
+                "rights_holder_id": hid,
+                "share_pct": share,
+                "valid_from": valid_from,
+                "valid_to": valid_to,
+                "split_version_id": svid,
+            }
+        )
     return rows
 
 
-def ownership_rows(model: RightsModel, recording_mbid: str,
-                   defect: str | None = None) -> list[dict]:
+def ownership_rows(
+    model: RightsModel, recording_mbid: str, defect: str | None = None
+) -> list[dict]:
     """Every ownership row for one recording, healthy or deliberately defective."""
     base, open_end = model.base_valid_from, model.open_ended_valid_to
 
     if defect == "temporal_overlap":
-        return (_set_rows(model, recording_mbid, base, model.overlap_end, "a")
-                + _set_rows(model, recording_mbid, model.overlap_start, open_end, "b"))
+        return _set_rows(model, recording_mbid, base, model.overlap_end, "a") + _set_rows(
+            model, recording_mbid, model.overlap_start, open_end, "b"
+        )
     if defect == "temporal_gap":
-        return (_set_rows(model, recording_mbid, base, model.gap_start, "a")
-                + _set_rows(model, recording_mbid, model.gap_end, open_end, "b"))
+        return _set_rows(model, recording_mbid, base, model.gap_start, "a") + _set_rows(
+            model, recording_mbid, model.gap_end, open_end, "b"
+        )
     if defect == "invalid_interval":
         return _set_rows(model, recording_mbid, model.invalid_from, model.invalid_to, "a")
     if defect == "shares_do_not_sum_to_100":
@@ -288,8 +315,9 @@ def ownership_rows(model: RightsModel, recording_mbid: str,
 
     if has_mid_period_change(model, recording_mbid):
         # Healthy, and contiguous across the change: [base, change) then [change, open).
-        return (_set_rows(model, recording_mbid, base, model.change_date, "a")
-                + _set_rows(model, recording_mbid, model.change_date, open_end, "b"))
+        return _set_rows(model, recording_mbid, base, model.change_date, "a") + _set_rows(
+            model, recording_mbid, model.change_date, open_end, "b"
+        )
     return _set_rows(model, recording_mbid, base, open_end, "a")
 
 
@@ -312,19 +340,22 @@ def orphan_rows(model: RightsModel) -> list[dict]:
 
 # --- rate card -----------------------------------------------------------------------------
 
+
 def rate_card_rows(model: RightsModel) -> list[dict]:
     out = []
     for i, interval in enumerate(model.rate_intervals):
-        out.append({
-            "rate_card_id": f"rate-{model.rule_version_id}-{i:02d}",
-            "model_scope": model.rate_model_scope,
-            "valid_from": dt.date.fromisoformat(interval["valid_from"]),
-            "valid_to": dt.date.fromisoformat(interval["valid_to"]),
-            "rate_per_stream": Decimal(interval["rate_per_stream"]),
-            "currency": model.rate_currency,
-            "rule_version_id": model.rule_version_id,
-            "is_modeled": True,
-        })
+        out.append(
+            {
+                "rate_card_id": f"rate-{model.rule_version_id}-{i:02d}",
+                "model_scope": model.rate_model_scope,
+                "valid_from": dt.date.fromisoformat(interval["valid_from"]),
+                "valid_to": dt.date.fromisoformat(interval["valid_to"]),
+                "rate_per_stream": Decimal(interval["rate_per_stream"]),
+                "currency": model.rate_currency,
+                "rule_version_id": model.rule_version_id,
+                "is_modeled": True,
+            }
+        )
     return out
 
 
@@ -343,6 +374,7 @@ def rate_gap_days(model: RightsModel) -> list[dt.date]:
 
 # --- interval semantics, in one place ------------------------------------------------------
 
+
 def covers(valid_from: dt.date, valid_to: dt.date, on: dt.date) -> bool:
     """Half-open membership: [valid_from, valid_to).
 
@@ -360,6 +392,7 @@ def sql_covers(from_col: str, to_col: str, on_col: str) -> str:
 
 # --- config loading ------------------------------------------------------------------------
 
+
 def _semantic_subset(raw: dict) -> dict:
     """Everything that changes generated output, and nothing that does not."""
     return {
@@ -372,21 +405,23 @@ def _semantic_subset(raw: dict) -> dict:
         "ownership": {k: v for k, v in sorted(raw["ownership"].items())},
         "defects": dict(sorted(raw["defects"].items())),
         "share_sum_tolerance": raw["share_sum_tolerance"],
-        "rate_card": {"model_scope": raw["rate_card"]["model_scope"],
-                      "currency": raw["rate_card"]["currency"],
-                      "intervals": raw["rate_card"]["intervals"],
-                      "expected_gap_days": raw["rate_card"]["expected_gap_days"]},
+        "rate_card": {
+            "model_scope": raw["rate_card"]["model_scope"],
+            "currency": raw["rate_card"]["currency"],
+            "intervals": raw["rate_card"]["intervals"],
+            "expected_gap_days": raw["rate_card"]["expected_gap_days"],
+        },
     }
 
 
 def compute_digest(raw: dict) -> str:
-    payload = json.dumps(_semantic_subset(raw), sort_keys=True, separators=(",", ":"),
-                         default=str)
+    payload = json.dumps(_semantic_subset(raw), sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
-def load_rights_model(path: str | pathlib.Path | None = None,
-                      require_digest: bool = True) -> RightsModel:
+def load_rights_model(
+    path: str | pathlib.Path | None = None, require_digest: bool = True
+) -> RightsModel:
     import yaml
 
     p = pathlib.Path(path) if path is not None else DEFAULT_CONFIG_PATH
@@ -400,7 +435,8 @@ def load_rights_model(path: str | pathlib.Path | None = None,
             f"config/rights_model.yml content digest is {digest} but the file records "
             f"{recorded!r}. A seed, count, interval or defect quota changed without the digest "
             f"being updated: refusing to generate rights under a version that no longer "
-            f"describes the model.")
+            f"describes the model."
+        )
 
     h, own, rc = raw["holders"], raw["ownership"], raw["rate_card"]
     if h["reserved_without_split"] >= h["count"]:
@@ -423,16 +459,14 @@ def load_rights_model(path: str | pathlib.Path | None = None,
         payee_status_weights=tuple(float(w) for w in h["payee_status_weights"]),
         reserved_without_split=int(h["reserved_without_split"]),
         holders_per_recording=tuple(int(n) for n in own["holders_per_recording"]),
-        holders_per_recording_weights=tuple(
-            float(w) for w in own["holders_per_recording_weights"]),
+        holders_per_recording_weights=tuple(float(w) for w in own["holders_per_recording_weights"]),
         share_decimal_places=int(own["share_decimal_places"]),
         minimum_share_pct=Decimal(str(own["minimum_share_pct"])),
         base_valid_from=dt.date.fromisoformat(str(own["base_valid_from"])),
         open_ended_valid_to=dt.date.fromisoformat(str(own["open_ended_valid_to"])),
         change_date=dt.date.fromisoformat(str(own["mid_period_change"]["change_date"])),
         change_share_of_recordings=float(own["mid_period_change"]["share_of_recordings"]),
-        defect_counts={k: int(v) for k, v in raw["defects"].items()
-                       if isinstance(v, int)},
+        defect_counts={k: int(v) for k, v in raw["defects"].items() if isinstance(v, int)},
         overlap_start=dt.date.fromisoformat(str(raw["defects"]["overlap_start"])),
         overlap_end=dt.date.fromisoformat(str(raw["defects"]["overlap_end"])),
         gap_start=dt.date.fromisoformat(str(raw["defects"]["gap_start"])),
@@ -452,5 +486,6 @@ def load_rights_model(path: str | pathlib.Path | None = None,
     if len(rate_gap_days(model)) != model.expected_rate_gap_days:
         raise ValueError(
             f"rate card intervals leave {len(rate_gap_days(model))} uncovered days but the "
-            f"config expects {model.expected_rate_gap_days}")
+            f"config expects {model.expected_rate_gap_days}"
+        )
     return model

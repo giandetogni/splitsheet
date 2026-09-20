@@ -64,12 +64,22 @@ def main() -> None:
     t0 = time.time()
 
     def q(sql: str, label: str):
-        job = client.query(sql, job_config=bigquery.QueryJobConfig(
-            maximum_bytes_billed=MAX_BYTES, use_query_cache=False))
+        job = client.query(
+            sql,
+            job_config=bigquery.QueryJobConfig(
+                maximum_bytes_billed=MAX_BYTES, use_query_cache=False
+            ),
+        )
         rows = [dict(r) for r in job.result()]
-        stats.append({"step": label, "job_id": job.job_id,
-                      "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-                      "duration_ms": int((job.ended - job.started).total_seconds() * 1000)})
+        stats.append(
+            {
+                "step": label,
+                "job_id": job.job_id,
+                "bytes_billed": job.total_bytes_billed,
+                "slot_ms": job.slot_millis,
+                "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
+            }
+        )
         print(f"  {label:<44} billed={job.total_bytes_billed or 0:>13,}", flush=True)
         return rows
 
@@ -78,7 +88,8 @@ def main() -> None:
     # Two queries rather than one because the first attempt combined the digest with the identity
     # aggregates and BigQuery killed it: "Resources exceeded ... Peak usage: 119% of limit". The
     # digest itself is now a two-level bucketed hash (src/payout/digest.py) for the same reason.
-    identity = q(f"""
+    identity = q(
+        f"""
         SELECT
           COUNT(*) AS row_count,
           COUNT(DISTINCT rights_holder_id) AS holders,
@@ -90,7 +101,9 @@ def main() -> None:
           MAX(published_at) AS last_published_at,
           SUM(holder_payout) AS portfolio_paid
         FROM `{FACT}` WHERE attribution_run_id = '{run_id}'
-    """, "publication identity")[0]
+    """,
+        "publication identity",
+    )[0]
 
     digest = q(publication_digest_sql(FACT, run_id), "publication content digest")[0]
     if int(digest["row_count"]) != int(identity["row_count"]):
@@ -99,15 +112,19 @@ def main() -> None:
         raise SystemExit("the digest covered a different total than the identity query")
     identity["content_digest"] = digest["content_digest"]
 
-    gross = q(f"""
+    gross = q(
+        f"""
         SELECT SUM(gross_royalty) AS portfolio_gross, COUNT(*) AS financial_groups
         FROM (
           SELECT MAX(gross_royalty) AS gross_royalty
           FROM `{FACT}` WHERE attribution_run_id = '{run_id}'
           GROUP BY period, recording_mbid, split_version_id, rate_card_id)
-    """, "portfolio gross")[0]
+    """,
+        "portfolio gross",
+    )[0]
 
-    versions = q(f"""
+    versions = q(
+        f"""
         SELECT MIN(normalization_version) AS normalization_version,
                MIN(scoring_version) AS scoring_version,
                MIN(match_run_id) AS match_run_id,
@@ -115,7 +132,9 @@ def main() -> None:
         FROM `{PROJECT}.splitsheet_silver.silver_listen_matches`
         WHERE listened_at >= TIMESTAMP '2026-06-01 00:00:00+00'
           AND listened_at <  TIMESTAMP '2026-07-01 00:00:00+00'
-    """, "upstream versions")[0]
+    """,
+        "upstream versions",
+    )[0]
 
     baseline = {
         "publication_id": args.publication_id,
@@ -137,14 +156,17 @@ def main() -> None:
         "recordings": int(identity["recordings"]),
     }
     if baseline["portfolio_gross"] != baseline["portfolio_paid"]:
-        raise SystemExit(f"baseline does not close: {baseline['portfolio_gross']} gross vs "
-                         f"{baseline['portfolio_paid']} paid")
+        raise SystemExit(
+            f"baseline does not close: {baseline['portfolio_gross']} gross vs "
+            f"{baseline['portfolio_paid']} paid"
+        )
 
     # --- 2. persist it ---------------------------------------------------------------------
     #
     # A registry row, not a comment in a doc. Everything Phase 6 compares against comes from here,
     # and MERGE on publication_id means re-running this step cannot create a second baseline.
-    q(f"""
+    q(
+        f"""
         CREATE TABLE IF NOT EXISTS `{REGISTRY}` (
           publication_id STRING NOT NULL,
           attribution_run_id STRING NOT NULL,
@@ -163,9 +185,12 @@ def main() -> None:
           registered_at TIMESTAMP NOT NULL,
           frozen BOOL NOT NULL
         ) OPTIONS(description='Registry of financial publications. A frozen row is a baseline no later phase may modify; content_digest is the reproducible proof.')
-    """, "ensure publication registry")
+    """,
+        "ensure publication registry",
+    )
 
-    q(f"""
+    q(
+        f"""
         MERGE `{REGISTRY}` t
         USING (SELECT '{baseline["publication_id"]}' AS publication_id,
                       '{run_id}' AS attribution_run_id,
@@ -189,32 +214,43 @@ def main() -> None:
         -- differs, that is the alarm, not something to overwrite.
         WHEN MATCHED AND t.content_digest != s.content_digest THEN
           UPDATE SET frozen = FALSE
-    """, "register the frozen baseline")
+    """,
+        "register the frozen baseline",
+    )
 
-    registered = q(f"""
+    registered = q(
+        f"""
         SELECT publication_id, attribution_run_id, content_digest, row_count,
                portfolio_gross, portfolio_paid, frozen, published_at
         FROM `{REGISTRY}` ORDER BY registered_at
-    """, "read back the registry")
+    """,
+        "read back the registry",
+    )
 
     if any(not r["frozen"] for r in registered):
         raise SystemExit(f"a registered publication lost its frozen status: {registered}")
 
     # --- 3. prove it is still queryable ----------------------------------------------------
-    still = q(f"""
+    still = q(
+        f"""
         SELECT COUNT(*) AS rows_readable, SUM(holder_payout) AS paid,
                COUNT(DISTINCT attribution_run_id) AS runs
         FROM `{FACT}` WHERE attribution_run_id = '{run_id}'
-    """, "prove v1 still queryable")[0]
-    queryable = (int(still["rows_readable"]) == baseline["row_count"]
-                 and str(still["paid"]) == baseline["portfolio_paid"])
+    """,
+        "prove v1 still queryable",
+    )[0]
+    queryable = (
+        int(still["rows_readable"]) == baseline["row_count"]
+        and str(still["paid"]) == baseline["portfolio_paid"]
+    )
 
     # --- 4. the black-box decomposition ----------------------------------------------------
     #
     # A rate is a function of the DATE alone, so streams held for a non-rate reason can be valued
     # at the rate their date actually carries. Streams inside the rate-card gap cannot: there is no
     # rate to apply, and their amount is UNKNOWN rather than zero.
-    blackbox = q(f"""
+    blackbox = q(
+        f"""
         WITH d AS (
           SELECT attribution_status, listen_date, match_status, COUNT(*) AS streams
           FROM `{DISPOSITION}`
@@ -239,12 +275,17 @@ def main() -> None:
         FROM priced
         GROUP BY attribution_status
         ORDER BY streams DESC
-    """, "black-box decomposition")
+    """,
+        "black-box decomposition",
+    )
 
-    totals = q(f"""
+    totals = q(
+        f"""
         SELECT COUNT(*) AS listens, COUNTIF(match_status = 'MATCHED') AS matched
         FROM `{DISPOSITION}`
-    """, "totals")[0]
+    """,
+        "totals",
+    )[0]
 
     total_listens = int(totals["listens"])
     matched = int(totals["matched"])
@@ -255,24 +296,33 @@ def main() -> None:
     for row in blackbox:
         streams = int(row["streams"])
         is_attributable = row["attribution_status"] == "ATTRIBUTABLE"
-        categories.append({
-            "attribution_status": row["attribution_status"],
-            "streams": streams,
-            "pct_of_total": round(100 * streams / total_listens, 6),
-            "pct_of_matched": (round(100 * int(row["matched_streams"]) / matched, 6)
-                               if int(row["matched_streams"]) else None),
-            "matched_streams": int(row["matched_streams"]),
-            "streams_with_a_rate": int(row["streams_with_a_rate"]),
-            "streams_with_amount_unknown": int(row["streams_with_amount_unknown"]),
-            "amount": str(row["modeled_amount"]) if int(row["streams_with_a_rate"]) else None,
-            "amount_meaning": (
-                "illustrative modeled amount ATTRIBUTED over real listening events"
-                if is_attributable else AMOUNT_LANGUAGE),
-            "amount_unknown_reason": (
-                "no rate card row covers these dates; no rate is imputed"
-                if int(row["streams_with_amount_unknown"]) else None),
-            "days_present": int(row["days"]),
-        })
+        categories.append(
+            {
+                "attribution_status": row["attribution_status"],
+                "streams": streams,
+                "pct_of_total": round(100 * streams / total_listens, 6),
+                "pct_of_matched": (
+                    round(100 * int(row["matched_streams"]) / matched, 6)
+                    if int(row["matched_streams"])
+                    else None
+                ),
+                "matched_streams": int(row["matched_streams"]),
+                "streams_with_a_rate": int(row["streams_with_a_rate"]),
+                "streams_with_amount_unknown": int(row["streams_with_amount_unknown"]),
+                "amount": str(row["modeled_amount"]) if int(row["streams_with_a_rate"]) else None,
+                "amount_meaning": (
+                    "illustrative modeled amount ATTRIBUTED over real listening events"
+                    if is_attributable
+                    else AMOUNT_LANGUAGE
+                ),
+                "amount_unknown_reason": (
+                    "no rate card row covers these dates; no rate is imputed"
+                    if int(row["streams_with_amount_unknown"])
+                    else None
+                ),
+                "days_present": int(row["days"]),
+            }
+        )
 
     reconciles = sum(c["streams"] for c in categories) == total_listens
 
@@ -291,7 +341,8 @@ def main() -> None:
     modeled_unrounded = float(attributable["amount"])
     published_paid = float(baseline["portfolio_paid"])
     rounding_loss = round(modeled_unrounded - published_paid, 2)
-    rounding = q(f"""
+    rounding = q(
+        f"""
         SELECT COUNT(*) AS financial_groups,
                COUNTIF(gross_royalty = NUMERIC '0') AS groups_rounded_to_zero,
                COUNTIF(attributable_streams = 1) AS single_stream_groups,
@@ -303,9 +354,14 @@ def main() -> None:
                  MAX(attributable_streams) AS attributable_streams
           FROM `{FACT}` WHERE attribution_run_id = '{run_id}'
           GROUP BY period, recording_mbid, split_version_id, rate_card_id)
-    """, "rounding loss at the published grain")[0]
-    suspended = sum(float(c["amount"]) for c in categories
-                    if c["amount"] and c["attribution_status"] != "ATTRIBUTABLE")
+    """,
+        "rounding loss at the published grain",
+    )[0]
+    suspended = sum(
+        float(c["amount"])
+        for c in categories
+        if c["amount"] and c["attribution_status"] != "ATTRIBUTABLE"
+    )
 
     report = {
         "artifact": "baseline_freeze_and_black_box_report",
@@ -334,10 +390,12 @@ def main() -> None:
                 "money is published to cents at the (recording, split set, rate window) grain, "
                 "and the median group is one stream worth $0.0035, which rounds to $0.00. This is "
                 "not a leak: it is the measured cost of the published rounding policy at a very "
-                "fine grain, and it is the same root cause as the zero-value holder rows."),
+                "fine grain, and it is the same root cause as the zero-value holder rows."
+            ),
             "not_a_restatement_trigger": (
                 "fixing this would require a minimum-payment threshold with multi-period balance "
-                "carry-forward, which is explicitly out of scope"),
+                "carry-forward, which is explicitly out of scope"
+            ),
         },
         "black_box": {
             "total_listens": total_listens,
@@ -346,16 +404,19 @@ def main() -> None:
             "categories": categories,
             "suspended_amount_total": round(suspended, 2),
             "suspended_amount_meaning": AMOUNT_LANGUAGE,
-            "attributed_amount": next(c["amount"] for c in categories
-                                      if c["attribution_status"] == "ATTRIBUTABLE"),
+            "attributed_amount": next(
+                c["amount"] for c in categories if c["attribution_status"] == "ATTRIBUTABLE"
+            ),
         },
         "cost": {
             "bytes_billed": sum(s.get("bytes_billed") or 0 for s in stats),
             "list_price_equivalent_usd": round(
-                sum(s.get("bytes_billed") or 0 for s in stats) / 1024**4
-                * ON_DEMAND_USD_PER_TIB, 4),
-            "caveat": ("list-price equivalent of processing consumption; actual monetary cost "
-                       "UNKNOWN without billing evidence"),
+                sum(s.get("bytes_billed") or 0 for s in stats) / 1024**4 * ON_DEMAND_USD_PER_TIB, 4
+            ),
+            "caveat": (
+                "list-price equivalent of processing consumption; actual monetary cost "
+                "UNKNOWN without billing evidence"
+            ),
         },
         "wall_seconds": round(time.time() - t0, 1),
         "jobs": stats,
@@ -366,30 +427,41 @@ def main() -> None:
         raise SystemExit("the black-box decomposition does not reconcile to the total")
 
     print(f"\n  BASELINE {baseline['publication_id']} / {run_id}")
-    print(f"    normalization {baseline['normalization_version']}   "
-          f"scoring {baseline['scoring_version']}")
-    print(f"    payout policy {baseline['payout_policy_version']}   "
-          f"rights {baseline['rights_version']}")
-    print(f"    rows {baseline['row_count']:,}   gross {baseline['portfolio_gross']}   "
-          f"paid {baseline['portfolio_paid']}")
+    print(
+        f"    normalization {baseline['normalization_version']}   "
+        f"scoring {baseline['scoring_version']}"
+    )
+    print(
+        f"    payout policy {baseline['payout_policy_version']}   "
+        f"rights {baseline['rights_version']}"
+    )
+    print(
+        f"    rows {baseline['row_count']:,}   gross {baseline['portfolio_gross']}   "
+        f"paid {baseline['portfolio_paid']}"
+    )
     print(f"    digest {baseline['content_digest'][:32]}...")
     print(f"    published_at {baseline['published_at']}   still queryable: {queryable}")
     print(f"\n  BLACK BOX ({AMOUNT_LANGUAGE}):")
     for c in categories:
         amount = f"{c['amount']:>12}" if c["amount"] else "     UNKNOWN"
-        print(f"    {c['attribution_status']:<22} streams={c['streams']:>12,} "
-              f"{c['pct_of_total']:>9.4f}%  amount={amount}  "
-              f"unknown_streams={c['streams_with_amount_unknown']:>9,}")
-    print(f"    {'suspended total':<22} {'':>12}  {'':>9}   "
-          f"amount={round(suspended, 2):>12}")
+        print(
+            f"    {c['attribution_status']:<22} streams={c['streams']:>12,} "
+            f"{c['pct_of_total']:>9.4f}%  amount={amount}  "
+            f"unknown_streams={c['streams_with_amount_unknown']:>9,}"
+        )
+    print(f"    {'suspended total':<22} {'':>12}  {'':>9}   " f"amount={round(suspended, 2):>12}")
     print("\n  ROUNDING RECONCILIATION")
     print(f"    attributable modeled (unrounded) {modeled_unrounded:>12}")
     print(f"    published paid                   {published_paid:>12}")
-    print(f"    lost to cent rounding            {rounding_loss:>12}  "
-          f"({round(100 * rounding_loss / modeled_unrounded, 4)}% of modeled)")
-    print(f"    groups rounded to zero           "
-          f"{int(rounding['groups_rounded_to_zero']):>12,} of "
-          f"{int(rounding['financial_groups']):,}")
+    print(
+        f"    lost to cent rounding            {rounding_loss:>12}  "
+        f"({round(100 * rounding_loss / modeled_unrounded, 4)}% of modeled)"
+    )
+    print(
+        f"    groups rounded to zero           "
+        f"{int(rounding['groups_rounded_to_zero']):>12,} of "
+        f"{int(rounding['financial_groups']):,}"
+    )
 
 
 if __name__ == "__main__":

@@ -35,8 +35,10 @@ from matching import features as F
 PROJECT = "ss-de-944054e7"
 MATCHER_SA = "splitsheet-matcher@ss-de-944054e7.iam.gserviceaccount.com"
 MAX_BYTES = 400 * 1024**3
-PERIOD = ("listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
-          "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'")
+PERIOD = (
+    "listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
+    "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'"
+)
 
 EXPECTED_PAIRS = 3_045_208
 EXPECTED_LISTENS = 132_852 + 319_001 + 217_545
@@ -50,29 +52,40 @@ def client_as_matcher():
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
     src, _ = google.auth.default(scopes=scopes)
     creds = impersonated_credentials.Credentials(
-        source_credentials=src, target_principal=MATCHER_SA, target_scopes=scopes)
+        source_credentials=src, target_principal=MATCHER_SA, target_scopes=scopes
+    )
     return bigquery.Client(project=PROJECT, credentials=creds)
 
 
 def run(client, sql: str, label: str, stats: list):
     from google.cloud import bigquery
 
-    job = client.query(sql, job_config=bigquery.QueryJobConfig(
-        maximum_bytes_billed=MAX_BYTES))
+    job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
     rows = [dict(r) for r in job.result()]
-    stats.append({"step": label, "job_id": job.job_id,
-                  "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-                  "duration_ms": int((job.ended - job.started).total_seconds() * 1000)})
-    print(f"  {label:<22} billed={job.total_bytes_billed or 0:>14,} "
-          f"slot_ms={job.slot_millis or 0:>10,}", flush=True)
+    stats.append(
+        {
+            "step": label,
+            "job_id": job.job_id,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
+        }
+    )
+    print(
+        f"  {label:<22} billed={job.total_bytes_billed or 0:>14,} "
+        f"slot_ms={job.slot_millis or 0:>10,}",
+        flush=True,
+    )
     return rows
 
 
 def feature_sql(candidate_run_id: str, feature_run_id: str, norm_version: str) -> str:
     """Generated from features.py so the two implementations cannot drift apart."""
     ratio = F.sql_ascii_retention_ratio(
-        "l.artist_normalized_unicode", "l.recording_normalized_unicode",
-        "IF(p.block_method = 'EXACT', l.lookup_exact, l.lookup_fallback)")
+        "l.artist_normalized_unicode",
+        "l.recording_normalized_unicode",
+        "IF(p.block_method = 'EXACT', l.lookup_exact, l.lookup_fallback)",
+    )
     return f"""
     WITH universe AS (
       SELECT listen_hash, COUNT(*) AS candidate_count, MIN(block_method) AS block_method
@@ -127,9 +140,12 @@ def main() -> None:
     stats: list = []
     t0 = time.time()
 
-    feature_run_id = "feat:" + hashlib.sha256(
-        f"{args.norm_version}|{args.candidate_run_id}|{F.FEATURE_VERSION}".encode()
-    ).hexdigest()[:16]
+    feature_run_id = (
+        "feat:"
+        + hashlib.sha256(
+            f"{args.norm_version}|{args.candidate_run_id}|{F.FEATURE_VERSION}".encode()
+        ).hexdigest()[:16]
+    )
     print(f"feature_version {F.FEATURE_VERSION}  feature_run_id {feature_run_id}", flush=True)
 
     # Before staging, before the joins and before the transaction: the features are a
@@ -137,7 +153,9 @@ def main() -> None:
     # and all three are in the run id. If the published table already carries this
     # identity at the ratified size, rebuilding it would spend ~12.4 GB to reproduce
     # what is there and rewrite every row for a fresh CURRENT_TIMESTAMP.
-    current = run(c, f"""
+    current = run(
+        c,
+        f"""
         SELECT COUNT(*) AS n,
                COUNT(DISTINCT feature_run_id) AS fruns, MIN(feature_run_id) AS frun,
                COUNT(DISTINCT candidate_run_id) AS cruns, MIN(candidate_run_id) AS crun,
@@ -145,17 +163,28 @@ def main() -> None:
                MIN(normalization_version) AS nver,
                COUNT(DISTINCT feature_version) AS fvers, MIN(feature_version) AS fver
         FROM `{PROJECT}.splitsheet_silver.silver_candidate_features`
-    """, "inspect_target", stats)[0]
-    already = (int(current["n"]) == EXPECTED_PAIRS
-               and int(current["fruns"]) == 1 and current["frun"] == feature_run_id
-               and int(current["cruns"]) == 1 and current["crun"] == args.candidate_run_id
-               and int(current["nvers"]) == 1 and current["nver"] == args.norm_version
-               and int(current["fvers"]) == 1 and current["fver"] == F.FEATURE_VERSION)
+    """,
+        "inspect_target",
+        stats,
+    )[0]
+    already = (
+        int(current["n"]) == EXPECTED_PAIRS
+        and int(current["fruns"]) == 1
+        and current["frun"] == feature_run_id
+        and int(current["cruns"]) == 1
+        and current["crun"] == args.candidate_run_id
+        and int(current["nvers"]) == 1
+        and current["nver"] == args.norm_version
+        and int(current["fvers"]) == 1
+        and current["fver"] == F.FEATURE_VERSION
+    )
     if already:
         print(f"target already holds {feature_run_id}: nothing written")
         report = {
-            "feature_version": F.FEATURE_VERSION, "feature_run_id": feature_run_id,
-            "candidate_run_id": args.candidate_run_id, "skipped": True,
+            "feature_version": F.FEATURE_VERSION,
+            "feature_run_id": feature_run_id,
+            "candidate_run_id": args.candidate_run_id,
+            "skipped": True,
             "feature_rows": int(current["n"]),
             "normalization_version": args.norm_version,
             "total_bytes_billed": sum(s["bytes_billed"] or 0 for s in stats),
@@ -167,11 +196,17 @@ def main() -> None:
         return
 
     stg = f"{PROJECT}.splitsheet_silver.stg_candidate_features"
-    run(c, f"CREATE OR REPLACE TABLE `{stg}` CLUSTER BY listen_hash AS "
-           + feature_sql(args.candidate_run_id, feature_run_id, args.norm_version),
-        "stage_features", stats)
+    run(
+        c,
+        f"CREATE OR REPLACE TABLE `{stg}` CLUSTER BY listen_hash AS "
+        + feature_sql(args.candidate_run_id, feature_run_id, args.norm_version),
+        "stage_features",
+        stats,
+    )
 
-    v = run(c, f"""
+    v = run(
+        c,
+        f"""
         SELECT COUNT(*) AS pairs, COUNT(DISTINCT listen_hash) AS listens,
                COUNT(DISTINCT FORMAT('%t|%t', listen_hash, candidate_recording_mbid))
                  AS distinct_grain,
@@ -187,7 +222,10 @@ def main() -> None:
                COUNTIF(block_method = 'EXACT' AND candidate_count = 1) AS exact_unique_leaked,
                COUNTIF(release_lower_exact IS NULL) AS release_null
         FROM `{stg}`
-    """, "validate_features", stats)[0]
+    """,
+        "validate_features",
+        stats,
+    )[0]
 
     checks = {
         "pair_count_matches_candidate_table": int(v["pairs"]) == EXPECTED_PAIRS,
@@ -204,7 +242,9 @@ def main() -> None:
     if args.fail_before_publish:
         raise SystemExit("INJECTED FAILURE after staging validation, before publication.")
 
-    run(c, f"""
+    run(
+        c,
+        f"""
         BEGIN TRANSACTION;
         DELETE FROM `{PROJECT}.splitsheet_silver.silver_candidate_features` WHERE TRUE;
         INSERT INTO `{PROJECT}.splitsheet_silver.silver_candidate_features`
@@ -217,10 +257,15 @@ def main() -> None:
                candidate_run_id, feature_run_id, created_at
         FROM `{stg}`;
         COMMIT TRANSACTION;
-    """, "publish_atomic", stats)
+    """,
+        "publish_atomic",
+        stats,
+    )
     run(c, f"DROP TABLE IF EXISTS `{stg}`", "drop_staging", stats)
 
-    profile = run(c, f"""
+    profile = run(
+        c,
+        f"""
         SELECT block_method, candidate_count > 1 AS multi, blocking_key_information_class,
                COUNT(*) AS pairs, COUNT(DISTINCT listen_hash) AS listens,
                ROUND(AVG(artist_token_similarity), 4) AS avg_artist_token,
@@ -231,7 +276,10 @@ def main() -> None:
                ROUND(AVG(CAST(recording_unicode_exact AS INT64)), 4) AS rate_recording_exact
         FROM `{PROJECT}.splitsheet_silver.silver_candidate_features`
         GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
-    """, "profile", stats)
+    """,
+        "profile",
+        stats,
+    )
 
     report = {
         "feature_version": F.FEATURE_VERSION,
@@ -247,12 +295,17 @@ def main() -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1, default=str)
-    print(json.dumps({k: report[k] for k in
-                      ("feature_run_id", "validation", "total_bytes_billed")}, indent=1))
+    print(
+        json.dumps(
+            {k: report[k] for k in ("feature_run_id", "validation", "total_bytes_billed")}, indent=1
+        )
+    )
     for p in profile:
-        print(f"  {p['block_method']:<9} multi={p['multi']!s:<5} "
-              f"{p['blocking_key_information_class']:<26} pairs={p['pairs']:>9,} "
-              f"art_tok={p['avg_artist_token']} rec_tok={p['avg_recording_token']}")
+        print(
+            f"  {p['block_method']:<9} multi={p['multi']!s:<5} "
+            f"{p['blocking_key_information_class']:<26} pairs={p['pairs']:>9,} "
+            f"art_tok={p['avg_artist_token']} rec_tok={p['avg_recording_token']}"
+        )
 
 
 if __name__ == "__main__":

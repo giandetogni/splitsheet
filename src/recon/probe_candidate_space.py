@@ -102,8 +102,12 @@ def mode_keys(args: argparse.Namespace) -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(out, fh)
-    print(json.dumps({k: out[k] for k in
-                      ("counts", "distinct_exact_keys", "distinct_aggressive_keys")}, indent=2))
+    print(
+        json.dumps(
+            {k: out[k] for k in ("counts", "distinct_exact_keys", "distinct_aggressive_keys")},
+            indent=2,
+        )
+    )
 
 
 def mode_join(args: argparse.Namespace) -> None:
@@ -119,8 +123,12 @@ def mode_join(args: argparse.Namespace) -> None:
     reader = csv.reader(sys.stdin)
     hdr = next(reader)
     col = {n: i for i, n in enumerate(hdr)}
-    ia, it, ir, icl = (col["artist_credit_name"], col["recording_name"],
-                       col["recording_mbid"], col["combined_lookup"])
+    ia, it, ir, icl = (
+        col["artist_credit_name"],
+        col["recording_name"],
+        col["recording_mbid"],
+        col["combined_lookup"],
+    )
 
     for row in reader:
         if len(row) != len(hdr):
@@ -145,11 +153,14 @@ def mode_join(args: argparse.Namespace) -> None:
             n = len(hits.get(key, ()))
             cand_per_listen.append((n, w))
             if n == 0:
-                zero += 1; zero_l += w
+                zero += 1
+                zero_l += w
             elif n == 1:
-                one += 1; one_l += w
+                one += 1
+                one_l += w
             else:
-                many += 1; many_l += w
+                many += 1
+                many_l += w
         cand_per_listen.sort()
         # percentiles weighted by listens, not by distinct key
         acc, p50, p99, pmax = 0, 0, 0, (cand_per_listen[-1][0] if cand_per_listen else 0)
@@ -181,7 +192,8 @@ def mode_join(args: argparse.Namespace) -> None:
         "listen_side": side["counts"],
         "canonical_counts": dict(c),
         "our_key_equals_combined_lookup_pct": round(
-            100 * c["our_key_equals_combined_lookup"] / max(c["canonical_rows"], 1), 4),
+            100 * c["our_key_equals_combined_lookup"] / max(c["canonical_rows"], 1), 4
+        ),
         "exact": summarize(exact_w, exact_hits, "exact normalization"),
         "aggressive": summarize(aggr_w, aggr_hits, "aggressive suffix-stripped"),
     }

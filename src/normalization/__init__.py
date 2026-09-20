@@ -11,5 +11,14 @@ from .normalizer import (
 )
 from .rules import NormalizationRules, load_rules
 
-__all__ = ["KeyStatus", "NormalizationRules", "NormalizationStatus", "NormalizedFields",
-           "aggressive", "fold", "load_rules", "normalize", "normalized_unicode"]
+__all__ = [
+    "KeyStatus",
+    "NormalizationRules",
+    "NormalizationStatus",
+    "NormalizedFields",
+    "aggressive",
+    "fold",
+    "load_rules",
+    "normalize",
+    "normalized_unicode",
+]

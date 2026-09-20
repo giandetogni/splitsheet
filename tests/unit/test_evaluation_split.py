@@ -57,13 +57,24 @@ def test_sql_expression_is_generated_from_the_same_config():
     assert CFG.unlabelled_bucket in sql
 
 
-@pytest.mark.parametrize("bad", [
-    {"algorithm": "coinflip"},
-    {"buckets": {"dev": {"lower_inclusive": 1, "upper_exclusive": 80},
-                 "holdout": {"lower_inclusive": 80, "upper_exclusive": 100}}},
-    {"buckets": {"dev": {"lower_inclusive": 0, "upper_exclusive": 70},
-                 "holdout": {"lower_inclusive": 80, "upper_exclusive": 100}}},
-])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"algorithm": "coinflip"},
+        {
+            "buckets": {
+                "dev": {"lower_inclusive": 1, "upper_exclusive": 80},
+                "holdout": {"lower_inclusive": 80, "upper_exclusive": 100},
+            }
+        },
+        {
+            "buckets": {
+                "dev": {"lower_inclusive": 0, "upper_exclusive": 70},
+                "holdout": {"lower_inclusive": 80, "upper_exclusive": 100},
+            }
+        },
+    ],
+)
 def test_malformed_split_config_is_rejected(tmp_path, bad):
     import yaml
 
@@ -92,6 +103,7 @@ def test_calibration_split_version_is_pinned():
 
 def test_partition_is_deterministic_and_order_independent():
     from evaluation import partition_of
+
     first = {m: partition_of(m, CFG) for m in MBIDS}
     second = {m: partition_of(m, CFG) for m in reversed(MBIDS)}
     assert first == second
@@ -99,6 +111,7 @@ def test_partition_is_deterministic_and_order_independent():
 
 def test_partitions_are_exactly_calibration_validation_holdout():
     from evaluation import CALIBRATION, HOLDOUT, VALIDATION, partition_of
+
     seen = {partition_of(m, CFG) for m in MBIDS}
     assert seen == {CALIBRATION, VALIDATION, HOLDOUT}
 
@@ -106,6 +119,7 @@ def test_partitions_are_exactly_calibration_validation_holdout():
 def test_no_recording_is_in_both_calibration_and_validation():
     """Disjointness by construction: the partition is a function of the recording."""
     from evaluation import CALIBRATION, VALIDATION, partition_of
+
     cal = {m for m in MBIDS if partition_of(m, CFG) == CALIBRATION}
     val = {m for m in MBIDS if partition_of(m, CFG) == VALIDATION}
     assert not (cal & val)
@@ -115,6 +129,7 @@ def test_no_recording_is_in_both_calibration_and_validation():
 def test_the_division_only_touches_dev():
     """holdout must survive the second division untouched, or the historical numbers move."""
     from evaluation import CALIBRATION, DEV, HOLDOUT, VALIDATION, bucket_of, partition_of
+
     for m in MBIDS:
         if bucket_of(m, CFG) == HOLDOUT:
             assert partition_of(m, CFG) == HOLDOUT
@@ -125,6 +140,7 @@ def test_the_division_only_touches_dev():
 
 def test_calibration_is_about_three_quarters_of_dev():
     from evaluation import CALIBRATION, DEV, bucket_of, partition_of
+
     dev = [m for m in MBIDS if bucket_of(m, CFG) == DEV]
     share = 100 * sum(partition_of(m, CFG) == CALIBRATION for m in dev) / len(dev)
     assert 70 < share < 80, f"calibration share of dev is {share:.1f}%, intended 75%"
@@ -137,6 +153,7 @@ def test_calibration_salt_is_different_from_the_dev_salt():
 
 def test_absent_label_is_in_no_partition():
     from evaluation import partition_of
+
     for missing in (None, ""):
         assert partition_of(missing, CFG) == CFG.unlabelled_bucket
 

@@ -23,20 +23,30 @@ CHUNK = 8 * 1024 * 1024
 PREFIX = "raw/musicbrainz/canonical/snapshot_date=2026-07-17"
 
 SOURCE = {
-    "source_url": ("https://data.metabrainz.org/pub/musicbrainz/canonical_data/"
-                   "musicbrainz-canonical-dump-20260717-080003/"
-                   "musicbrainz-canonical-dump-20260717-080003.tar.zst"),
-    "source_archive_sha256": (
-        "65796cec3609ad45edfcc6a334cb78cae8a4579430bfbe6b9b54c96cf1566cd5"),
+    "source_url": (
+        "https://data.metabrainz.org/pub/musicbrainz/canonical_data/"
+        "musicbrainz-canonical-dump-20260717-080003/"
+        "musicbrainz-canonical-dump-20260717-080003.tar.zst"
+    ),
+    "source_archive_sha256": ("65796cec3609ad45edfcc6a334cb78cae8a4579430bfbe6b9b54c96cf1566cd5"),
     "source_archive_bytes": 2320377487,
     "source_timestamp": "2026-07-17 08:00:03.172114",
     "snapshot_date": "2026-07-17",
     "member": "canonical/canonical_musicbrainz_data.csv",
     "member_bytes_uncompressed": 7519259059,
     "license": "CC0 1.0 Universal (COPYING inside archive)",
-    "schema": ["id", "artist_credit_id", "artist_mbids", "artist_credit_name",
-               "release_mbid", "release_name", "recording_mbid", "recording_name",
-               "combined_lookup", "score"],
+    "schema": [
+        "id",
+        "artist_credit_id",
+        "artist_mbids",
+        "artist_credit_name",
+        "release_mbid",
+        "release_name",
+        "recording_mbid",
+        "recording_name",
+        "combined_lookup",
+        "score",
+    ],
     "measured_grain": "exactly one row per recording_mbid",
     "measured_rows": 31554198,
     "measured_distinct_recording_mbid": 31554198,
@@ -75,14 +85,16 @@ def main() -> None:
     blob_name = f"{PREFIX}/{name}"
     t0 = time.time()
     existing = bucket.get_blob(blob_name)
-    if existing is not None and existing.size == size \
-            and (existing.metadata or {}).get("sha256") == sha:
+    if (
+        existing is not None
+        and existing.size == size
+        and (existing.metadata or {}).get("sha256") == sha
+    ):
         state, retries = "already_present", 0
         print(f"  {name}: already present and verified")
     else:
         blob = bucket.blob(blob_name)
-        blob.metadata = {"sha256": sha, **{k: str(v) for k, v in SOURCE.items()
-                                           if k != "schema"}}
+        blob.metadata = {"sha256": sha, **{k: str(v) for k, v in SOURCE.items() if k != "schema"}}
         blob.content_type = "application/gzip"
         retries = 0
         for attempt in range(4):
@@ -117,9 +129,22 @@ def main() -> None:
     }
     with open(args.manifest, "w") as fh:
         json.dump(manifest, fh, indent=1)
-    print(json.dumps({k: manifest[k] for k in
-                      ("landed_object", "landed_bytes", "landed_sha256", "state",
-                       "retries", "seconds")}, indent=1))
+    print(
+        json.dumps(
+            {
+                k: manifest[k]
+                for k in (
+                    "landed_object",
+                    "landed_bytes",
+                    "landed_sha256",
+                    "state",
+                    "retries",
+                    "seconds",
+                )
+            },
+            indent=1,
+        )
+    )
 
 
 if __name__ == "__main__":

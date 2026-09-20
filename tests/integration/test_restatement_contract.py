@@ -46,40 +46,50 @@ PRIOR_RUN = R["baseline_attribution_run_id"]
 @pytest.fixture(scope="module")
 def bq():
     from google.cloud import bigquery
+
     return bigquery.Client(project=PROJECT)
 
 
 def one(client, sql: str) -> dict:
     from google.cloud import bigquery
+
     cfg = bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES)
     return next(iter(dict(r) for r in client.query(sql, job_config=cfg).result()))
 
 
 def rows(client, sql: str) -> list[dict]:
     from google.cloud import bigquery
+
     cfg = bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES)
     return [dict(r) for r in client.query(sql, job_config=cfg).result()]
 
 
 @pytest.fixture(scope="module")
 def new_run(bq) -> str:
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT attribution_run_id FROM `{REGISTRY}`
         WHERE publication_id = 'pub:v2'
-    """)
+    """,
+    )
     return r["attribution_run_id"]
 
 
 # --- v1 is immutable -----------------------------------------------------------------------
 
+
 @pytest.mark.integration_readonly
 def test_the_baseline_publication_still_matches_the_frozen_manifest(bq):
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT COUNT(*) AS row_count, SUM(holder_payout) AS portfolio_paid,
                MIN(published_at) AS published_at,
                COUNT(DISTINCT publication_status) AS statuses
         FROM `{FACT}` WHERE attribution_run_id = '{PRIOR_RUN}'
-    """)
+    """,
+    )
     assert int(r["row_count"]) == R["baseline_row_count"] == 5_925_913
     assert str(r["portfolio_paid"]) == R["baseline_portfolio_paid"] == "98284.22"
     assert r["statuses"] == 1
@@ -96,29 +106,44 @@ def test_the_baseline_content_digest_is_unchanged(bq):
 
 @pytest.mark.integration_readonly
 def test_the_registry_records_both_publications_as_frozen(bq):
-    registry = {r["publication_id"]: r for r in rows(bq, f"""
+    registry = {
+        r["publication_id"]: r
+        for r in rows(
+            bq,
+            f"""
         SELECT publication_id, attribution_run_id, normalization_version, scoring_version,
                payout_policy_version, row_count, portfolio_paid, content_digest, frozen
         FROM `{REGISTRY}`
-    """)}
+    """,
+        )
+    }
     assert "pub:v1" in registry and "pub:v2" in registry
     assert all(r["frozen"] for r in registry.values())
     assert registry["pub:v1"]["normalization_version"] == R["prior_normalization_version"]
     assert registry["pub:v2"]["normalization_version"] == R["new_normalization_version"]
     # The one input that moved, and the three that did not.
     assert registry["pub:v1"]["scoring_version"] == registry["pub:v2"]["scoring_version"]
-    assert (registry["pub:v1"]["payout_policy_version"]
-            == registry["pub:v2"]["payout_policy_version"] == R["payout_policy_version"])
+    assert (
+        registry["pub:v1"]["payout_policy_version"]
+        == registry["pub:v2"]["payout_policy_version"]
+        == R["payout_policy_version"]
+    )
     assert registry["pub:v1"]["content_digest"] != registry["pub:v2"]["content_digest"]
 
 
 @pytest.mark.integration_readonly
 def test_both_publications_are_queryable_at_once(bq, new_run):
-    got = {r["attribution_run_id"]: r for r in rows(bq, f"""
+    got = {
+        r["attribution_run_id"]: r
+        for r in rows(
+            bq,
+            f"""
         SELECT attribution_run_id, COUNT(*) AS row_count, SUM(holder_payout) AS paid
         FROM `{FACT}` WHERE attribution_run_id IN ('{PRIOR_RUN}', '{new_run}')
         GROUP BY attribution_run_id
-    """)}
+    """,
+        )
+    }
     assert set(got) == {PRIOR_RUN, new_run}
     assert int(got[PRIOR_RUN]["row_count"]) == R["baseline_row_count"]
     assert int(got[new_run]["row_count"]) > 0
@@ -126,9 +151,12 @@ def test_both_publications_are_queryable_at_once(bq, new_run):
 
 # --- the delta reconciles ------------------------------------------------------------------
 
+
 @pytest.mark.integration_readonly
 def test_summed_delta_equals_the_difference_between_the_two_totals(bq, new_run):
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT
           (SELECT SUM(holder_payout) FROM `{FACT}`
              WHERE attribution_run_id = '{PRIOR_RUN}') AS prior_paid,
@@ -137,15 +165,21 @@ def test_summed_delta_equals_the_difference_between_the_two_totals(bq, new_run):
           (SELECT SUM(delta) FROM `{RESTATEMENTS}`
              WHERE restatement_run_id = '{FROZEN["restatement"]["trigger_id"]}'
                 OR restatement_run_id LIKE 'restate:%') AS summed_delta
-    """)
-    prior, restated, delta = (Decimal(r["prior_paid"]), Decimal(r["restated_paid"]),
-                              Decimal(r["summed_delta"]))
+    """,
+    )
+    prior, restated, delta = (
+        Decimal(r["prior_paid"]),
+        Decimal(r["restated_paid"]),
+        Decimal(r["summed_delta"]),
+    )
     assert delta == restated - prior, (prior, restated, delta)
 
 
 @pytest.mark.integration_readonly
 def test_the_restatement_mart_carries_prior_new_and_delta(bq):
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT COUNT(*) AS rows_total,
                COUNTIF(delta != restated_payout - prior_payout) AS delta_wrong,
                COUNTIF(prior_normalization_version = new_normalization_version) AS same_norm,
@@ -153,7 +187,8 @@ def test_the_restatement_mart_carries_prior_new_and_delta(bq):
                COUNTIF(trigger_reason IS NULL) AS missing_trigger,
                COUNT(DISTINCT change_type) AS change_types
         FROM `{RESTATEMENTS}`
-    """)
+    """,
+    )
     assert int(r["rows_total"]) > 0
     assert int(r["delta_wrong"]) == 0, "delta must be restated minus prior, exactly"
     assert int(r["same_norm"]) == 0, "every row must record a normalization change"
@@ -164,19 +199,28 @@ def test_the_restatement_mart_carries_prior_new_and_delta(bq):
 
 @pytest.mark.integration_readonly
 def test_no_monetary_column_in_the_restatement_mart_is_float(bq):
-    types = {r["column_name"]: r["data_type"] for r in rows(bq, f"""
+    types = {
+        r["column_name"]: r["data_type"]
+        for r in rows(
+            bq,
+            f"""
         SELECT column_name, data_type FROM `{PROJECT}.{DATASET}`.INFORMATION_SCHEMA.COLUMNS
         WHERE table_name = 'fct_restatements'
-    """)}
+    """,
+        )
+    }
     for col in ("prior_payout", "restated_payout", "delta"):
         assert types[col].startswith("NUMERIC"), (col, types[col])
 
 
 # --- nothing disappeared, nothing outside the cohort moved ---------------------------------
 
+
 @pytest.mark.integration_readonly
 def test_no_listen_disappeared_and_the_cohort_is_contained(bq):
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT
           (SELECT COUNT(*) FROM `{V2_MATCHES}`
              WHERE listened_at >= TIMESTAMP '2026-06-01 00:00:00+00'
@@ -187,14 +231,17 @@ def test_no_listen_disappeared_and_the_cohort_is_contained(bq):
           (SELECT COUNTIF(recording_cohort) FROM `{V2_MATCHES}`
              WHERE listened_at >= TIMESTAMP '2026-06-01 00:00:00+00'
                AND listened_at <  TIMESTAMP '2026-07-01 00:00:00+00') AS cohort_listens
-    """)
+    """,
+    )
     assert int(r["restated_listens"]) == int(r["distinct_listens"]) == LISTENS
     assert 0 < int(r["cohort_listens"]) < LISTENS
 
 
 @pytest.mark.integration_readonly
 def test_every_listen_outside_the_cohort_is_identical_to_v1(bq):
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT COUNT(*) AS moved
         FROM `{V2_MATCHES}` r JOIN `{V1_MATCHES}` v USING (listen_hash)
         WHERE r.listened_at >= TIMESTAMP '2026-06-01 00:00:00+00'
@@ -207,13 +254,16 @@ def test_every_listen_outside_the_cohort_is_identical_to_v1(bq):
             OR r.match_method != v.match_method
             OR IFNULL(r.failure_reason, 'x') != IFNULL(v.failure_reason, 'x')
             OR r.candidate_count != v.candidate_count)
-    """)
+    """,
+    )
     assert int(r["moved"]) == 0, "the restatement is not contained to its cohort"
 
 
 @pytest.mark.integration_readonly
 def test_the_restated_matches_carry_the_new_normalization_and_the_frozen_scoring(bq):
-    r = one(bq, f"""
+    r = one(
+        bq,
+        f"""
         SELECT COUNT(DISTINCT normalization_version) AS norm_versions,
                MIN(normalization_version) AS normalization_version,
                COUNT(DISTINCT scoring_version) AS scoring_versions,
@@ -221,13 +271,15 @@ def test_the_restated_matches_carry_the_new_normalization_and_the_frozen_scoring
         FROM `{V2_MATCHES}`
         WHERE listened_at >= TIMESTAMP '2026-06-01 00:00:00+00'
           AND listened_at <  TIMESTAMP '2026-07-01 00:00:00+00'
-    """)
+    """,
+    )
     assert r["normalization_version"] == R["new_normalization_version"]
     assert r["scoring_version"] == R["scoring_version"]
     assert int(r["norm_versions"]) == int(r["scoring_versions"]) == 1
 
 
 # --- run identity: the warehouse can tell the two cohorts apart ------------------------------
+
 
 @pytest.mark.integration_readonly
 def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq):
@@ -238,12 +290,15 @@ def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq
     registry must map that string to the canonical identity of the run that produced them.
     """
     ident = R["published_run_identity"]
-    reg = one(bq, f"""
+    reg = one(
+        bq,
+        f"""
         SELECT canonical_run_id, legacy_run_id, mart_run_id, cohort_key, cohort_sha256,
                new_publication_id, is_financially_effective
         FROM `{PROJECT}.{DATASET}.restatement_run_registry`
         WHERE run_type = 'PUBLISHED_RESTATEMENT'
-    """)
+    """,
+    )
     assert reg["canonical_run_id"] == ident["canonical_run_id"]
     assert reg["legacy_run_id"] == ident["legacy_run_id"]
     assert reg["mart_run_id"] == ident["legacy_run_id"]
@@ -252,18 +307,23 @@ def test_the_run_registry_resolves_the_legacy_identifier_without_rewriting_it(bq
     assert reg["is_financially_effective"] is True
 
     # The rows that reconcile to the published delta must still carry the legacy string.
-    carried = rows(bq, f"""
+    carried = rows(
+        bq,
+        f"""
         SELECT restatement_run_id, COUNT(*) AS n, SUM(delta) AS summed_delta
         FROM `{RESTATEMENTS}` GROUP BY 1 ORDER BY n DESC
-    """)
+    """,
+    )
     real = [r for r in carried if r["summed_delta"] != 0]
     assert len(real) == 1
     assert real[0]["restatement_run_id"] == ident["legacy_run_id"], (
         "the published restatement rows carry an identifier other than the one they were published "
-        "with; a published statement was rewritten")
+        "with; a published statement was rewritten"
+    )
     assert ident["canonical_run_id"] not in {r["restatement_run_id"] for r in carried}, (
         "the canonical identity was retrofitted onto published rows; the correction is supposed to "
-        "be a registry entry, not an edit")
+        "be a registry entry, not an edit"
+    )
 
 
 @pytest.mark.integration_readonly
@@ -275,7 +335,9 @@ def test_every_identifier_in_the_delta_mart_resolves_to_exactly_one_entry(bq):
     registry entry classifying it as a LEGACY_REHEARSAL with no canonical inputs, so the assertion
     is the plain one.
     """
-    resolution = rows(bq, f"""
+    resolution = rows(
+        bq,
+        f"""
         WITH mart AS (
           SELECT restatement_run_id, COUNT(*) AS rows_in_mart, SUM(delta) AS summed_delta
           FROM `{RESTATEMENTS}` GROUP BY 1
@@ -290,7 +352,8 @@ def test_every_identifier_in_the_delta_mart_resolves_to_exactly_one_entry(bq):
         LEFT JOIN `{PROJECT}.{DATASET}.restatement_run_registry` r
           ON r.mart_run_id = m.restatement_run_id
         GROUP BY 1, 2, 3 ORDER BY 1
-    """)
+    """,
+    )
     assert resolution, "the delta mart is empty"
     for r in resolution:
         assert r["entries"] == 1, f"{r['restatement_run_id']} resolves to {r['entries']} entries"
@@ -310,11 +373,14 @@ def test_every_identifier_in_the_delta_mart_resolves_to_exactly_one_entry(bq):
 @pytest.mark.integration_readonly
 def test_the_rejected_cohort_has_a_different_identity_in_the_warehouse(bq):
     """The collision, closed and observable: same legacy string, two canonical ids, two cohorts."""
-    reg = rows(bq, f"""
+    reg = rows(
+        bq,
+        f"""
         SELECT canonical_run_id, legacy_run_id, cohort_sha256, run_type, measured_listens
         FROM `{PROJECT}.{DATASET}.restatement_run_registry`
         WHERE cohort_sha256 IS NOT NULL ORDER BY canonical_run_id
-    """)
+    """,
+    )
     assert len(reg) == 2
     assert len({r["canonical_run_id"] for r in reg}) == 2
     assert len({r["cohort_sha256"] for r in reg}) == 2

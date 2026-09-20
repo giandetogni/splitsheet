@@ -70,83 +70,103 @@ class Task:
 # expensive in bytes. retries=0 marks a stage no scheduler may repeat on its own.
 TASKS: tuple[Task, ...] = (
     Task(
-        "verify_source_slice", "preflight",
+        "verify_source_slice",
+        "preflight",
         "mkdir -p " + RUN_OUT + " && uv run python src/recon/verify_slice.py"
         " --manifest " + MANIFEST + " --raw-dir {{ params.raw_dir }}"
         " --out " + RUN_OUT + "/slice_verification.json",
         retries=2,
     ),
     Task(
-        "verify_gcs_slice", "preflight",
+        "verify_gcs_slice",
+        "preflight",
         "uv run python src/preservation/verify_gcs_slice.py"
         " --manifest " + MANIFEST + " --raw-dir {{ params.raw_dir }}"
         " --bucket {{ params.gcs_bucket }}"
         " --out " + RUN_OUT + "/gcs_verification.json",
-        retries=2, upstream=("verify_source_slice",),
+        retries=2,
+        upstream=("verify_source_slice",),
     ),
     Task(
-        "load_bronze_tables", "compute",
+        "load_bronze_tables",
+        "compute",
         "uv run python src/ingestion/load_period.py --project {{ params.project }}"
         " --manifest " + MANIFEST + " --bucket {{ params.gcs_bucket }}"
         " --out " + RUN_OUT + "/bronze_load.json",
-        retries=2, upstream=("verify_gcs_slice",),
+        retries=2,
+        upstream=("verify_gcs_slice",),
     ),
     Task(
-        "run_normalization_job", "compute",
+        "run_normalization_job",
+        "compute",
         "uv run python src/normalization/build_canonical_texts.py"
         " --candidate-run-id '{{ params.candidate_run_id }}' --bucket {{ params.gcs_bucket }}"
         " --norm-version '{{ params.norm_version }}'"
         " --work-dir {{ params.derived_dir }}"
         " --out " + RUN_OUT + "/canonical_texts.json",
-        retries=2, upstream=("load_bronze_tables",),
+        retries=2,
+        upstream=("load_bronze_tables",),
     ),
     Task(
-        "run_blocking_job", "compute",
+        "run_blocking_job",
+        "compute",
         "uv run python src/matching/build_blocking.py --project {{ params.project }}"
         " --norm-version '{{ params.norm_version }}'"
         " --blocking-version '{{ params.blocking_version }}'"
         " --out " + RUN_OUT + "/blocking.json",
-        retries=2, upstream=("run_normalization_job",),
+        retries=2,
+        upstream=("run_normalization_job",),
     ),
     Task(
-        "build_candidate_features", "compute",
+        "build_candidate_features",
+        "compute",
         "uv run python src/matching/build_candidate_features.py"
         " --norm-version '{{ params.norm_version }}'"
         " --candidate-run-id '{{ params.candidate_run_id }}'"
         " --out " + RUN_OUT + "/candidate_features.json",
-        retries=2, upstream=("run_blocking_job",),
+        retries=2,
+        upstream=("run_blocking_job",),
     ),
     Task(
-        "build_match_results", "compute",
+        "build_match_results",
+        "compute",
         "uv run python src/matching/build_match_results.py"
         " --norm-version '{{ params.norm_version }}'"
         " --blocking-version '{{ params.blocking_version }}'"
         " --candidate-run-id '{{ params.candidate_run_id }}'"
         " --out " + RUN_OUT + "/match_results.json",
-        retries=1, upstream=("build_candidate_features",),
+        retries=1,
+        upstream=("build_candidate_features",),
     ),
     Task(
-        "report_top_unmatched", "validation",
-        "uv run python src/evaluation/top_unmatched.py"
-        " --out " + RUN_OUT + "/top_unmatched.json",
-        retries=2, upstream=("build_match_results",),
+        "report_top_unmatched",
+        "validation",
+        "uv run python src/evaluation/top_unmatched.py" " --out " + RUN_OUT + "/top_unmatched.json",
+        retries=2,
+        upstream=("build_match_results",),
     ),
     Task(
-        "run_dbt_build", "dbt",
+        "run_dbt_build",
+        "dbt",
         "cd dbt && DBT_PROFILES_DIR=$(pwd) ../.venv/bin/dbt build",
-        retries=1, upstream=("report_top_unmatched",),
+        retries=1,
+        upstream=("report_top_unmatched",),
     ),
     Task(
-        "verify_rights_layer", "validation",
+        "verify_rights_layer",
+        "validation",
         "uv run python src/rights/verify_rights.py"
         " --out " + RUN_OUT + "/rights_verification.json",
-        retries=2, upstream=("run_dbt_build",),
+        retries=2,
+        upstream=("run_dbt_build",),
     ),
     Task(
-        "publish_period_results", "publication",
+        "publish_period_results",
+        "publication",
         PUBLISH_GUARD + "uv run python src/payout/publish.py"
         " --out " + RUN_OUT + "/payout_publication.json",
-        retries=0, upstream=("verify_rights_layer",),
+        retries=0,
+        upstream=("verify_rights_layer",),
     ),
 )
 

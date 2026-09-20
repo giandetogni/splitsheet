@@ -35,8 +35,11 @@ def head_validators(reader: RangeReader) -> dict:
     r = conn.getresponse()
     r.read()
     reader.requests += 1
-    return {"etag": r.getheader("ETag"), "last_modified": r.getheader("Last-Modified"),
-            "content_length": int(r.getheader("Content-Length"))}
+    return {
+        "etag": r.getheader("ETag"),
+        "last_modified": r.getheader("Last-Modified"),
+        "content_length": int(r.getheader("Content-Length")),
+    }
 
 
 def stream_member(reader: RangeReader, offset: int, size: int, dest: str) -> tuple[str, int, int]:
@@ -92,8 +95,9 @@ def main() -> None:
     members.sort(key=lambda m: int(m["name"].rsplit("/", 1)[-1].split(".")[0]))
     first = int(rep["first_member"].split(".")[0])
     last = int(rep["last_member"].split(".")[0])
-    selected = [m for m in members
-                if first <= int(m["name"].rsplit("/", 1)[-1].split(".")[0]) <= last]
+    selected = [
+        m for m in members if first <= int(m["name"].rsplit("/", 1)[-1].split(".")[0]) <= last
+    ]
     expected_bytes = sum(m["size"] for m in selected)
     print(f"period {rep['period']}: {len(selected)} members, {expected_bytes:,} bytes expected")
     if len(selected) != rep["member_count_covering_period"]:
@@ -126,10 +130,20 @@ def main() -> None:
             note = "downloaded"
         if nbytes != m["size"]:
             raise SystemExit(f"{base}: size {nbytes} != index {m['size']}")
-        entries.append({"member": base, "tar_offset": m["offset"], "size_bytes": m["size"],
-                        "sha256": digest, "retries": retries, "state": note})
-        print(f"  {base:<14} {m['size']:>12,}B  {note:<11} sha256={digest[:16]}… "
-              f"retries={retries}")
+        entries.append(
+            {
+                "member": base,
+                "tar_offset": m["offset"],
+                "size_bytes": m["size"],
+                "sha256": digest,
+                "retries": retries,
+                "state": note,
+            }
+        )
+        print(
+            f"  {base:<14} {m['size']:>12,}B  {note:<11} sha256={digest[:16]}… "
+            f"retries={retries}"
+        )
 
     elapsed = time.time() - t0
     manifest = {
@@ -156,8 +170,10 @@ def main() -> None:
     }
     with open(args.manifest, "w") as fh:
         json.dump(manifest, fh, indent=1)
-    print(f"\ntransferred {r.bytes:,} bytes in {r.requests} requests, {elapsed:.1f}s, "
-          f"retries={manifest['retries_total']}, reused={reused}")
+    print(
+        f"\ntransferred {r.bytes:,} bytes in {r.requests} requests, {elapsed:.1f}s, "
+        f"retries={manifest['retries_total']}, reused={reused}"
+    )
     print(f"manifest -> {args.manifest}")
     r.close()
 

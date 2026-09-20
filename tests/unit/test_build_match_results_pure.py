@@ -33,11 +33,16 @@ EXPECTED_RUN_ID = "match:101eef5c5b5c081e"
 
 PUBLISHED = {
     "n": 38_199_641,
-    "mruns": 1, "mrun": EXPECTED_RUN_ID,
-    "cruns": 1, "crun": CANDIDATE,
-    "svers": 1, "sver": SCORING,
-    "nvers": 1, "nver": NORM,
-    "bvers": 1, "bver": BLOCKING,
+    "mruns": 1,
+    "mrun": EXPECTED_RUN_ID,
+    "cruns": 1,
+    "crun": CANDIDATE,
+    "svers": 1,
+    "sver": SCORING,
+    "nvers": 1,
+    "nver": NORM,
+    "bvers": 1,
+    "bver": BLOCKING,
 }
 
 
@@ -64,8 +69,15 @@ class RulesAtVersion:
         return self._version
 
 
-def drive(monkeypatch, tmp_path, target_row, norm=NORM, blocking=BLOCKING,
-          candidate=CANDIDATE, scoring=SCORING):
+def drive(
+    monkeypatch,
+    tmp_path,
+    target_row,
+    norm=NORM,
+    blocking=BLOCKING,
+    candidate=CANDIDATE,
+    scoring=SCORING,
+):
     """Run main() with the cloud replaced by a fake, and report which steps it reached."""
     calls: list[str] = []
     sqls: dict[str, str] = {}
@@ -78,19 +90,45 @@ def drive(monkeypatch, tmp_path, target_row, norm=NORM, blocking=BLOCKING,
         sqls[label] = sql
         if label == "inspect_target":
             stats.append({"step": label, "bytes_billed": 0, "slot_ms": 0})
-            return [dict(target_row)] if target_row is not None else [
-                {"n": 0, "mruns": 0, "mrun": None, "cruns": 0, "crun": None,
-                 "svers": 0, "sver": None, "nvers": 0, "nver": None,
-                 "bvers": 0, "bver": None}]
+            return (
+                [dict(target_row)]
+                if target_row is not None
+                else [
+                    {
+                        "n": 0,
+                        "mruns": 0,
+                        "mrun": None,
+                        "cruns": 0,
+                        "crun": None,
+                        "svers": 0,
+                        "sver": None,
+                        "nvers": 0,
+                        "nver": None,
+                        "bvers": 0,
+                        "bver": None,
+                    }
+                ]
+            )
         raise ReachedHeavyWork(label)
 
     monkeypatch.setattr(mod, "run", fake_run)
     monkeypatch.setattr(mod, "client_as_matcher", lambda: object())
     monkeypatch.setattr(mod, "load_scoring_rules", lambda *a, **k: rules)
-    monkeypatch.setattr(sys, "argv", [
-        "build_match_results.py", "--norm-version", norm,
-        "--blocking-version", blocking, "--candidate-run-id", candidate,
-        "--out", str(out)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_match_results.py",
+            "--norm-version",
+            norm,
+            "--blocking-version",
+            blocking,
+            "--candidate-run-id",
+            candidate,
+            "--out",
+            str(out),
+        ],
+    )
     try:
         mod.main()
         return calls, json.loads(out.read_text()), sqls
@@ -107,8 +145,14 @@ def test_an_existing_period_under_the_same_identity_satisfies_the_guard(monkeypa
 def test_the_guard_creates_no_staging_and_scores_nothing(monkeypatch, tmp_path):
     calls, _report, _sqls = drive(monkeypatch, tmp_path, PUBLISHED)
     assert calls == ["inspect_target"], f"the builder went past the guard: {calls}"
-    for step in ("stage_matches", "validate_matches", "publish_atomic", "drop_staging",
-                 "distribution", "coverage"):
+    for step in (
+        "stage_matches",
+        "validate_matches",
+        "publish_atomic",
+        "drop_staging",
+        "distribution",
+        "coverage",
+    ):
         assert step not in calls
 
 
@@ -122,29 +166,44 @@ def test_the_guard_returns_the_identity_already_published(monkeypatch, tmp_path)
     assert report["matched_rows"] == 38_199_641
 
 
-@pytest.mark.parametrize("broken", [
-    {"n": 38_199_640}, {"n": 38_199_642}, {"n": 0}, {"n": 1},
-    {"mrun": "match:0000000000000000"},
-    {"mruns": 2}, {"cruns": 2}, {"svers": 2}, {"nvers": 2}, {"bvers": 2},
-])
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"n": 38_199_640},
+        {"n": 38_199_642},
+        {"n": 0},
+        {"n": 1},
+        {"mrun": "match:0000000000000000"},
+        {"mruns": 2},
+        {"cruns": 2},
+        {"svers": 2},
+        {"nvers": 2},
+        {"bvers": 2},
+    ],
+)
 def test_any_mismatched_invariant_does_not_satisfy_the_guard(monkeypatch, tmp_path, broken):
     calls, outcome, _sqls = drive(monkeypatch, tmp_path, {**PUBLISHED, **broken})
     assert isinstance(outcome, ReachedHeavyWork), f"{broken} wrongly satisfied the guard"
     assert "stage_matches" in calls
 
 
-@pytest.mark.parametrize("field,kwarg,other", [
-    ("crun", "candidate", "blk:0000000000000000"),
-    ("sver", "scoring", "2.0.0+ffffffffffff"),
-    ("nver", "norm", "1.1.0+b3253b155934"),
-    ("bver", "blocking", "staged-2.0.0"),
-])
+@pytest.mark.parametrize(
+    "field,kwarg,other",
+    [
+        ("crun", "candidate", "blk:0000000000000000"),
+        ("sver", "scoring", "2.0.0+ffffffffffff"),
+        ("nver", "norm", "1.1.0+b3253b155934"),
+        ("bver", "blocking", "staged-2.0.0"),
+    ],
+)
 def test_an_output_built_from_another_input_does_not_satisfy_the_guard(
-        monkeypatch, tmp_path, field, kwarg, other):
+    monkeypatch, tmp_path, field, kwarg, other
+):
     """Each of these is in the run id, so a table written under a different one carries a
     different identity -- and the column has to disagree too."""
     calls, outcome, _sqls = drive(
-        monkeypatch, tmp_path, {**PUBLISHED, field: other}, **{kwarg: other})
+        monkeypatch, tmp_path, {**PUBLISHED, field: other}, **{kwarg: other}
+    )
     assert isinstance(outcome, ReachedHeavyWork)
     assert "stage_matches" in calls
 
@@ -176,13 +235,18 @@ def test_the_guard_query_carries_the_required_partition_filter(monkeypatch, tmp_
 def test_the_match_run_id_formula_is_unchanged():
     """The identity is derived from inputs alone; changing the formula would orphan
     match:101eef5c5b5c081e."""
-    body = inspect.getsource(mod.main)
+    # Whitespace-collapsed, so the assertions below pin the formula rather than the
+    # line wrapping a formatter chose for it.
+    body = " ".join(inspect.getsource(mod.main).split())
     assert '"match:" + hashlib.sha256(' in body
-    assert '{args.norm_version}|{args.blocking_version}|{args.candidate_run_id}|' in body
-    assert '{rules.version}|{F.FEATURE_VERSION}' in body
-    recomputed = "match:" + hashlib.sha256(
-        f"{NORM}|{BLOCKING}|{CANDIDATE}|{SCORING}|{F.FEATURE_VERSION}".encode()
-    ).hexdigest()[:16]
+    assert "{args.norm_version}|{args.blocking_version}|{args.candidate_run_id}|" in body
+    assert "{rules.version}|{F.FEATURE_VERSION}" in body
+    recomputed = (
+        "match:"
+        + hashlib.sha256(
+            f"{NORM}|{BLOCKING}|{CANDIDATE}|{SCORING}|{F.FEATURE_VERSION}".encode()
+        ).hexdigest()[:16]
+    )
     assert recomputed == EXPECTED_RUN_ID
 
 

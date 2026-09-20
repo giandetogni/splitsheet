@@ -71,14 +71,24 @@ def cohort_pairs(client, stats):
         GROUP BY 1, 2, 3
     """
     job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
-    rows = [(r["artist_name"], r["recording_name"], r["failure_reason"], int(r["listens"]))
-            for r in job.result()]
-    stats.append({"step": "cohort pairs", "job_id": job.job_id,
-                  "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-                  "rows": len(rows)})
-    print(f"  cohort: {len(rows):,} distinct pairs, "
-          f"{sum(r[3] for r in rows):,} listens  billed={job.total_bytes_billed or 0:,}",
-          flush=True)
+    rows = [
+        (r["artist_name"], r["recording_name"], r["failure_reason"], int(r["listens"]))
+        for r in job.result()
+    ]
+    stats.append(
+        {
+            "step": "cohort pairs",
+            "job_id": job.job_id,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "rows": len(rows),
+        }
+    )
+    print(
+        f"  cohort: {len(rows):,} distinct pairs, "
+        f"{sum(r[3] for r in rows):,} listens  billed={job.total_bytes_billed or 0:,}",
+        flush=True,
+    )
     return rows
 
 
@@ -103,11 +113,20 @@ def canonical_rows(client, scripts: tuple[str, ...], stats):
     """
     job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
     result = job.result()
-    stats.append({"step": f"canonical rows for {'+'.join(scripts)}", "job_id": job.job_id,
-                  "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-                  "rows": result.total_rows})
-    print(f"  canonical for {'+'.join(scripts)}: {result.total_rows:,} rows  "
-          f"billed={job.total_bytes_billed or 0:,}", flush=True)
+    stats.append(
+        {
+            "step": f"canonical rows for {'+'.join(scripts)}",
+            "job_id": job.job_id,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "rows": result.total_rows,
+        }
+    )
+    print(
+        f"  canonical for {'+'.join(scripts)}: {result.total_rows:,} rows  "
+        f"billed={job.total_bytes_billed or 0:,}",
+        flush=True,
+    )
     return result
 
 
@@ -133,8 +152,11 @@ def evaluate(name: str, scripts: tuple[str, ...], cohort, client, rules, stats) 
             # pathological key is how a probe runs the machine out of memory.
             if len(bucket) < MAX_CANDIDATES_PER_KEY + 1:
                 bucket.append(row["recording_mbid"])
-    print(f"     canonical: {canonical_seen:,} scanned, {canonical_covered:,} fully covered, "
-          f"{canonical_keyed:,} produced a key, {len(index):,} distinct keys", flush=True)
+    print(
+        f"     canonical: {canonical_seen:,} scanned, {canonical_covered:,} fully covered, "
+        f"{canonical_keyed:,} produced a key, {len(index):,} distinct keys",
+        flush=True,
+    )
 
     # --- listen side ------------------------------------------------------------------------
     scripts_found: Counter = Counter()
@@ -190,15 +212,29 @@ def evaluate(name: str, scripts: tuple[str, ...], cohort, client, rules, stats) 
             zero_listens += listens
 
         if len(examples["korean"]) < 6 and inventory["hangul"]:
-            examples["korean"].append({
-                "artist": artist, "recording": recording, "listens": listens,
-                "transliterated": f"{artist_t} / {title_t}", "lookup_key": n.lookup_exact,
-                "candidates": count, "candidate_sample": candidates[:3]})
+            examples["korean"].append(
+                {
+                    "artist": artist,
+                    "recording": recording,
+                    "listens": listens,
+                    "transliterated": f"{artist_t} / {title_t}",
+                    "lookup_key": n.lookup_exact,
+                    "candidates": count,
+                    "candidate_sample": candidates[:3],
+                }
+            )
         elif len(examples["japanese"]) < 6 and (inventory["kana"] or inventory["han"]):
-            examples["japanese"].append({
-                "artist": artist, "recording": recording, "listens": listens,
-                "transliterated": f"{artist_t} / {title_t}", "lookup_key": n.lookup_exact,
-                "candidates": count, "candidate_sample": candidates[:3]})
+            examples["japanese"].append(
+                {
+                    "artist": artist,
+                    "recording": recording,
+                    "listens": listens,
+                    "transliterated": f"{artist_t} / {title_t}",
+                    "lookup_key": n.lookup_exact,
+                    "candidates": count,
+                    "candidate_sample": candidates[:3],
+                }
+            )
 
     matchable = unique_listens + multi_listens
     unique_rate = (unique_listens / matchable) if matchable else 0.0
@@ -218,11 +254,15 @@ def evaluate(name: str, scripts: tuple[str, ...], cohort, client, rules, stats) 
         "listens_with_no_candidate": zero_listens,
         "unique_candidate_rate": round(unique_rate, 6),
         "keys_over_candidate_cap": len(over_cap_keys),
-        "worst_key_candidates": max(over_cap_keys.values()) if over_cap_keys else
-                                (max(candidate_counts) if candidate_counts else 0),
+        "worst_key_candidates": (
+            max(over_cap_keys.values())
+            if over_cap_keys
+            else (max(candidate_counts) if candidate_counts else 0)
+        ),
         "newly_keyed_listens_by_prior_failure_reason": dict(by_reason),
         "candidate_count_distribution_by_listens": {
-            str(k): v for k, v in sorted(candidate_counts.items())},
+            str(k): v for k, v in sorted(candidate_counts.items())
+        },
         "examples": examples,
         "constraints": {
             "unique_candidate_rate_ok": unique_rate >= MIN_UNIQUE_CANDIDATE_RATE,
@@ -230,11 +270,15 @@ def evaluate(name: str, scripts: tuple[str, ...], cohort, client, rules, stats) 
         },
     }
     result["satisfies_frozen_constraints"] = all(result["constraints"].values())
-    print(f"     listens affected {affected_listens:,}; keyed {keyed_listens:,}; "
-          f"unique {unique_listens:,}; multi {multi_listens:,}; none {zero_listens:,}")
-    print(f"     unique-candidate rate {unique_rate:.4f} "
-          f"(constraint >= {MIN_UNIQUE_CANDIDATE_RATE})  "
-          f"keys over {MAX_CANDIDATES_PER_KEY} candidates: {len(over_cap_keys)}")
+    print(
+        f"     listens affected {affected_listens:,}; keyed {keyed_listens:,}; "
+        f"unique {unique_listens:,}; multi {multi_listens:,}; none {zero_listens:,}"
+    )
+    print(
+        f"     unique-candidate rate {unique_rate:.4f} "
+        f"(constraint >= {MIN_UNIQUE_CANDIDATE_RATE})  "
+        f"keys over {MAX_CANDIDATES_PER_KEY} candidates: {len(over_cap_keys)}"
+    )
     print(f"     satisfies frozen constraints: {result['satisfies_frozen_constraints']}")
     index.clear()
     return result, scripts_found
@@ -251,8 +295,10 @@ def main() -> None:
     client = bigquery.Client(project=PROJECT)
     stats: list = []
     t0 = time.time()
-    print(f"probe under normalization {rules.version} (unchanged; this probe writes nothing)",
-          flush=True)
+    print(
+        f"probe under normalization {rules.version} (unchanged; this probe writes nothing)",
+        flush=True,
+    )
 
     cohort = cohort_pairs(client, stats)
     results = []
@@ -266,12 +312,16 @@ def main() -> None:
     eligible = [r for r in results if r["satisfies_frozen_constraints"]]
     if eligible:
         chosen = max(eligible, key=lambda r: r["listens_that_produced_a_key"])
-        decision = ("frozen rule: among alternatives satisfying both constraints, the one keying "
-                    "the most listens")
+        decision = (
+            "frozen rule: among alternatives satisfying both constraints, the one keying "
+            "the most listens"
+        )
     else:
         chosen = None
-        decision = ("NO alternative satisfied the frozen constraints; the frozen rule says "
-                    "implement nothing and report a negative result")
+        decision = (
+            "NO alternative satisfied the frozen constraints; the frozen rule says "
+            "implement nothing and report a negative result"
+        )
 
     report = {
         "artifact": "transliteration_probe",
@@ -297,8 +347,8 @@ def main() -> None:
         "cost": {
             "bytes_billed": sum(s.get("bytes_billed") or 0 for s in stats),
             "list_price_equivalent_usd": round(
-                sum(s.get("bytes_billed") or 0 for s in stats) / 1024**4
-                * ON_DEMAND_USD_PER_TIB, 4),
+                sum(s.get("bytes_billed") or 0 for s in stats) / 1024**4 * ON_DEMAND_USD_PER_TIB, 4
+            ),
             "caveat": "list-price equivalent; actual monetary cost UNKNOWN without billing evidence",
         },
         "wall_seconds": round(time.time() - t0, 1),
@@ -312,10 +362,12 @@ def main() -> None:
     print(f"\n  DECISION: {chosen['alternative'] if chosen else 'IMPLEMENT NOTHING'}")
     print(f"    {decision}")
     for r in results:
-        print(f"    {r['alternative']:<16} keyed={r['listens_that_produced_a_key']:>10,}  "
-              f"unique_rate={r['unique_candidate_rate']:.4f}  "
-              f"over_cap_keys={r['keys_over_candidate_cap']}  "
-              f"ok={r['satisfies_frozen_constraints']}")
+        print(
+            f"    {r['alternative']:<16} keyed={r['listens_that_produced_a_key']:>10,}  "
+            f"unique_rate={r['unique_candidate_rate']:.4f}  "
+            f"over_cap_keys={r['keys_over_candidate_cap']}  "
+            f"ok={r['satisfies_frozen_constraints']}"
+        )
 
 
 if __name__ == "__main__":

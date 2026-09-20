@@ -30,8 +30,10 @@ import json
 import pathlib
 import time
 
-PERIOD = ("listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
-          "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'")
+PERIOD = (
+    "listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
+    "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'"
+)
 EXPECTED_LISTENS = 38_199_641
 MATCHER_SA = "splitsheet-matcher@ss-de-944054e7.iam.gserviceaccount.com"
 MAX_BYTES = 200 * 1024**3
@@ -70,21 +72,29 @@ def client_as_matcher(project: str):
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
     src, _ = google.auth.default(scopes=scopes)
     creds = impersonated_credentials.Credentials(
-        source_credentials=src, target_principal=MATCHER_SA, target_scopes=scopes)
+        source_credentials=src, target_principal=MATCHER_SA, target_scopes=scopes
+    )
     return bigquery.Client(project=project, credentials=creds)
 
 
 def run(client, sql: str, label: str, stats: list):
     from google.cloud import bigquery
 
-    job = client.query(sql, job_config=bigquery.QueryJobConfig(
-        maximum_bytes_billed=MAX_BYTES))
+    job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
     rows = [dict(r) for r in job.result()]
-    stats.append({"step": label, "job_id": job.job_id,
-                  "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-                  "duration_ms": int((job.ended - job.started).total_seconds() * 1000)})
-    print(f"  {label:<24} billed={job.total_bytes_billed or 0:>14,} "
-          f"slot_ms={job.slot_millis or 0:>10,}")
+    stats.append(
+        {
+            "step": label,
+            "job_id": job.job_id,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
+        }
+    )
+    print(
+        f"  {label:<24} billed={job.total_bytes_billed or 0:>14,} "
+        f"slot_ms={job.slot_millis or 0:>10,}"
+    )
     return rows
 
 
@@ -104,14 +114,20 @@ def main() -> None:
     stats: list = []
     t0 = time.time()
 
-    run_id = "match:" + hashlib.sha256(
-        f"{args.norm_version}|{args.blocking_version}|{args.candidate_run_id}|"
-        f"{pol['version']}|{pol['digest']}".encode()).hexdigest()[:16]
+    run_id = (
+        "match:"
+        + hashlib.sha256(
+            f"{args.norm_version}|{args.blocking_version}|{args.candidate_run_id}|"
+            f"{pol['version']}|{pol['digest']}".encode()
+        ).hexdigest()[:16]
+    )
     print(f"baseline_policy {pol['version']}+{pol['digest']}  match_run_id {run_id}")
 
     stg = f"{p}.splitsheet_silver.stg_baseline_cardinality"
 
-    run(c, f"""
+    run(
+        c,
+        f"""
         CREATE OR REPLACE TABLE `{stg}`
         PARTITION BY DATE(listened_at) AS
         WITH counts AS (
@@ -173,16 +189,29 @@ def main() -> None:
           '{run_id}' AS match_run_id,
           CURRENT_TIMESTAMP() AS created_at
         FROM j
-    """, "stage_matches", stats)
+    """,
+        "stage_matches",
+        stats,
+    )
 
-    cols = {r["column_name"] for r in run(c, f"""
+    cols = {
+        r["column_name"]
+        for r in run(
+            c,
+            f"""
         SELECT column_name FROM `{p}.splitsheet_silver`.INFORMATION_SCHEMA.COLUMNS
         WHERE table_name = 'baseline_cardinality_matches'
-    """, "target_columns", stats)}
+    """,
+            "target_columns",
+            stats,
+        )
+    }
     if any("confidence" in col for col in cols):
         raise SystemExit(f"target table still has a confidence column: {sorted(cols)}")
 
-    v = run(c, f"""
+    v = run(
+        c,
+        f"""
         SELECT COUNT(*) AS n, COUNT(DISTINCT listen_hash) AS distinct_hash,
                COUNTIF(match_status='MATCHED' AND matched_recording_mbid IS NULL) AS matched_without_mbid,
                COUNTIF(match_status='UNRESOLVED' AND failure_reason IS NULL) AS unresolved_without_reason,
@@ -191,7 +220,10 @@ def main() -> None:
                COUNTIF(failure_reason = 'UNKNOWN') AS unknown_bucket,
                COUNTIF(failure_reason LIKE 'AMBIGUOUS_TIE%') AS ambiguous_tie
         FROM `{stg}`
-    """, "validate_matches", stats)[0]
+    """,
+        "validate_matches",
+        stats,
+    )[0]
     checks = {
         "one_row_per_listen": int(v["n"]) == EXPECTED_LISTENS
         and int(v["distinct_hash"]) == EXPECTED_LISTENS,
@@ -209,22 +241,32 @@ def main() -> None:
     if args.fail_before_publish:
         raise SystemExit("INJECTED FAILURE after staging validation, before publication.")
 
-    run(c, f"""
+    run(
+        c,
+        f"""
         BEGIN TRANSACTION;
         DELETE FROM `{p}.splitsheet_silver.baseline_cardinality_matches` WHERE {PERIOD};
         INSERT INTO `{p}.splitsheet_silver.baseline_cardinality_matches`
         SELECT * FROM `{stg}`;
         COMMIT TRANSACTION;
-    """, "publish_atomic", stats)
+    """,
+        "publish_atomic",
+        stats,
+    )
     run(c, f"DROP TABLE IF EXISTS `{stg}`", "drop_staging", stats)
 
-    dist = run(c, f"""
+    dist = run(
+        c,
+        f"""
         SELECT match_tier, match_status, failure_reason, COUNT(*) AS listens,
                ROUND(100*COUNT(*)/{EXPECTED_LISTENS}, 4) AS pct
         FROM `{p}.splitsheet_silver.baseline_cardinality_matches`
         WHERE {PERIOD}
         GROUP BY 1,2,3 ORDER BY listens DESC
-    """, "tier_distribution", stats)
+    """,
+        "tier_distribution",
+        stats,
+    )
 
     report = {
         "artifact": "baseline_cardinality_matches",
@@ -242,8 +284,10 @@ def main() -> None:
         json.dump(report, fh, indent=1, default=str)
     print()
     for d in dist:
-        print(f"  tier {d['match_tier']} {d['match_status']:<11} "
-              f"{d['failure_reason'] or '-':<26} {d['listens']:>10,}  {d['pct']:>8}%")
+        print(
+            f"  tier {d['match_tier']} {d['match_status']:<11} "
+            f"{d['failure_reason'] or '-':<26} {d['listens']:>10,}  {d['pct']:>8}%"
+        )
 
 
 if __name__ == "__main__":

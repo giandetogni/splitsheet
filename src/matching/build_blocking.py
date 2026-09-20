@@ -29,8 +29,10 @@ import hashlib
 import json
 import time
 
-PERIOD = ("listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
-          "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'")
+PERIOD = (
+    "listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
+    "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'"
+)
 EXPECTED_LISTENS = 38_199_641
 # The candidate count is not one of the run id's inputs, so it is pinned per run
 # rather than as a standing constant: 34,466,312 was measured for
@@ -42,11 +44,14 @@ SNAPSHOT = "2026-07-17"
 MATCHER_SA = "splitsheet-matcher@ss-de-944054e7.iam.gserviceaccount.com"
 MAX_BYTES = 200 * 1024**3
 
+
 # U+001F, identical to the separator used when the mapping was built in Python.
 def pair_hash_sql(alias: str) -> str:
     """Alias-qualified: both sides of the join carry artist_name/recording_name."""
-    return (f"TO_HEX(SHA256(CONCAT({alias}.artist_name, CODE_POINTS_TO_STRING([31]), "
-            f"{alias}.recording_name)))")
+    return (
+        f"TO_HEX(SHA256(CONCAT({alias}.artist_name, CODE_POINTS_TO_STRING([31]), "
+        f"{alias}.recording_name)))"
+    )
 
 
 def client_as_matcher(project: str):
@@ -57,24 +62,30 @@ def client_as_matcher(project: str):
     scopes = ["https://www.googleapis.com/auth/cloud-platform"]
     src, _ = google.auth.default(scopes=scopes)
     creds = impersonated_credentials.Credentials(
-        source_credentials=src, target_principal=MATCHER_SA, target_scopes=scopes)
+        source_credentials=src, target_principal=MATCHER_SA, target_scopes=scopes
+    )
     return bigquery.Client(project=project, credentials=creds)
 
 
 def run(client, sql: str, label: str, stats: list):
     from google.cloud import bigquery
 
-    job = client.query(sql, job_config=bigquery.QueryJobConfig(
-        maximum_bytes_billed=MAX_BYTES))
+    job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
     rows = [dict(r) for r in job.result()]
-    stats.append({
-        "step": label, "job_id": job.job_id,
-        "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-        "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
-        "dml_rows": job.num_dml_affected_rows,
-    })
-    print(f"  {label:<26} billed={job.total_bytes_billed or 0:>14,} "
-          f"slot_ms={job.slot_millis or 0:>10,} rows={job.num_dml_affected_rows}")
+    stats.append(
+        {
+            "step": label,
+            "job_id": job.job_id,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
+            "dml_rows": job.num_dml_affected_rows,
+        }
+    )
+    print(
+        f"  {label:<26} billed={job.total_bytes_billed or 0:>14,} "
+        f"slot_ms={job.slot_millis or 0:>10,} rows={job.num_dml_affected_rows}"
+    )
     return rows
 
 
@@ -93,15 +104,20 @@ def main() -> None:
     t0 = time.time()
 
     # Deterministic: same inputs and config produce the same run id.
-    run_id = "blk:" + hashlib.sha256(
-        f"{args.norm_version}|{args.blocking_version}|{SNAPSHOT}|{EXPECTED_LISTENS}".encode()
-    ).hexdigest()[:16]
+    run_id = (
+        "blk:"
+        + hashlib.sha256(
+            f"{args.norm_version}|{args.blocking_version}|{SNAPSHOT}|{EXPECTED_LISTENS}".encode()
+        ).hexdigest()[:16]
+    )
     print(f"candidate_run_id = {run_id}")
 
     # Before staging, before the two index joins and before the published tables: if the
     # candidates already carry this run id under the same versions and snapshot, the work
     # would reproduce what is already there and rewrite every row for a fresh timestamp.
-    current = run(c, f"""
+    current = run(
+        c,
+        f"""
         SELECT COUNT(*) AS n,
                COUNT(DISTINCT candidate_run_id) AS runs, MIN(candidate_run_id) AS run_id,
                COUNT(DISTINCT normalization_version) AS nvers,
@@ -110,18 +126,28 @@ def main() -> None:
                COUNT(DISTINCT canonical_snapshot_date) AS snaps,
                MIN(canonical_snapshot_date) AS snap
         FROM `{p}.splitsheet_silver.silver_match_candidates`
-    """, "inspect_target", stats)[0]
+    """,
+        "inspect_target",
+        stats,
+    )[0]
     ratified = EXPECTED_CANDIDATES.get(run_id)
-    already = (ratified is not None and int(current["n"]) == ratified
-               and int(current["runs"]) == 1
-               and current["run_id"] == run_id
-               and int(current["nvers"]) == 1 and current["nver"] == args.norm_version
-               and int(current["bvers"]) == 1 and current["bver"] == args.blocking_version
-               and int(current["snaps"]) == 1 and str(current["snap"]) == SNAPSHOT)
+    already = (
+        ratified is not None
+        and int(current["n"]) == ratified
+        and int(current["runs"]) == 1
+        and current["run_id"] == run_id
+        and int(current["nvers"]) == 1
+        and current["nver"] == args.norm_version
+        and int(current["bvers"]) == 1
+        and current["bver"] == args.blocking_version
+        and int(current["snaps"]) == 1
+        and str(current["snap"]) == SNAPSHOT
+    )
     if already:
         print(f"target already holds {run_id}: nothing written")
         report = {
-            "candidate_run_id": run_id, "skipped": True,
+            "candidate_run_id": run_id,
+            "skipped": True,
             "normalization_version": args.norm_version,
             "blocking_version": args.blocking_version,
             "candidate_rows": int(current["n"]),
@@ -137,7 +163,9 @@ def main() -> None:
     stg_cand = f"{p}.splitsheet_silver.stg_match_candidates"
 
     # --- stage normalized listens -------------------------------------------------------
-    run(c, f"""
+    run(
+        c,
+        f"""
         CREATE OR REPLACE TABLE `{stg_norm}`
         PARTITION BY DATE(listened_at) AS
         SELECT v.listen_hash, v.listened_at, v.artist_name, v.recording_name,
@@ -150,19 +178,32 @@ def main() -> None:
         FROM `{p}.splitsheet_bronze.v_matcher_input` v
         JOIN `{p}.splitsheet_bronze.listen_pair_normalization` m
           ON m.pair_hash = {pair_hash_sql('v')}
-    """, "stage_normalized", stats)
+    """,
+        "stage_normalized",
+        stats,
+    )
 
-    v = run(c, f"""
+    v = run(
+        c,
+        f"""
         SELECT COUNT(*) AS n, COUNT(DISTINCT listen_hash) AS distinct_hash,
                COUNTIF(normalization_version != '{args.norm_version}') AS wrong_version
         FROM `{stg_norm}`
-    """, "validate_normalized", stats)[0]
-    if int(v["n"]) != EXPECTED_LISTENS or int(v["distinct_hash"]) != EXPECTED_LISTENS \
-            or int(v["wrong_version"]) != 0:
+    """,
+        "validate_normalized",
+        stats,
+    )[0]
+    if (
+        int(v["n"]) != EXPECTED_LISTENS
+        or int(v["distinct_hash"]) != EXPECTED_LISTENS
+        or int(v["wrong_version"]) != 0
+    ):
         raise SystemExit(f"normalized staging failed validation: {v}")
 
     # --- stage candidates: EXACT first, FALLBACK only where EXACT found nothing ---------
-    run(c, f"""
+    run(
+        c,
+        f"""
         CREATE OR REPLACE TABLE `{stg_cand}` AS
         WITH exact_hits AS (
           SELECT n.listen_hash, i.recording_mbid AS candidate_recording_mbid,
@@ -190,9 +231,14 @@ def main() -> None:
         SELECT * FROM exact_hits
         UNION ALL
         SELECT * FROM fallback_hits
-    """, "stage_candidates", stats)
+    """,
+        "stage_candidates",
+        stats,
+    )
 
-    g = run(c, f"""
+    g = run(
+        c,
+        f"""
         SELECT COUNT(*) AS n,
                COUNT(DISTINCT FORMAT('%t|%t|%t', listen_hash, candidate_recording_mbid,
                                      block_method)) AS distinct_grain,
@@ -202,7 +248,10 @@ def main() -> None:
                   HAVING COUNTIF(block_method='EXACT') > 0
                      AND COUNTIF(block_method='FALLBACK') > 0)) AS listens_with_both_stages
         FROM `{stg_cand}`
-    """, "validate_candidates", stats)[0]
+    """,
+        "validate_candidates",
+        stats,
+    )[0]
     if int(g["n"]) != int(g["distinct_grain"]):
         raise SystemExit(f"candidate grain is not unique: {g}")
     if int(g["empty_keys"]) != 0:
@@ -214,7 +263,9 @@ def main() -> None:
         raise SystemExit("INJECTED FAILURE after staging validation, before publication.")
 
     # --- publish both, atomically -------------------------------------------------------
-    run(c, f"""
+    run(
+        c,
+        f"""
         BEGIN TRANSACTION;
         DELETE FROM `{p}.splitsheet_silver.silver_listens_normalized` WHERE {PERIOD};
         INSERT INTO `{p}.splitsheet_silver.silver_listens_normalized`
@@ -226,7 +277,10 @@ def main() -> None:
                '{run_id}', CURRENT_TIMESTAMP()
         FROM `{stg_cand}`;
         COMMIT TRANSACTION;
-    """, "publish_atomic", stats)
+    """,
+        "publish_atomic",
+        stats,
+    )
 
     for t in (stg_norm, stg_cand):
         run(c, f"DROP TABLE IF EXISTS `{t}`", "drop_staging", stats)
@@ -245,10 +299,23 @@ def main() -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1)
-    print(json.dumps({k: report[k] for k in
-                      ("candidate_run_id", "normalized_rows", "candidate_rows",
-                       "listens_with_both_stages", "total_bytes_billed",
-                       "total_slot_ms", "wall_seconds")}, indent=1))
+    print(
+        json.dumps(
+            {
+                k: report[k]
+                for k in (
+                    "candidate_run_id",
+                    "normalized_rows",
+                    "candidate_rows",
+                    "listens_with_both_stages",
+                    "total_bytes_billed",
+                    "total_slot_ms",
+                    "wall_seconds",
+                )
+            },
+            indent=1,
+        )
+    )
 
 
 if __name__ == "__main__":

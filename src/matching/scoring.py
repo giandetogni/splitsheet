@@ -38,13 +38,17 @@ DEFAULT_CONFIG_PATH = pathlib.Path(__file__).parents[2] / "config/scoring_rules.
 # The features the config may name, and which of them are booleans that need a cast in SQL.
 # Column names in silver_candidate_features are identical to the config's feature names.
 FEATURE_COLUMNS = (
-    "artist_unicode_exact", "recording_unicode_exact",
-    "artist_token_similarity", "recording_token_similarity",
-    "artist_string_similarity", "recording_string_similarity",
+    "artist_unicode_exact",
+    "recording_unicode_exact",
+    "artist_token_similarity",
+    "recording_token_similarity",
+    "artist_string_similarity",
+    "recording_string_similarity",
     "release_lower_exact",
 )
-BOOL_FEATURES = frozenset({"artist_unicode_exact", "recording_unicode_exact",
-                           "release_lower_exact"})
+BOOL_FEATURES = frozenset(
+    {"artist_unicode_exact", "recording_unicode_exact", "release_lower_exact"}
+)
 
 ACCEPTED = "ACCEPTED"
 AMBIGUOUS_TIE = "AMBIGUOUS_TIE"
@@ -90,8 +94,9 @@ class ScoringRules:
     def applied_threshold(self, block_method: str) -> float:
         return self.exact_threshold if block_method == "EXACT" else self.fallback_threshold
 
-    def decide(self, block_method: str, candidate_count: int,
-               top1: float | None, top2: float | None) -> str:
+    def decide(
+        self, block_method: str, candidate_count: int, top1: float | None, top2: float | None
+    ) -> str:
         """One outcome per listen. See the module docstring for why the order is the policy."""
         if candidate_count == 0 or top1 is None:
             return NO_BLOCK_CANDIDATES
@@ -109,20 +114,27 @@ class ScoringRules:
     def sql_score(self, alias: str = "") -> str:
         p = f"{alias}." if alias else ""
         used = [(n, self.weights[n]) for n in FEATURE_COLUMNS if self.weights.get(n, 0.0)]
+
         def expr(name: str) -> str:
             col = f"{p}{name}"
             return f"CAST({col} AS INT64)" if name in BOOL_FEATURES else col
+
         num = " + ".join(f"IF({p}{n} IS NULL, 0, {w} * {expr(n)})" for n, w in used)
         den = " + ".join(f"IF({p}{n} IS NULL, 0, {w})" for n, w in used)
         return f"SAFE_DIVIDE({num}, NULLIF({den}, 0))"
 
     def sql_applied_threshold(self, block_method: str = "block_method") -> str:
-        return (f"IF({block_method} = 'EXACT', {self.exact_threshold}, "
-                f"{self.fallback_threshold})")
+        return (
+            f"IF({block_method} = 'EXACT', {self.exact_threshold}, " f"{self.fallback_threshold})"
+        )
 
-    def sql_decision(self, block_method: str = "block_method",
-                     candidate_count: str = "candidate_count",
-                     top1: str = "top1", top2: str = "top2") -> str:
+    def sql_decision(
+        self,
+        block_method: str = "block_method",
+        candidate_count: str = "candidate_count",
+        top1: str = "top1",
+        top2: str = "top2",
+    ) -> str:
         return f"""CASE
           WHEN {candidate_count} = 0 OR {top1} IS NULL THEN '{NO_BLOCK_CANDIDATES}'
           WHEN {top1} < {self.sql_applied_threshold(block_method)} THEN '{BELOW_THRESHOLD}'
@@ -148,8 +160,13 @@ def _semantic_subset(raw: dict) -> dict:
         "tie_epsilon": float(raw["tie_epsilon"]),
         "low_information_policy": {
             k: raw["low_information_policy"][k]
-            for k in ("suppress_candidates", "score_on_full_unicode_text",
-                      "use_ascii_key_as_score_evidence", "separate_threshold")},
+            for k in (
+                "suppress_candidates",
+                "score_on_full_unicode_text",
+                "use_ascii_key_as_score_evidence",
+                "separate_threshold",
+            )
+        },
     }
 
 
@@ -158,8 +175,9 @@ def compute_digest(raw: dict) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
-def load_scoring_rules(path: str | pathlib.Path | None = None,
-                       require_digest: bool = True) -> ScoringRules:
+def load_scoring_rules(
+    path: str | pathlib.Path | None = None, require_digest: bool = True
+) -> ScoringRules:
     import yaml
 
     p = pathlib.Path(path) if path is not None else DEFAULT_CONFIG_PATH
@@ -172,20 +190,25 @@ def load_scoring_rules(path: str | pathlib.Path | None = None,
         raise ValueError(
             f"config/scoring_rules.yml content digest is {digest} but the file records "
             f"{recorded!r}. A weight, threshold or margin changed without the digest being "
-            f"updated: refusing to score under a version that no longer describes the rules.")
+            f"updated: refusing to score under a version that no longer describes the rules."
+        )
 
     lip = raw["low_information_policy"]
     if lip["suppress_candidates"] or lip["use_ascii_key_as_score_evidence"]:
-        raise ValueError("low-information keys may not be suppressed or scored on the ASCII "
-                         "key; the preflight measured 100% unique agreement for them")
+        raise ValueError(
+            "low-information keys may not be suppressed or scored on the ASCII "
+            "key; the preflight measured 100% unique agreement for them"
+        )
     weights = {k: float(v["weight"]) for k, v in raw["features"].items()}
     unknown = set(weights) - set(FEATURE_COLUMNS)
     if unknown:
-        raise ValueError(f"config names features that do not exist in the feature table: "
-                         f"{sorted(unknown)}")
+        raise ValueError(
+            f"config names features that do not exist in the feature table: " f"{sorted(unknown)}"
+        )
     if raw["tie_epsilon"] > raw["minimum_score_margin"]:
-        raise ValueError("tie_epsilon above minimum_score_margin would make the margin rule "
-                         "unreachable")
+        raise ValueError(
+            "tie_epsilon above minimum_score_margin would make the margin rule " "unreachable"
+        )
     return ScoringRules(
         scoring_version=str(raw["scoring_version"]),
         feature_version=str(raw["feature_version"]),

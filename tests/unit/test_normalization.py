@@ -92,23 +92,31 @@ def test_transliterable_scripts_now_produce_a_key_and_keep_their_script(artist, 
     assert n.exact_key_status is KeyStatus.AVAILABLE
 
 
-@pytest.mark.parametrize(("artist", "recording", "expected"), [
-    pytest.param("Radiohead", "丸ノ内サディスティック", KeyStatus.PARTIAL, id="latin-artist-cjk-track"),
-    pytest.param("椎名林檎", "Tokyo", KeyStatus.PARTIAL, id="cjk-artist-latin-track"),
-    pytest.param("椎名林檎", "丸ノ内サディスティック", KeyStatus.EMPTY, id="both-cjk"),
-    pytest.param("Radiohead", "Creep", KeyStatus.AVAILABLE, id="both-latin"),
-])
+@pytest.mark.parametrize(
+    ("artist", "recording", "expected"),
+    [
+        pytest.param(
+            "Radiohead", "丸ノ内サディスティック", KeyStatus.PARTIAL, id="latin-artist-cjk-track"
+        ),
+        pytest.param("椎名林檎", "Tokyo", KeyStatus.PARTIAL, id="cjk-artist-latin-track"),
+        pytest.param("椎名林檎", "丸ノ内サディスティック", KeyStatus.EMPTY, id="both-cjk"),
+        pytest.param("Radiohead", "Creep", KeyStatus.AVAILABLE, id="both-latin"),
+    ],
+)
 def test_key_status_distinguishes_partial_from_empty(artist, recording, expected):
     n = normalize(artist, recording)
     assert n.exact_key_status is expected
     assert n.normalization_status is NormalizationStatus.VALID
 
 
-@pytest.mark.parametrize(("artist", "recording"), [
-    ("Radiohead", "丸ノ内サディスティック"),
-    ("椎名林檎", "Tokyo"),
-    ("Various Artists", "乡愁四韵"),
-])
+@pytest.mark.parametrize(
+    ("artist", "recording"),
+    [
+        ("Radiohead", "丸ノ内サディスティック"),
+        ("椎名林檎", "Tokyo"),
+        ("Various Artists", "乡愁四韵"),
+    ],
+)
 def test_no_partial_key_is_ever_emitted(artist, recording):
     """Half a key would collapse every such recording by that artist into one bucket."""
     n = normalize(artist, recording)
@@ -125,13 +133,16 @@ def test_punctuation_only_is_a_content_error():
     assert n.status_detail
 
 
-@pytest.mark.parametrize(("artist", "recording", "status"), [
-    ("", "Some Track", NormalizationStatus.MISSING_ARTIST),
-    (None, "Some Track", NormalizationStatus.MISSING_ARTIST),
-    ("   ", "Some Track", NormalizationStatus.MISSING_ARTIST),
-    ("Some Artist", "", NormalizationStatus.MISSING_RECORDING),
-    ("Some Artist", None, NormalizationStatus.MISSING_RECORDING),
-])
+@pytest.mark.parametrize(
+    ("artist", "recording", "status"),
+    [
+        ("", "Some Track", NormalizationStatus.MISSING_ARTIST),
+        (None, "Some Track", NormalizationStatus.MISSING_ARTIST),
+        ("   ", "Some Track", NormalizationStatus.MISSING_ARTIST),
+        ("Some Artist", "", NormalizationStatus.MISSING_RECORDING),
+        ("Some Artist", None, NormalizationStatus.MISSING_RECORDING),
+    ],
+)
 def test_absent_fields_are_classified_not_dropped(artist, recording, status):
     n = normalize(artist, recording)
     assert n.normalization_status is status
@@ -149,8 +160,7 @@ def test_composed_and_decomposed_unicode_converge():
 
 def test_casefold_handles_sharp_s_and_final_sigma():
     assert normalized_unicode("STRASSE", RULES) == normalized_unicode("Straße", RULES)
-    assert normalized_unicode("ΟΔΟΣ", RULES) == \
-        normalized_unicode("οδός", RULES)
+    assert normalized_unicode("ΟΔΟΣ", RULES) == normalized_unicode("οδός", RULES)
 
 
 def test_unicode_punctuation_becomes_a_space_not_a_join():
@@ -160,26 +170,35 @@ def test_unicode_punctuation_becomes_a_space_not_a_join():
 
 # --- stage 1: exact ---------------------------------------------------------------------
 
-@pytest.mark.parametrize(("artist", "recording", "expected"), [
-    ("Radiohead", "Paranoid Android", "radioheadparanoidandroid"),
-    ("Radiohead", "Paranoid Android - Remastered 2017",
-     "radioheadparanoidandroidremastered2017"),
-    ("Radiohead", "Paranoid Android (Live)", "radioheadparanoidandroidlive"),
-    ("Beyoncé", "Déjà Vu", "beyoncedejavu"),
-    ("Sigur Rós", "Untitled #3", "sigurrosuntitled3"),
-    ("A  Tribe   Called Quest", "Can I Kick It?", "atribecalledquestcanikickit"),
-    ("AC/DC", "T.N.T.", "acdctnt"),
-    ("The Beatles", "Let It Be", "thebeatlesletitbe"),
-])
+
+@pytest.mark.parametrize(
+    ("artist", "recording", "expected"),
+    [
+        ("Radiohead", "Paranoid Android", "radioheadparanoidandroid"),
+        (
+            "Radiohead",
+            "Paranoid Android - Remastered 2017",
+            "radioheadparanoidandroidremastered2017",
+        ),
+        ("Radiohead", "Paranoid Android (Live)", "radioheadparanoidandroidlive"),
+        ("Beyoncé", "Déjà Vu", "beyoncedejavu"),
+        ("Sigur Rós", "Untitled #3", "sigurrosuntitled3"),
+        ("A  Tribe   Called Quest", "Can I Kick It?", "atribecalledquestcanikickit"),
+        ("AC/DC", "T.N.T.", "acdctnt"),
+        ("The Beatles", "Let It Be", "thebeatlesletitbe"),
+    ],
+)
 def test_exact_lookup_is_conservative(artist, recording, expected):
     assert normalize(artist, recording).lookup_exact == expected
 
 
 def test_exact_never_applies_fallback_rules():
     """If the exact stage starts stripping, the 73.64% measurement stops describing it."""
-    for recording, marker in [("Song - Live", "live"),
-                              ("Song (Remastered 2017)", "remastered"),
-                              ("Song feat. X", "feat")]:
+    for recording, marker in [
+        ("Song - Live", "live"),
+        ("Song (Remastered 2017)", "remastered"),
+        ("Song feat. X", "feat"),
+    ]:
         n = normalize("The Artist", recording)
         assert marker in n.lookup_exact, f"exact stage stripped {marker!r}"
         assert n.lookup_exact.startswith("theartist"), "exact stripped a leading article"
@@ -187,24 +206,32 @@ def test_exact_never_applies_fallback_rules():
 
 # --- stage 2: fallback ------------------------------------------------------------------
 
-@pytest.mark.parametrize(("recording", "expected"), [
-    ("Paranoid Android", "paranoidandroid"),
-    ("Paranoid Android - Remastered 2017", "paranoidandroid"),
-    ("Paranoid Android - 2017 Remaster", "paranoidandroid"),
-    ("Paranoid Android (Live)", "paranoidandroid"),
-    ("Paranoid Android [Deluxe Edition]", "paranoidandroid"),
-    ("Paranoid Android - Radio Edit", "paranoidandroid"),
-    ("Paranoid Android (feat. Someone)", "paranoidandroid"),
-    ("Paranoid Android - Anniversary Edition 2017", "paranoidandroid"),
-])
+
+@pytest.mark.parametrize(
+    ("recording", "expected"),
+    [
+        ("Paranoid Android", "paranoidandroid"),
+        ("Paranoid Android - Remastered 2017", "paranoidandroid"),
+        ("Paranoid Android - 2017 Remaster", "paranoidandroid"),
+        ("Paranoid Android (Live)", "paranoidandroid"),
+        ("Paranoid Android [Deluxe Edition]", "paranoidandroid"),
+        ("Paranoid Android - Radio Edit", "paranoidandroid"),
+        ("Paranoid Android (feat. Someone)", "paranoidandroid"),
+        ("Paranoid Android - Anniversary Edition 2017", "paranoidandroid"),
+    ],
+)
 def test_fallback_collapses_version_markers(recording, expected):
     assert aggressive(recording, RULES) == expected
 
 
 def test_variants_stay_distinct_at_exact_and_merge_at_fallback():
-    variants = ["Paranoid Android", "Paranoid Android - Remastered 2017",
-                "Paranoid Android (Live)", "Paranoid Android - 2017 Remaster",
-                "Paranoid Android [Deluxe Edition]"]
+    variants = [
+        "Paranoid Android",
+        "Paranoid Android - Remastered 2017",
+        "Paranoid Android (Live)",
+        "Paranoid Android - 2017 Remaster",
+        "Paranoid Android [Deluxe Edition]",
+    ]
     exact = {normalize("Radiohead", v).lookup_exact for v in variants}
     fallback = {normalize("Radiohead", v).lookup_fallback for v in variants}
     assert len(exact) == len(variants), "exact stage merged variants it must keep apart"
@@ -213,24 +240,39 @@ def test_variants_stay_distinct_at_exact_and_merge_at_fallback():
 
 # --- years: only inside recognised structures -------------------------------------------
 
-@pytest.mark.parametrize("title", [
-    "1999", "1984", "2001", "Class of 1984", "Live 2000", "Summer of 69",
-    "1969", "2112", "Nineteen 1985",
-])
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "1999",
+        "1984",
+        "2001",
+        "Class of 1984",
+        "Live 2000",
+        "Summer of 69",
+        "1969",
+        "2112",
+        "Nineteen 1985",
+    ],
+)
 def test_legitimate_numeric_titles_are_preserved(title):
     """A bare four-digit strip would destroy every one of these."""
     digits = "".join(c for c in title if c.isdigit())
-    assert digits and digits in aggressive(title, RULES), \
-        f"fallback removed the year from the legitimate title {title!r}"
+    assert digits and digits in aggressive(
+        title, RULES
+    ), f"fallback removed the year from the legitimate title {title!r}"
 
 
-@pytest.mark.parametrize(("title", "must_not_contain"), [
-    ("Song - Remastered 2017", "2017"),
-    ("Song - 2017 Remaster", "2017"),
-    ("Song - Remastered in 1998", "1998"),
-    ("Song - Anniversary Edition 2017", "2017"),
-    ("Song - 2011 Remastered Version", "2011"),
-])
+@pytest.mark.parametrize(
+    ("title", "must_not_contain"),
+    [
+        ("Song - Remastered 2017", "2017"),
+        ("Song - 2017 Remaster", "2017"),
+        ("Song - Remastered in 1998", "1998"),
+        ("Song - Anniversary Edition 2017", "2017"),
+        ("Song - 2011 Remastered Version", "2011"),
+    ],
+)
 def test_year_is_removed_only_inside_a_recognised_structure(title, must_not_contain):
     assert must_not_contain not in aggressive(title, RULES)
 
@@ -260,12 +302,22 @@ def test_fallback_never_destroys_a_title_entirely():
 
 # --- word boundaries --------------------------------------------------------------------
 
-@pytest.mark.parametrize(("text", "expected"), [
-    ("Ftisha", "ftisha"), ("Aftermath", "aftermath"), ("Drift", "drift"),
-    ("Withered Hand", "witheredhand"), ("Within Temptation", "withintemptation"),
-    ("Deliverance", "deliverance"), ("Oliver", "oliver"), ("Alive", "alive"),
-    ("Monolith", "monolith"), ("Mixtape Vol 1", "mixtapevol1"),
-])
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Ftisha", "ftisha"),
+        ("Aftermath", "aftermath"),
+        ("Drift", "drift"),
+        ("Withered Hand", "witheredhand"),
+        ("Within Temptation", "withintemptation"),
+        ("Deliverance", "deliverance"),
+        ("Oliver", "oliver"),
+        ("Alive", "alive"),
+        ("Monolith", "monolith"),
+        ("Mixtape Vol 1", "mixtapevol1"),
+    ],
+)
 def test_markers_are_word_boundary_anchored(text, expected):
     assert aggressive(text, RULES) == expected
 
@@ -278,14 +330,22 @@ def test_featuring_marker_at_a_boundary_is_stripped():
 # --- invariants over a deterministic corpus ---------------------------------------------
 
 CORPUS = [
-    ("Radiohead", "Paranoid Android"), ("Radiohead", "Paranoid Android - Remastered 2017"),
-    ("Beyoncé", "Déjà Vu"), ("The Beatles", "Let It Be"),
+    ("Radiohead", "Paranoid Android"),
+    ("Radiohead", "Paranoid Android - Remastered 2017"),
+    ("Beyoncé", "Déjà Vu"),
+    ("The Beatles", "Let It Be"),
     ("Кино", "Группа крови"),
-    ("椎名林檎", "丸ノ内"), ("فيروز", "زهرة"),
+    ("椎名林檎", "丸ノ内"),
+    ("فيروز", "زهرة"),
     ("Ελευθερία", "Δυναμίτης"),
-    ("AC/DC", "T.N.T."), ("Prince", "1999"), ("Various", "Live 2000"),
-    ("!!!", "???"), ("", "Orphan"), ("Orphan", ""),
-    ("Sigur Rós", "Untitled #3"), ("Withered Hand", "Drift"),
+    ("AC/DC", "T.N.T."),
+    ("Prince", "1999"),
+    ("Various", "Live 2000"),
+    ("!!!", "???"),
+    ("", "Orphan"),
+    ("Orphan", ""),
+    ("Sigur Rós", "Untitled #3"),
+    ("Withered Hand", "Drift"),
     ("아이유", "좋은 날"),
 ]
 
@@ -309,8 +369,10 @@ def test_invariant_valid_content_never_normalizes_to_empty(artist, recording):
 @pytest.mark.parametrize(("artist", "recording"), CORPUS)
 def test_invariant_combined_key_is_never_partial(artist, recording):
     n = normalize(artist, recording)
-    for key, status in ((n.lookup_exact, n.exact_key_status),
-                        (n.lookup_fallback, n.fallback_key_status)):
+    for key, status in (
+        (n.lookup_exact, n.exact_key_status),
+        (n.lookup_fallback, n.fallback_key_status),
+    ):
         assert bool(key) == (status is KeyStatus.AVAILABLE)
 
 
@@ -325,6 +387,7 @@ def test_invariant_every_result_carries_the_version(artist, recording):
 
 
 # --- versioning cannot drift from the rules ---------------------------------------------
+
 
 def test_version_matches_the_pinned_value():
     """Fails if the rules changed without updating EXPECTED_VERSION.

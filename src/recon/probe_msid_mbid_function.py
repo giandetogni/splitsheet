@@ -44,14 +44,18 @@ def main() -> None:
 
     seen: dict[int, list] = {}  # msid_hash -> [rows, non_null, set(mbid_hash)]
     rows_scanned = 0
-    files = sorted((f for f in os.listdir(args.slice_dir) if f.endswith(".parquet")),
-                   key=lambda f: int(f.split(".")[0]))
+    files = sorted(
+        (f for f in os.listdir(args.slice_dir) if f.endswith(".parquet")),
+        key=lambda f: int(f.split(".")[0]),
+    )
     for fname in files:
-        tbl = pq.read_table(os.path.join(args.slice_dir, fname),
-                            columns=["recording_msid", "recording_mbid"])
+        tbl = pq.read_table(
+            os.path.join(args.slice_dir, fname), columns=["recording_msid", "recording_mbid"]
+        )
         rows_scanned += tbl.num_rows
-        for msid, mbid in zip(tbl.column("recording_msid").to_pylist(),
-                              tbl.column("recording_mbid").to_pylist()):
+        for msid, mbid in zip(
+            tbl.column("recording_msid").to_pylist(), tbl.column("recording_mbid").to_pylist()
+        ):
             if not isinstance(msid, str):
                 continue
             k = h64(msid)
@@ -97,8 +101,8 @@ def main() -> None:
         "ListenBrainz mapper reference label, not ground truth. Mixed and conflicting "
         "cases are candidates for upstream changes; attributing them to mapper revision "
         "requires a temporal analysis ruling out redirects and canonical corrections."
-        if strong else
-        "recording_mbid varies across occurrences of the same string, which is "
+        if strong
+        else "recording_mbid varies across occurrences of the same string, which is "
         "consistent with client-supplied values. Treat coverage claims with care."
     )
     with open(args.out, "w") as fh:

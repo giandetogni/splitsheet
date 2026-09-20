@@ -71,16 +71,19 @@ def main() -> None:
             if n.lookup_exact and n.lookup_exact == n.lookup_fallback:
                 c["stages_identical"] += 1
             if c["canonical_rows"] % 5_000_000 == 0:
-                print(f"  {c['canonical_rows']:,} rows -> "
-                      f"{c['index_rows_exact'] + c['index_rows_fallback']:,} index rows",
-                      flush=True)
+                print(
+                    f"  {c['canonical_rows']:,} rows -> "
+                    f"{c['index_rows_exact'] + c['index_rows_fallback']:,} index rows",
+                    flush=True,
+                )
 
     stats = {
         "normalization_version": rules.version,
         "counts": dict(c),
         "index_rows_total": c["index_rows_exact"] + c["index_rows_fallback"],
         "recordings_with_no_ascii_key_pct": round(
-            100 * c["exact_EMPTY"] / max(c["canonical_rows"], 1), 4),
+            100 * c["exact_EMPTY"] / max(c["canonical_rows"], 1), 4
+        ),
         "seconds": round(time.time() - t0, 1),
     }
     with open(args.stats, "w") as fh:

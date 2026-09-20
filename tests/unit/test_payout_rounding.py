@@ -25,14 +25,20 @@ from payout.rounding import (
     sql_remainder_rank,
 )
 
-THIRDS = [("MRH-000001", Decimal("33.3333")),
-          ("MRH-000002", Decimal("33.3333")),
-          ("MRH-000003", Decimal("33.3334"))]
+THIRDS = [
+    ("MRH-000001", Decimal("33.3333")),
+    ("MRH-000002", Decimal("33.3333")),
+    ("MRH-000003", Decimal("33.3334")),
+]
 
 EQUAL_HALVES = [("MRH-000002", Decimal("50.0000")), ("MRH-000001", Decimal("50.0000"))]
 
-FOUR_WAY = [("MRH-000010", Decimal("25.0000")), ("MRH-000011", Decimal("25.0000")),
-            ("MRH-000012", Decimal("25.0000")), ("MRH-000013", Decimal("25.0000"))]
+FOUR_WAY = [
+    ("MRH-000010", Decimal("25.0000")),
+    ("MRH-000011", Decimal("25.0000")),
+    ("MRH-000012", Decimal("25.0000")),
+    ("MRH-000013", Decimal("25.0000")),
+]
 
 
 def total(allocations) -> Decimal:
@@ -41,10 +47,26 @@ def total(allocations) -> Decimal:
 
 # --- the closure invariant ----------------------------------------------------------------
 
-@pytest.mark.parametrize("gross", [
-    "0.00", "0.01", "0.03", "1.00", "1.01", "9.99", "10.00", "0.07",
-    "123.45", "0.005", "0.015", "2.995", "1000.00", "0.0349",
-])
+
+@pytest.mark.parametrize(
+    "gross",
+    [
+        "0.00",
+        "0.01",
+        "0.03",
+        "1.00",
+        "1.01",
+        "9.99",
+        "10.00",
+        "0.07",
+        "123.45",
+        "0.005",
+        "0.015",
+        "2.995",
+        "1000.00",
+        "0.0349",
+    ],
+)
 @pytest.mark.parametrize("holders", [THIRDS, EQUAL_HALVES, FOUR_WAY])
 def test_published_amounts_always_close_to_the_published_gross(gross, holders):
     g = Decimal(gross)
@@ -88,11 +110,11 @@ def test_negative_gross_is_refused_rather_than_distributed():
 
 def test_negative_share_is_refused():
     with pytest.raises(ValueError, match="negative share"):
-        allocate(Decimal("1.00"), [("MRH-000001", Decimal(-50)),
-                                   ("MRH-000002", Decimal(150))])
+        allocate(Decimal("1.00"), [("MRH-000001", Decimal(-50)), ("MRH-000002", Decimal(150))])
 
 
 # --- fractional cents, built deliberately -------------------------------------------------
+
 
 def test_a_gross_that_cannot_be_split_evenly_still_closes():
     """0.07 across three holders: 2.3333 cents each. Two holders get 2c, one gets 3c."""
@@ -125,6 +147,7 @@ def test_a_half_cent_gross_rounds_once_and_the_parts_follow():
 
 # --- the deterministic tiebreak -----------------------------------------------------------
 
+
 def test_identical_fractions_are_broken_by_holder_id_ascending():
     """Two holders, one cent to give, identical discarded fractions. The lower id must win, and it
     must win regardless of the order the holders arrive in."""
@@ -140,16 +163,19 @@ def test_identical_fractions_are_broken_by_holder_id_ascending():
 def test_allocation_is_independent_of_input_order():
     for gross in ("0.01", "0.03", "1.00", "7.77"):
         a = {x.rights_holder_id: x.published for x in allocate(Decimal(gross), FOUR_WAY)}
-        b = {x.rights_holder_id: x.published
-             for x in allocate(Decimal(gross), list(reversed(FOUR_WAY)))}
+        b = {
+            x.rights_holder_id: x.published
+            for x in allocate(Decimal(gross), list(reversed(FOUR_WAY)))
+        }
         assert a == b, gross
 
 
 def test_repeated_allocation_is_identical():
     first = allocate(Decimal("1.00"), THIRDS)
     second = allocate(Decimal("1.00"), THIRDS)
-    assert [(a.rights_holder_id, a.published) for a in first] == \
-           [(a.rights_holder_id, a.published) for a in second]
+    assert [(a.rights_holder_id, a.published) for a in first] == [
+        (a.rights_holder_id, a.published) for a in second
+    ]
 
 
 def test_larger_fraction_beats_the_id_tiebreak():
@@ -163,6 +189,7 @@ def test_larger_fraction_beats_the_id_tiebreak():
 
 # --- everything is Decimal ----------------------------------------------------------------
 
+
 def test_no_value_in_an_allocation_is_a_float():
     for a in allocate(Decimal("1.00"), THIRDS):
         for value in (a.share_pct, a.unrounded, a.remainder_fraction, a.published):
@@ -171,6 +198,7 @@ def test_no_value_in_an_allocation_is_a_float():
 
 
 # --- the generated SQL matches the Python -------------------------------------------------
+
 
 def test_sql_helpers_use_numeric_literals_and_the_documented_order():
     assert "NUMERIC '0.01'" in sql_floor_cents("x")

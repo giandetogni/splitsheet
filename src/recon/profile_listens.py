@@ -40,7 +40,9 @@ SUFFIX_PATTERNS = [
 ]
 SUFFIX_RES = [(name, re.compile(pat, re.IGNORECASE)) for name, pat in SUFFIX_PATTERNS]
 PAREN_RE = re.compile(r"[\(\[][^\)\]]*[\)\]]")
-UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
 ISRC_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$", re.IGNORECASE)
 WS_RE = re.compile(r"\s+")
 
@@ -115,7 +117,10 @@ def main() -> None:
             continue
         if args.only_month:
             _ts = rec.get("timestamp")
-            if not isinstance(_ts, int) or time.strftime("%Y-%m", time.gmtime(_ts)) != args.only_month:
+            if (
+                not isinstance(_ts, int)
+                or time.strftime("%Y-%m", time.gmtime(_ts)) != args.only_month
+            ):
                 c["filtered_out_other_month"] += 1
                 continue
             c["kept_in_month"] += 1
@@ -230,10 +235,16 @@ def main() -> None:
         "rates_pct_of_parsed": {
             k: round(100.0 * c[k] / max(parsed, 1), 4)
             for k in (
-                "client_recording_mbid", "mapping_recording_mbid", "both_mbid_origins",
-                "no_mbid_any_origin", "isrc_present", "duration_present",
-                "null_or_blank_artist", "null_or_blank_track",
-                "track_has_version_marker", "dup_on_user_ts_msid",
+                "client_recording_mbid",
+                "mapping_recording_mbid",
+                "both_mbid_origins",
+                "no_mbid_any_origin",
+                "isrc_present",
+                "duration_present",
+                "null_or_blank_artist",
+                "null_or_blank_track",
+                "track_has_version_marker",
+                "dup_on_user_ts_msid",
             )
         },
         "mbid_agreement_pct_of_both": round(
@@ -257,8 +268,9 @@ def main() -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=2, ensure_ascii=False)
-    json.dump({k: report[k] for k in ("counts", "derived", "rates_pct_of_parsed")},
-              sys.stdout, indent=2)
+    json.dump(
+        {k: report[k] for k in ("counts", "derived", "rates_pct_of_parsed")}, sys.stdout, indent=2
+    )
     print()
 
 

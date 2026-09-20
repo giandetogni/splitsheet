@@ -40,8 +40,10 @@ from matching.scoring import load_scoring_rules
 
 PROJECT = "ss-de-944054e7"
 MAX_BYTES = 200 * 1024**3
-PERIOD = ("listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
-          "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'")
+PERIOD = (
+    "listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
+    "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'"
+)
 SNAPSHOT = "2026-07-17"
 
 PARTITION_LABELS = {
@@ -51,8 +53,9 @@ PARTITION_LABELS = {
 }
 
 
-def metrics_sql(partition_sql: str, partition: str, candidate_run_id: str,
-                select_expr: str, group_alias: str) -> str:
+def metrics_sql(
+    partition_sql: str, partition: str, candidate_run_id: str, select_expr: str, group_alias: str
+) -> str:
     return f"""
     WITH labelled AS (
       SELECT l.listen_hash, l.mapper_recording_mbid,
@@ -109,8 +112,9 @@ def rates(r: dict) -> dict:
     evaluable = matched - na
     judged = int(r["ranking_error"]) + int(r["ref_not_retrieved"])
     return {
-        "coverage": round(matched / int(r["labelled_listens"]), 6)
-        if r["labelled_listens"] else None,
+        "coverage": (
+            round(matched / int(r["labelled_listens"]), 6) if r["labelled_listens"] else None
+        ),
         "evaluable_accepted": evaluable,
         "agreement": round(int(r["agree"]) / evaluable, 6) if evaluable else None,
         "disagreement": round(judged / evaluable, 6) if evaluable else None,
@@ -136,25 +140,34 @@ def main() -> None:
     t0 = time.time()
 
     def q(sql: str, label: str):
-        job = client.query(sql, job_config=bigquery.QueryJobConfig(
-            maximum_bytes_billed=MAX_BYTES))
+        job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
         rows = [dict(r) for r in job.result()]
-        stats.append({"step": label, "job_id": job.job_id,
-                      "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis})
+        stats.append(
+            {
+                "step": label,
+                "job_id": job.job_id,
+                "bytes_billed": job.total_bytes_billed,
+                "slot_ms": job.slot_millis,
+            }
+        )
         print(f"  {label:<40} billed={job.total_bytes_billed or 0:>13,}", flush=True)
         return rows
 
-    published = q(f"""
+    published = q(
+        f"""
         SELECT DISTINCT scoring_version, match_run_id, candidate_run_id
         FROM `{PROJECT}.splitsheet_silver.silver_listen_matches` WHERE {PERIOD}
-    """, "published version check")
+    """,
+        "published version check",
+    )
     if len(published) != 1:
         raise SystemExit(f"expected exactly one published run, found {published}")
     if published[0]["scoring_version"] != rules.version:
         raise SystemExit(
             f"published rows were scored under {published[0]['scoring_version']} but "
             f"config/scoring_rules.yml is now {rules.version}: refusing to report a metric "
-            f"for a configuration that did not produce the rows")
+            f"for a configuration that did not produce the rows"
+        )
 
     report = {
         "opened_once": True,
@@ -163,29 +176,42 @@ def main() -> None:
         "match_run_id": published[0]["match_run_id"],
         "candidate_run_id": args.candidate_run_id,
         "partition_status": PARTITION_LABELS,
-        "label_status": ("correlated reference label, not independent ground truth; "
-                         "agreement is not absolute matching accuracy"),
+        "label_status": (
+            "correlated reference label, not independent ground truth; "
+            "agreement is not absolute matching accuracy"
+        ),
         "partitions": {},
     }
 
     for partition in ("validation", "calibration", "holdout"):
-        overall = q(metrics_sql(psql, partition, args.candidate_run_id,
-                                "'ALL' AS scope", "scope"), f"{partition}: overall")
-        by_method = q(metrics_sql(psql, partition, args.candidate_run_id,
-                                  "match_method", "match_method"),
-                      f"{partition}: by match_method")
-        by_info = q(metrics_sql(psql, partition, args.candidate_run_id,
-                                "blocking_key_information_class",
-                                "blocking_key_information_class"),
-                    f"{partition}: by information class")
+        overall = q(
+            metrics_sql(psql, partition, args.candidate_run_id, "'ALL' AS scope", "scope"),
+            f"{partition}: overall",
+        )
+        by_method = q(
+            metrics_sql(psql, partition, args.candidate_run_id, "match_method", "match_method"),
+            f"{partition}: by match_method",
+        )
+        by_info = q(
+            metrics_sql(
+                psql,
+                partition,
+                args.candidate_run_id,
+                "blocking_key_information_class",
+                "blocking_key_information_class",
+            ),
+            f"{partition}: by information class",
+        )
         report["partitions"][partition] = {
             "status": PARTITION_LABELS[partition],
             "overall": {"raw": overall[0], "rates": rates(overall[0])},
-            "by_method": [{"match_method": r["match_method"], "raw": r, "rates": rates(r)}
-                          for r in by_method],
+            "by_method": [
+                {"match_method": r["match_method"], "raw": r, "rates": rates(r)} for r in by_method
+            ],
             "by_information_class": [
                 {"class": r["blocking_key_information_class"], "raw": r, "rates": rates(r)}
-                for r in by_info],
+                for r in by_info
+            ],
         }
 
     report["bytes_billed"] = sum(s["bytes_billed"] or 0 for s in stats)
@@ -199,20 +225,28 @@ def main() -> None:
         p = report["partitions"][partition]
         o, rt = p["overall"]["raw"], p["overall"]["rates"]
         print(f"\n== {partition.upper()}  ({p['status']})")
-        print(f"  labelled listens {int(o['labelled_listens']):>10,}   "
-              f"coverage {rt['coverage']}   evaluable accepted {rt['evaluable_accepted']:,}")
-        print(f"  agreement {rt['agreement']}   disagreement {rt['disagreement']}   "
-              f"(ranking_error={rt['ranking_error']:,} not_retrieved={rt['ref_not_retrieved']:,} "
-              f"not_in_snapshot={rt['ref_not_in_snapshot']:,})")
-        print(f"  ambiguous_tie {int(o['ambiguous_tie']):,}   "
-              f"below_threshold {int(o['below_threshold']):,}   "
-              f"unresolved_with_reference_in_block "
-              f"{int(o['unresolved_with_reference_in_block']):,}")
+        print(
+            f"  labelled listens {int(o['labelled_listens']):>10,}   "
+            f"coverage {rt['coverage']}   evaluable accepted {rt['evaluable_accepted']:,}"
+        )
+        print(
+            f"  agreement {rt['agreement']}   disagreement {rt['disagreement']}   "
+            f"(ranking_error={rt['ranking_error']:,} not_retrieved={rt['ref_not_retrieved']:,} "
+            f"not_in_snapshot={rt['ref_not_in_snapshot']:,})"
+        )
+        print(
+            f"  ambiguous_tie {int(o['ambiguous_tie']):,}   "
+            f"below_threshold {int(o['below_threshold']):,}   "
+            f"unresolved_with_reference_in_block "
+            f"{int(o['unresolved_with_reference_in_block']):,}"
+        )
         for m in p["by_method"]:
             r, mr = m["raw"], m["rates"]
-            print(f"    {m['match_method']:<25} listens={int(r['labelled_listens']):>9,} "
-                  f"matched={int(r['matched']):>9,} evaluable={mr['evaluable_accepted']:>9,} "
-                  f"agreement={mr['agreement']} disagreement={mr['disagreement']}")
+            print(
+                f"    {m['match_method']:<25} listens={int(r['labelled_listens']):>9,} "
+                f"matched={int(r['matched']):>9,} evaluable={mr['evaluable_accepted']:>9,} "
+                f"agreement={mr['agreement']} disagreement={mr['disagreement']}"
+            )
 
 
 if __name__ == "__main__":

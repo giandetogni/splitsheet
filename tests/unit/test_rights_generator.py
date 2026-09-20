@@ -61,21 +61,29 @@ def _write(tmp_path, raw: dict):
 
 # --- versioning, proven by mutation -------------------------------------------------------
 
+
 def test_rights_version_is_pinned():
     assert MODEL.version == EXPECTED_RIGHTS_VERSION, (
         "the rights model changed without updating EXPECTED_RIGHTS_VERSION. Regenerating under "
-        f"a new model is fine, but set it to {MODEL.version!r} in the same commit.")
+        f"a new model is fine, but set it to {MODEL.version!r} in the same commit."
+    )
 
 
-@pytest.mark.parametrize("mutate", [
-    pytest.param(lambda r: r.update({"seed": "different-seed"}), id="seed"),
-    pytest.param(lambda r: r["holders"].update({"count": 70000}), id="holder_count"),
-    pytest.param(lambda r: r["defects"].update({"temporal_gap": 401}), id="defect_quota"),
-    pytest.param(lambda r: r["ownership"].update({"base_valid_from": "2024-01-01"}),
-                 id="interval"),
-    pytest.param(lambda r: r["rate_card"]["intervals"][1].update(
-        {"rate_per_stream": "0.0099000000"}), id="rate"),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda r: r.update({"seed": "different-seed"}), id="seed"),
+        pytest.param(lambda r: r["holders"].update({"count": 70000}), id="holder_count"),
+        pytest.param(lambda r: r["defects"].update({"temporal_gap": 401}), id="defect_quota"),
+        pytest.param(
+            lambda r: r["ownership"].update({"base_valid_from": "2024-01-01"}), id="interval"
+        ),
+        pytest.param(
+            lambda r: r["rate_card"]["intervals"][1].update({"rate_per_stream": "0.0099000000"}),
+            id="rate",
+        ),
+    ],
+)
 def test_changing_the_model_without_the_digest_fails_the_load(tmp_path, mutate):
     raw = copy.deepcopy(_raw())
     mutate(raw)
@@ -100,6 +108,7 @@ def test_a_rate_card_gap_that_disagrees_with_the_config_is_rejected(tmp_path):
 
 
 # --- determinism ---------------------------------------------------------------------------
+
 
 def test_unit_is_in_range_and_deterministic():
     values = [unit(MODEL.seed, "kind", i) for i in range(500)]
@@ -128,6 +137,7 @@ def test_holder_ids_are_zero_padded_and_stable():
 
 # --- the modeled declaration travels with the data ----------------------------------------
 
+
 def test_every_generated_row_declares_itself_modeled():
     assert holder_row(MODEL, 7)["is_modeled"] is True
     assert all(r["is_modeled"] is True for r in rate_card_rows(MODEL))
@@ -139,6 +149,7 @@ def test_holder_names_cannot_collide_with_a_real_organisation():
 
 
 # --- shares --------------------------------------------------------------------------------
+
 
 def test_shares_are_decimal_not_float():
     for share in shares_for(MODEL, MBIDS[0], 4):
@@ -181,11 +192,13 @@ def test_assignment_never_touches_the_reserved_holder_block():
 def test_assignment_is_skewed_towards_low_ranks():
     drawn = [i for m in MBIDS for i in holders_for(MODEL, m, 1)]
     first_eighth = sum(1 for i in drawn if i < MODEL.assignable_holders / 8)
-    assert first_eighth / len(drawn) > 0.35, (
-        "assignment_power is supposed to concentrate ownership; it does not")
+    assert (
+        first_eighth / len(drawn) > 0.35
+    ), "assignment_power is supposed to concentrate ownership; it does not"
 
 
 # --- half-open intervals -------------------------------------------------------------------
+
 
 def test_covers_includes_valid_from_and_excludes_valid_to():
     lo, hi = dt.date(2026, 6, 1), dt.date(2026, 6, 15)
@@ -221,15 +234,18 @@ def test_mid_period_change_produces_contiguous_intervals_with_different_holders(
         assert before and after
         assert not (before & after), (
             "the holder set must actually change, or a wrong interval predicate would still "
-            "select a plausible holder")
+            "select a plausible holder"
+        )
         # contiguous: the first interval ends exactly where the second begins
         ends = {r["valid_to"] for r in rows if r["valid_from"] == MODEL.base_valid_from}
         assert ends == {MODEL.change_date}
-        assert sum(r["share_pct"] for r in rows
-                   if r["valid_from"] == MODEL.change_date) == Decimal("100.0000")
+        assert sum(r["share_pct"] for r in rows if r["valid_from"] == MODEL.change_date) == Decimal(
+            "100.0000"
+        )
 
 
 # --- deliberate defects --------------------------------------------------------------------
+
 
 def test_defect_quotas_are_exact_and_disjoint():
     selected = select_defects(MODEL, MBIDS)
@@ -281,6 +297,7 @@ def test_healthy_recordings_are_not_quietly_defective():
 
 
 # --- rate card -----------------------------------------------------------------------------
+
 
 def test_rate_card_uses_decimal_and_declares_currency_and_version():
     for row in rate_card_rows(MODEL):

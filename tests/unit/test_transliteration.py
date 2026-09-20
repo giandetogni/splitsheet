@@ -44,14 +44,18 @@ EXPECTED_V2_VERSION = "1.1.0+b3253b155934"
 
 # --- Hangul --------------------------------------------------------------------------------
 
-@pytest.mark.parametrize(("hangul", "romanised"), [
-    ("해금", "haegeum"),          # the restatement's headline case
-    ("쩔어", "jjeoleo"),
-    ("팔도강산", "paldogangsan"),
-    ("다음", "daeum"),
-    ("한국", "hanguk"),   # final consonant romanises as k, not g
-    ("아", "a"),                  # initial ieung is silent
-])
+
+@pytest.mark.parametrize(
+    ("hangul", "romanised"),
+    [
+        ("해금", "haegeum"),  # the restatement's headline case
+        ("쩔어", "jjeoleo"),
+        ("팔도강산", "paldogangsan"),
+        ("다음", "daeum"),
+        ("한국", "hanguk"),  # final consonant romanises as k, not g
+        ("아", "a"),  # initial ieung is silent
+    ],
+)
 def test_hangul_syllables_romanise_by_the_arithmetic_decomposition(hangul, romanised):
     assert transliterate_hangul(hangul) == romanised
 
@@ -66,14 +70,18 @@ def test_hangul_is_detected_and_kana_is_not():
 
 # --- Kana ----------------------------------------------------------------------------------
 
-@pytest.mark.parametrize(("kana", "romaji"), [
-    ("アイドル", "aidoru"),
-    ("キャラメル", "kyarameru"),       # yoon merges into the previous syllable
-    ("ヨルシカ", "yorushika"),
-    ("ん", "n"),
-    ("ドラゴン", "doragon"),
-    ("サッカー", "sakkaa".replace("aa", "a")),  # sokuon doubles, chouonpu drops
-])
+
+@pytest.mark.parametrize(
+    ("kana", "romaji"),
+    [
+        ("アイドル", "aidoru"),
+        ("キャラメル", "kyarameru"),  # yoon merges into the previous syllable
+        ("ヨルシカ", "yorushika"),
+        ("ん", "n"),
+        ("ドラゴン", "doragon"),
+        ("サッカー", "sakkaa".replace("aa", "a")),  # sokuon doubles, chouonpu drops
+    ],
+)
 def test_kana_romanises_by_syllable(kana, romaji):
     assert transliterate_kana(kana) == romaji
 
@@ -91,6 +99,7 @@ def test_kana_is_detected():
 
 
 # --- kanji is deliberately not converted ---------------------------------------------------
+
 
 def test_kanji_is_recognised_and_never_transliterated():
     assert is_han("夜") and is_han("駆")
@@ -113,6 +122,7 @@ def test_transliterated_for_key_returns_the_input_unchanged_when_not_covered():
 
 
 # --- coverage and inventory ----------------------------------------------------------------
+
 
 def test_full_coverage_is_required_for_a_key():
     for text in ("해금", "アイドル", "Creep", "해금 remix"):
@@ -142,6 +152,7 @@ def test_would_transliterate_only_fires_for_enabled_scripts():
 
 
 # --- v1 stays reproducible -----------------------------------------------------------------
+
 
 def test_the_frozen_v1_rule_set_still_produces_its_exact_version():
     """If this fails, the v1 financial publication is no longer reproducible from its rules and the
@@ -180,8 +191,12 @@ def test_transliteration_never_changes_the_preserved_unicode_value():
 
 def test_latin_content_is_byte_identical_between_the_two_versions():
     """The unaffected cohort must not move. Anything else would make the restatement unbounded."""
-    for artist, title in [("Radiohead", "Creep"), ("The Beatles", "Let It Be (Remastered 2009)"),
-                          ("Kino", "Gruppa krovi"), ("Sigur Ros", "Hoppipolla")]:
+    for artist, title in [
+        ("Radiohead", "Creep"),
+        ("The Beatles", "Let It Be (Remastered 2009)"),
+        ("Kino", "Gruppa krovi"),
+        ("Sigur Ros", "Hoppipolla"),
+    ]:
         before = normalize(artist, title, rules=V1)
         after = normalize(artist, title, rules=V2)
         assert before.lookup_exact == after.lookup_exact
@@ -192,15 +207,19 @@ def test_latin_content_is_byte_identical_between_the_two_versions():
 
 # --- versioning, proven by mutation --------------------------------------------------------
 
+
 def test_the_live_version_is_pinned():
     assert V2.version == EXPECTED_V2_VERSION
 
 
-@pytest.mark.parametrize("mutate", [
-    pytest.param(lambda r: r["transliteration"].update({"scripts": ["hangul"]}), id="scripts"),
-    pytest.param(lambda r: r["transliteration"].update({"enabled": False}), id="enabled"),
-    pytest.param(lambda r: r["transliteration"].update({"stage": "everywhere"}), id="stage"),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda r: r["transliteration"].update({"scripts": ["hangul"]}), id="scripts"),
+        pytest.param(lambda r: r["transliteration"].update({"enabled": False}), id="enabled"),
+        pytest.param(lambda r: r["transliteration"].update({"stage": "everywhere"}), id="stage"),
+    ],
+)
 def test_changing_the_transliteration_rule_changes_the_version(tmp_path, mutate):
     """The new rule cannot appear silently under any existing version string."""
     with open(LIVE_PATH) as fh:

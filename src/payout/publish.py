@@ -46,38 +46,51 @@ DBT_BIN = REPO / ".venv/bin/dbt"
 POINTER_TABLE = f"{PROJECT}.{DATASET}.publication_pointer"
 FACT_TABLE = f"{PROJECT}.{DATASET}.fct_royalty_attribution"
 
-FINANCIAL_MODELS = ["int_financial_disposition", "int_attributable_streams",
-                    "fct_royalty_attribution", "fct_royalty_attribution_current",
-                    "royalty_reconciliation"]
+FINANCIAL_MODELS = [
+    "int_financial_disposition",
+    "int_attributable_streams",
+    "fct_royalty_attribution",
+    "fct_royalty_attribution_current",
+    "royalty_reconciliation",
+]
 
 
 def bq_client():
     from google.cloud import bigquery
+
     return bigquery.Client(project=PROJECT)
 
 
 def run_query(client, sql: str, label: str, stats: list, dry_run: bool = False):
     from google.cloud import bigquery
 
-    cfg = bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES, dry_run=dry_run,
-                                  use_query_cache=False)
+    cfg = bigquery.QueryJobConfig(
+        maximum_bytes_billed=MAX_BYTES, dry_run=dry_run, use_query_cache=False
+    )
     job = client.query(sql, job_config=cfg)
     if dry_run:
-        stats.append({"step": label, "dry_run": True,
-                      "estimated_bytes": job.total_bytes_processed})
+        stats.append({"step": label, "dry_run": True, "estimated_bytes": job.total_bytes_processed})
         print(f"  DRY RUN {label:<34} estimated={job.total_bytes_processed or 0:>13,}", flush=True)
         return None
     rows = [dict(r) for r in job.result()]
-    stats.append({"step": label, "job_id": job.job_id,
-                  "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis,
-                  "duration_ms": int((job.ended - job.started).total_seconds() * 1000)})
+    stats.append(
+        {
+            "step": label,
+            "job_id": job.job_id,
+            "bytes_billed": job.total_bytes_billed,
+            "slot_ms": job.slot_millis,
+            "duration_ms": int((job.ended - job.started).total_seconds() * 1000),
+        }
+    )
     print(f"  {label:<42} billed={job.total_bytes_billed or 0:>13,}", flush=True)
     return rows
 
 
 def verify_frozen_inputs(client, policy, stats) -> dict:
     """The publisher refuses to price a different universe than the policy was written for."""
-    r = run_query(client, f"""
+    r = run_query(
+        client,
+        f"""
         SELECT
           (SELECT COUNT(DISTINCT match_run_id)
              FROM `{PROJECT}.splitsheet_silver.silver_listen_matches`
@@ -97,7 +110,10 @@ def verify_frozen_inputs(client, policy, stats) -> dict:
              FROM `{PROJECT}.splitsheet_rights.ownership_splits`) AS rights_generation_run_id,
           (SELECT MIN(rule_version_id) FROM `{PROJECT}.splitsheet_rights.rate_card`)
             AS rule_version_id
-    """, "verify frozen inputs", stats)[0]
+    """,
+        "verify frozen inputs",
+        stats,
+    )[0]
 
     expected = {
         "match_runs": 1,
@@ -112,12 +128,15 @@ def verify_frozen_inputs(client, policy, stats) -> dict:
         raise SystemExit(
             f"the warehouse no longer holds the inputs this policy was written for: "
             f"{mismatches}. Publishing would price a different universe under the same "
-            f"payout_policy_version.")
+            f"payout_policy_version."
+        )
     return {k: r[k] for k in expected}
 
 
 def ensure_pointer_table(client, stats) -> None:
-    run_query(client, f"""
+    run_query(
+        client,
+        f"""
         CREATE TABLE IF NOT EXISTS `{POINTER_TABLE}` (
           pointer_name STRING NOT NULL
             OPTIONS(description='CURRENT names the publication in force.'),
@@ -126,13 +145,18 @@ def ensure_pointer_table(client, stats) -> None:
           set_at TIMESTAMP NOT NULL,
           note STRING
         ) OPTIONS(description='Publication pointer. Mutable BY DESIGN and deliberately outside dbt: moving it changes which immutable publication is in force and touches no published row.')
-    """, "ensure pointer table", stats)
+    """,
+        "ensure pointer table",
+        stats,
+    )
 
 
 def set_pointer(client, run_id: str, policy_version: str, note: str, stats) -> None:
     """MERGE on pointer_name: the pointer is the one mutable object in the financial layer, and it
     contains no amounts. Published rows are never touched by this."""
-    run_query(client, f"""
+    run_query(
+        client,
+        f"""
         MERGE `{POINTER_TABLE}` t
         USING (SELECT 'CURRENT' AS pointer_name, '{run_id}' AS attribution_run_id,
                       '{policy_version}' AS payout_policy_version,
@@ -145,7 +169,10 @@ def set_pointer(client, run_id: str, policy_version: str, note: str, stats) -> N
         WHEN NOT MATCHED THEN INSERT (pointer_name, attribution_run_id, payout_policy_version,
                                       set_at, note)
         VALUES (s.pointer_name, s.attribution_run_id, s.payout_policy_version, s.set_at, s.note)
-    """, f"set pointer -> {run_id}", stats)
+    """,
+        f"set pointer -> {run_id}",
+        stats,
+    )
 
 
 def dbt(args: list[str], dbt_vars: dict, label: str) -> dict:
@@ -154,19 +181,25 @@ def dbt(args: list[str], dbt_vars: dict, label: str) -> dict:
     cmd = [str(DBT_BIN), *args, "--vars", json.dumps(dbt_vars)]
     env = {**dict(__import__("os").environ), "DBT_PROFILES_DIR": str(DBT_DIR)}
     t0 = time.time()
-    proc = subprocess.run(cmd, cwd=DBT_DIR, env=env, capture_output=True, text=True,
-                          check=False, timeout=3600)
+    proc = subprocess.run(
+        cmd, cwd=DBT_DIR, env=env, capture_output=True, text=True, check=False, timeout=3600
+    )
     tail = (proc.stdout or "")[-4000:]
     ok = proc.returncode == 0
     summary = [ln for ln in tail.splitlines() if "Done." in ln or "Completed" in ln]
-    print(f"  dbt {label:<38} exit={proc.returncode}  {summary[-1].strip() if summary else ''}",
-          flush=True)
+    print(
+        f"  dbt {label:<38} exit={proc.returncode}  {summary[-1].strip() if summary else ''}",
+        flush=True,
+    )
     if not ok:
         print(tail[-2500:], flush=True)
         raise SystemExit(f"dbt {label} failed with exit {proc.returncode}")
-    return {"label": label, "exit_code": proc.returncode,
-            "seconds": round(time.time() - t0, 1),
-            "summary": summary[-1].strip() if summary else None}
+    return {
+        "label": label,
+        "exit_code": proc.returncode,
+        "seconds": round(time.time() - t0, 1),
+        "summary": summary[-1].strip() if summary else None,
+    }
 
 
 def content_digest(client, run_id: str, stats, label: str) -> dict:
@@ -176,13 +209,21 @@ def content_digest(client, run_id: str, stats, label: str) -> dict:
     that the AMOUNTS and their keys are untouched.
     """
     r = run_query(client, publication_digest_sql(FACT_TABLE, run_id), label, stats)[0]
-    stamp = run_query(client, f"""
+    stamp = run_query(
+        client,
+        f"""
         SELECT MIN(published_at) AS first_published_at
         FROM `{FACT_TABLE}` WHERE attribution_run_id = '{run_id}'
-    """, f"{label}: published_at", stats)[0]
-    out = {"rows_published": r["row_count"], "content_digest": r["content_digest"],
-           "total_holder_payout": r["total_holder_payout"],
-           "first_published_at": stamp["first_published_at"]}
+    """,
+        f"{label}: published_at",
+        stats,
+    )[0]
+    out = {
+        "rows_published": r["row_count"],
+        "content_digest": r["content_digest"],
+        "total_holder_payout": r["total_holder_payout"],
+        "first_published_at": stamp["first_published_at"],
+    }
     return {k: (str(v) if v is not None else None) for k, v in out.items()}
 
 
@@ -197,11 +238,16 @@ def existing_publication(client, run_id: str, stats) -> dict | None:
     publication is in force has no bearing on which one this policy describes.
     """
     fact = content_digest(client, run_id, stats, "existing publication digest")
-    registered = run_query(client, f"""
+    registered = run_query(
+        client,
+        f"""
         SELECT publication_id, row_count, portfolio_paid, content_digest, frozen
         FROM `{PROJECT}.{DATASET}.publication_registry`
         WHERE attribution_run_id = '{run_id}'
-    """, "existing publication registry", stats)
+    """,
+        "existing publication registry",
+        stats,
+    )
 
     rows = int(fact["rows_published"])
     if rows == 0 and not registered:
@@ -209,23 +255,29 @@ def existing_publication(client, run_id: str, stats) -> dict | None:
     if rows == 0 or not registered:
         raise SystemExit(
             f"{run_id} is half published: {rows:,} fact rows against {len(registered)} registry "
-            f"entries. Refusing to build over an inconsistent publication.")
+            f"entries. Refusing to build over an inconsistent publication."
+        )
     if len(registered) != 1:
-        raise SystemExit(f"{run_id} maps to {len(registered)} registry entries: "
-                         f"{[r['publication_id'] for r in registered]}")
+        raise SystemExit(
+            f"{run_id} maps to {len(registered)} registry entries: "
+            f"{[r['publication_id'] for r in registered]}"
+        )
 
     entry = registered[0]
-    mismatch = {name: {"published": str(a), "registered": str(b)}
-                for name, a, b in (("row_count", rows, entry["row_count"]),
-                                   ("portfolio_paid", fact["total_holder_payout"],
-                                    entry["portfolio_paid"]),
-                                   ("content_digest", fact["content_digest"],
-                                    entry["content_digest"]))
-                if str(a) != str(b)}
+    mismatch = {
+        name: {"published": str(a), "registered": str(b)}
+        for name, a, b in (
+            ("row_count", rows, entry["row_count"]),
+            ("portfolio_paid", fact["total_holder_payout"], entry["portfolio_paid"]),
+            ("content_digest", fact["content_digest"], entry["content_digest"]),
+        )
+        if str(a) != str(b)
+    }
     if mismatch:
         raise SystemExit(
             f"{run_id} is already published as {entry['publication_id']} but does not match it: "
-            f"{mismatch}. Rebuilding would price a different result under a published identity.")
+            f"{mismatch}. Rebuilding would price a different result under a published identity."
+        )
     return {**fact, "publication_id": entry["publication_id"], "frozen": entry["frozen"]}
 
 
@@ -234,18 +286,29 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--label", default="PUBLISHED", choices=["PUBLISHED", "REHEARSAL"])
     ap.add_argument("--skip-dry-run", action="store_true")
-    ap.add_argument("--prove-idempotency", action="store_true",
-                    help="re-run the publication and prove the content is unchanged")
-    ap.add_argument("--prove-pointer-move", action="store_true",
-                    help="move the pointer away and back, proving published rows are untouched")
-    ap.add_argument("--move-pointer", action="store_true",
-                    help="promote this publication: point CURRENT at this attribution_run_id. "
-                         "Publishing and validating never move the pointer on their own, so a "
-                         "scheduled run cannot change which publication is in force.")
+    ap.add_argument(
+        "--prove-idempotency",
+        action="store_true",
+        help="re-run the publication and prove the content is unchanged",
+    )
+    ap.add_argument(
+        "--prove-pointer-move",
+        action="store_true",
+        help="move the pointer away and back, proving published rows are untouched",
+    )
+    ap.add_argument(
+        "--move-pointer",
+        action="store_true",
+        help="promote this publication: point CURRENT at this attribution_run_id. "
+        "Publishing and validating never move the pointer on their own, so a "
+        "scheduled run cannot change which publication is in force.",
+    )
     args = ap.parse_args()
     if args.prove_pointer_move and not args.move_pointer:
-        ap.error("--prove-pointer-move moves the pointer away and restores it, so it needs "
-                 "--move-pointer: exactly one flag authorises touching CURRENT.")
+        ap.error(
+            "--prove-pointer-move moves the pointer away and restores it, so it needs "
+            "--move-pointer: exactly one flag authorises touching CURRENT."
+        )
 
     policy = load_payout_policy()
     run_id = attribution_run_id(policy, args.label)
@@ -254,40 +317,66 @@ def main() -> None:
     dbt_runs: list = []
     t0 = time.time()
 
-    print(f"payout policy {policy.version}  label {args.label}  "
-          f"attribution_run_id {run_id}", flush=True)
+    print(
+        f"payout policy {policy.version}  label {args.label}  " f"attribution_run_id {run_id}",
+        flush=True,
+    )
 
     frozen = verify_frozen_inputs(client, policy, stats)
-    print(f"  frozen inputs verified: {frozen['match_run_id']} / {frozen['rights_version']}",
-          flush=True)
+    print(
+        f"  frozen inputs verified: {frozen['match_run_id']} / {frozen['rights_version']}",
+        flush=True,
+    )
 
     # Before any dbt work: this publication may already exist. Rebuilding it would rewrite the
     # derived financial models under THIS run id's vars, which is how a rerun aimed at a prior
     # publication left the restatement layer disagreeing with itself. Validate and stop.
     already = existing_publication(client, run_id, stats)
     if already:
-        print(f"  {run_id} already published as {already['publication_id']}: "
-              f"{int(already['rows_published']):,} rows, {already['total_holder_payout']} paid, "
-              f"digest {already['content_digest']}", flush=True)
+        print(
+            f"  {run_id} already published as {already['publication_id']}: "
+            f"{int(already['rows_published']):,} rows, {already['total_holder_payout']} paid, "
+            f"digest {already['content_digest']}",
+            flush=True,
+        )
         if args.move_pointer:
-            set_pointer(client, run_id, policy.version,
-                        f"{args.label} under payout policy {policy.version}", stats)
+            set_pointer(
+                client,
+                run_id,
+                policy.version,
+                f"{args.label} under payout policy {policy.version}",
+                stats,
+            )
         else:
-            print(f"  pointer NOT moved: CURRENT is unchanged. Pass --move-pointer to promote "
-                  f"{run_id}.", flush=True)
+            print(
+                f"  pointer NOT moved: CURRENT is unchanged. Pass --move-pointer to promote "
+                f"{run_id}.",
+                flush=True,
+            )
         report = {
-            "artifact": "royalty_attribution_publication", "skipped": True,
-            "payout_policy_version": policy.version, "publication_label": args.label,
-            "attribution_run_id": run_id, "publication_id": already["publication_id"],
+            "artifact": "royalty_attribution_publication",
+            "skipped": True,
+            "payout_policy_version": policy.version,
+            "publication_label": args.label,
+            "attribution_run_id": run_id,
+            "publication_id": already["publication_id"],
             "frozen_inputs_verified": frozen,
-            "existing_publication": already, "pointer_moved": args.move_pointer,
+            "existing_publication": already,
+            "pointer_moved": args.move_pointer,
             "bytes_billed_queries": sum(s.get("bytes_billed") or 0 for s in stats),
-            "wall_seconds": round(time.time() - t0, 1), "jobs": stats,
+            "wall_seconds": round(time.time() - t0, 1),
+            "jobs": stats,
         }
         pathlib.Path(args.out).write_text(json.dumps(report, indent=1, default=str))
-        print(json.dumps({k: report[k] for k in
-                          ("attribution_run_id", "publication_id", "skipped", "pointer_moved")},
-                         indent=1))
+        print(
+            json.dumps(
+                {
+                    k: report[k]
+                    for k in ("attribution_run_id", "publication_id", "skipped", "pointer_moved")
+                },
+                indent=1,
+            )
+        )
         return
 
     dbt_vars = {
@@ -307,9 +396,13 @@ def main() -> None:
     ensure_pointer_table(client, stats)
 
     # --- build ---------------------------------------------------------------------------
-    dbt_runs.append(dbt(["build", "--select",
-                         "int_financial_disposition+ int_attributable_streams+"], dbt_vars,
-                        "build financial layer"))
+    dbt_runs.append(
+        dbt(
+            ["build", "--select", "int_financial_disposition+ int_attributable_streams+"],
+            dbt_vars,
+            "build financial layer",
+        )
+    )
 
     first = content_digest(client, run_id, stats, "publication content digest")
     if int(first["rows_published"]) == 0:
@@ -318,48 +411,72 @@ def main() -> None:
     # force, and a run that only materialises and validates must leave that decision alone --
     # otherwise a scheduled publication silently changes what the business is standing behind.
     if args.move_pointer:
-        set_pointer(client, run_id, policy.version,
-                    f"{args.label} under payout policy {policy.version}", stats)
+        set_pointer(
+            client,
+            run_id,
+            policy.version,
+            f"{args.label} under payout policy {policy.version}",
+            stats,
+        )
     else:
-        print(f"  pointer NOT moved: CURRENT is unchanged. Pass --move-pointer to promote "
-              f"{run_id}.", flush=True)
+        print(
+            f"  pointer NOT moved: CURRENT is unchanged. Pass --move-pointer to promote "
+            f"{run_id}.",
+            flush=True,
+        )
 
     proofs: dict = {"first_publication": first, "pointer_moved": args.move_pointer}
 
     # --- idempotency: same inputs, same run id, zero new rows ----------------------------
     if args.prove_idempotency:
-        dbt_runs.append(dbt(["run", "--select", "fct_royalty_attribution"], dbt_vars,
-                            "re-run publication (idempotency)"))
+        dbt_runs.append(
+            dbt(
+                ["run", "--select", "fct_royalty_attribution"],
+                dbt_vars,
+                "re-run publication (idempotency)",
+            )
+        )
         second = content_digest(client, run_id, stats, "digest after re-run")
         proofs["after_rerun"] = second
         proofs["idempotent"] = (
             second["rows_published"] == first["rows_published"]
             and second["content_digest"] == first["content_digest"]
             and second["total_holder_payout"] == first["total_holder_payout"]
-            and second["first_published_at"] == first["first_published_at"])
+            and second["first_published_at"] == first["first_published_at"]
+        )
         if not proofs["idempotent"]:
             raise SystemExit(f"re-run changed the publication: {first} -> {second}")
 
     # --- pointer movement does not destroy anything --------------------------------------
     if args.prove_pointer_move:
         before = content_digest(client, run_id, stats, "digest before pointer move")
-        set_pointer(client, "attr:none", policy.version,
-                    "deliberate no-current-publication state, to prove pointer moves are "
-                    "non-destructive", stats)
+        set_pointer(
+            client,
+            "attr:none",
+            policy.version,
+            "deliberate no-current-publication state, to prove pointer moves are "
+            "non-destructive",
+            stats,
+        )
         during = content_digest(client, run_id, stats, "digest while pointer moved away")
-        current_rows = run_query(client, f"""
+        current_rows = run_query(
+            client,
+            f"""
             SELECT COUNT(*) AS n FROM `{PROJECT}.{DATASET}.fct_royalty_attribution_current`
-        """, "current view while pointer moved away", stats)[0]
-        set_pointer(client, run_id, policy.version,
-                    f"restored to {args.label} publication", stats)
+        """,
+            "current view while pointer moved away",
+            stats,
+        )[0]
+        set_pointer(client, run_id, policy.version, f"restored to {args.label} publication", stats)
         after = content_digest(client, run_id, stats, "digest after pointer restored")
         proofs["pointer_move"] = {
             "published_rows_before": before["rows_published"],
             "published_rows_while_moved": during["rows_published"],
             "published_rows_after": after["rows_published"],
             "current_view_rows_while_moved": int(current_rows["n"]),
-            "digest_unchanged": (before["content_digest"] == during["content_digest"]
-                                 == after["content_digest"]),
+            "digest_unchanged": (
+                before["content_digest"] == during["content_digest"] == after["content_digest"]
+            ),
             "previous_publication_still_queryable": int(during["rows_published"]) > 0,
         }
         if not proofs["pointer_move"]["digest_unchanged"]:
@@ -368,18 +485,25 @@ def main() -> None:
     # --- test the whole thing ------------------------------------------------------------
     dbt_runs.append(dbt(["test"], dbt_vars, "dbt test"))
 
-    reconciliation = run_query(client, f"""
+    reconciliation = run_query(
+        client,
+        f"""
         SELECT attribution_status, listens, streams, pct_of_all_listens, distinct_recordings,
                total_gross_royalty, total_holder_payout, holder_rows, recordings_paid, holders_paid
         FROM `{PROJECT}.{DATASET}.royalty_reconciliation`
         ORDER BY listens DESC
-    """, "reconciliation", stats)
+    """,
+        "reconciliation",
+        stats,
+    )
 
     # gross_royalty is a GROUP-level value repeated on every holder row, so summing it across rows
     # would multiply it by the holder count. The total gross is the sum of one gross per group, and
     # it must equal the total of the holder payouts -- which is the closure invariant at portfolio
     # level rather than per group.
-    money = run_query(client, f"""
+    money = run_query(
+        client,
+        f"""
         WITH per_group AS (
           SELECT period, recording_mbid, split_version_id, rate_card_id,
                  MAX(gross_royalty) AS gross_royalty,
@@ -411,21 +535,27 @@ def main() -> None:
           (SELECT SUM(remainder_cents) FROM per_group) AS remainder_cents_distributed,
           (SELECT COUNTIF(group_holder_payout != gross_royalty) FROM per_group)
             AS groups_that_do_not_close
-    """, "money summary", stats)[0]
+    """,
+        "money summary",
+        stats,
+    )[0]
     if int(money["groups_that_do_not_close"]) != 0:
         raise SystemExit(f"{money['groups_that_do_not_close']} groups do not close in cents")
     if str(money["total_gross_royalty"]) != str(money["total_holder_payout"]):
         raise SystemExit(
             f"portfolio total does not close: gross {money['total_gross_royalty']} vs paid "
-            f"{money['total_holder_payout']}")
+            f"{money['total_holder_payout']}"
+        )
 
     estimated = sum(s.get("estimated_bytes") or 0 for s in stats)
     billed = sum(s.get("bytes_billed") or 0 for s in stats)
     report = {
         "artifact": "royalty_attribution_publication",
         "declaration": {
-            "listenbrainz_listens": "REAL", "musicbrainz_recordings": "REAL",
-            "rights_holders": "MODELED", "ownership_splits": "MODELED",
+            "listenbrainz_listens": "REAL",
+            "musicbrainz_recordings": "REAL",
+            "rights_holders": "MODELED",
+            "ownership_splits": "MODELED",
             "rate_cards": "MODELED",
             "amounts": "illustrative modeled amounts, not observed industry payouts",
         },
@@ -436,8 +566,7 @@ def main() -> None:
         "policy": {
             "hold_methods": list(policy.hold_methods),
             "rate_imputation": "FORBIDDEN",
-            "rounding": "largest_remainder, single rounding point, tiebreak "
-                        + policy.tiebreak,
+            "rounding": "largest_remainder, single rounding point, tiebreak " + policy.tiebreak,
             "terminal_states": list(policy.attribution_states),
             "fact_grain": list(policy.fact_grain),
         },
@@ -449,32 +578,42 @@ def main() -> None:
             "estimated_bytes_dry_run": estimated,
             "bytes_billed_queries": billed,
             "list_price_equivalent_usd": round(billed / 1024**4 * ON_DEMAND_USD_PER_TIB, 4),
-            "caveat": ("list-price equivalent of processing consumption for this script's own "
-                       "queries; dbt's own job bytes are reported separately by dbt. Actual "
-                       "monetary cost UNKNOWN without billing evidence."),
+            "caveat": (
+                "list-price equivalent of processing consumption for this script's own "
+                "queries; dbt's own job bytes are reported separately by dbt. Actual "
+                "monetary cost UNKNOWN without billing evidence."
+            ),
         },
         "wall_seconds": round(time.time() - t0, 1),
         "jobs": stats,
     }
     pathlib.Path(args.out).write_text(json.dumps(report, indent=1, default=str))
 
-    print(f"\n  published {int(money['holder_rows']):,} holder rows over "
-          f"{int(money['financial_groups']):,} financial groups")
-    print(f"  gross {money['total_gross_royalty']} == paid {money['total_holder_payout']} "
-          f"{policy.currency}   negative={money['negative_payouts']}  "
-          f"zero={money['zero_payouts']}  remainder cents distributed="
-          f"{int(money['remainder_cents_distributed']):,}")
+    print(
+        f"\n  published {int(money['holder_rows']):,} holder rows over "
+        f"{int(money['financial_groups']):,} financial groups"
+    )
+    print(
+        f"  gross {money['total_gross_royalty']} == paid {money['total_holder_payout']} "
+        f"{policy.currency}   negative={money['negative_payouts']}  "
+        f"zero={money['zero_payouts']}  remainder cents distributed="
+        f"{int(money['remainder_cents_distributed']):,}"
+    )
     print("\n  waterfall:")
     for r in reconciliation:
-        print(f"    {r['attribution_status']:<22} listens={r['listens']:>12,}  "
-              f"{r['pct_of_all_listens']:>10}%")
+        print(
+            f"    {r['attribution_status']:<22} listens={r['listens']:>12,}  "
+            f"{r['pct_of_all_listens']:>10}%"
+        )
     if proofs.get("idempotent") is not None:
         print(f"\n  idempotent re-run: {proofs['idempotent']}")
     if "pointer_move" in proofs:
         pm = proofs["pointer_move"]
-        print(f"  pointer moved away and back: digest unchanged={pm['digest_unchanged']}, "
-              f"current view rows while moved={pm['current_view_rows_while_moved']}, "
-              f"previous publication still queryable={pm['previous_publication_still_queryable']}")
+        print(
+            f"  pointer moved away and back: digest unchanged={pm['digest_unchanged']}, "
+            f"current view rows while moved={pm['current_view_rows_while_moved']}, "
+            f"previous publication still queryable={pm['previous_publication_still_queryable']}"
+        )
 
 
 if __name__ == "__main__":

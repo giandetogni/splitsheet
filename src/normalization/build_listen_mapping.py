@@ -45,10 +45,16 @@ PERIOD_START = dt.datetime(2026, 6, 1)  # noqa: DTZ001
 PERIOD_END = dt.datetime(2026, 7, 1)  # noqa: DTZ001
 
 COLUMNS = [
-    "pair_hash", "artist_name", "recording_name",
-    "artist_normalized_unicode", "recording_normalized_unicode",
-    "lookup_exact", "lookup_fallback",
-    "normalization_status", "exact_key_status", "fallback_key_status",
+    "pair_hash",
+    "artist_name",
+    "recording_name",
+    "artist_normalized_unicode",
+    "recording_normalized_unicode",
+    "lookup_exact",
+    "lookup_fallback",
+    "normalization_status",
+    "exact_key_status",
+    "fallback_key_status",
 ]
 
 
@@ -70,18 +76,23 @@ def main() -> None:
     c: Counter = Counter()
     t0 = time.time()
 
-    files = sorted((f for f in os.listdir(args.slice_dir) if f.endswith(".parquet")),
-                   key=lambda f: int(f.split(".")[0]))
+    files = sorted(
+        (f for f in os.listdir(args.slice_dir) if f.endswith(".parquet")),
+        key=lambda f: int(f.split(".")[0]),
+    )
     with gzip.open(args.out, "wt", encoding="utf-8", newline="") as fh:
-        w = csv.writer(fh, delimiter="\t", lineterminator="\n",
-                       quoting=csv.QUOTE_MINIMAL)
+        w = csv.writer(fh, delimiter="\t", lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
         for fname in files:
-            tbl = pq.read_table(os.path.join(args.slice_dir, fname),
-                                columns=["artist_name", "recording_name", "listened_at"])
+            tbl = pq.read_table(
+                os.path.join(args.slice_dir, fname),
+                columns=["artist_name", "recording_name", "listened_at"],
+            )
             c["rows_in_member"] += tbl.num_rows
-            for artist, recording, ts in zip(tbl.column("artist_name").to_pylist(),
-                                             tbl.column("recording_name").to_pylist(),
-                                             tbl.column("listened_at").to_pylist()):
+            for artist, recording, ts in zip(
+                tbl.column("artist_name").to_pylist(),
+                tbl.column("recording_name").to_pylist(),
+                tbl.column("listened_at").to_pylist(),
+            ):
                 if ts is None or ts < PERIOD_START or ts >= PERIOD_END:
                     c["rows_outside_period"] += 1
                     continue
@@ -95,13 +106,20 @@ def main() -> None:
                 c[f"norm_{n.normalization_status.value}"] += 1
                 c[f"exact_{n.exact_key_status.value}"] += 1
                 c[f"fallback_{n.fallback_key_status.value}"] += 1
-                w.writerow([
-                    ph, a, r,
-                    n.artist_normalized_unicode, n.recording_normalized_unicode,
-                    n.lookup_exact, n.lookup_fallback,
-                    n.normalization_status.value,
-                    n.exact_key_status.value, n.fallback_key_status.value,
-                ])
+                w.writerow(
+                    [
+                        ph,
+                        a,
+                        r,
+                        n.artist_normalized_unicode,
+                        n.recording_normalized_unicode,
+                        n.lookup_exact,
+                        n.lookup_fallback,
+                        n.normalization_status.value,
+                        n.exact_key_status.value,
+                        n.fallback_key_status.value,
+                    ]
+                )
             print(f"  {fname}: distinct pairs so far {len(seen):,}", flush=True)
 
     c["distinct_pairs"] = len(seen)
@@ -110,7 +128,8 @@ def main() -> None:
         problems.append(f"listens {c['listens']} != {EXPECTED_LISTENS}")
     if c["distinct_pairs"] != EXPECTED_DISTINCT_PAIRS:
         problems.append(
-            f"distinct pairs {c['distinct_pairs']} != BigQuery's {EXPECTED_DISTINCT_PAIRS}")
+            f"distinct pairs {c['distinct_pairs']} != BigQuery's {EXPECTED_DISTINCT_PAIRS}"
+        )
 
     stats = {
         "columns": COLUMNS,

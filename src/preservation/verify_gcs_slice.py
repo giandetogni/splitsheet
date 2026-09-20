@@ -63,11 +63,11 @@ class GCSFile(io.RawIOBase):
             return 0
         if self._pos >= self._tail_start:
             off = self._pos - self._tail_start
-            data = self._tail[off:off + n]
+            data = self._tail[off : off + n]
         else:
             data = self._blob.download_as_bytes(start=self._pos, end=self._pos + n - 1)
             self.bytes_read += len(data)
-        buf[:len(data)] = data
+        buf[: len(data)] = data
         self._pos += len(data)
         return len(data)
 
@@ -156,25 +156,35 @@ def main() -> None:
         n_rows = pf.metadata.num_rows
         if name in boundary:
             col = pf.read(columns=["listened_at"]).column(0)
-            in_period = int(pc.sum(pc.and_(pc.greater_equal(col, start),
-                                           pc.less(col, end))).as_py() or 0)
+            in_period = int(
+                pc.sum(pc.and_(pc.greater_equal(col, start), pc.less(col, end))).as_py() or 0
+            )
         else:
             # Interior members lie wholly inside the period (Phase 0B contiguity argument).
             in_period = n_rows
         rows_in_period += in_period
         egress += fh.bytes_read
-        per_object.append({"member": name, "size_bytes": blob.size,
-                           "sha256_metadata_ok": sha_meta == exp["sha256"],
-                           "md5_matches_local": blob.md5_hash == md5_here,
-                           "rows": n_rows, "rows_in_period": in_period,
-                           "generation": blob.generation})
-        print(f"  {name:<14} size ok={blob.size == exp['size_bytes']} "
-              f"sha256 ok={sha_meta == exp['sha256']} md5 ok={blob.md5_hash == md5_here} "
-              f"rows={n_rows:,} in_period={in_period:,}")
+        per_object.append(
+            {
+                "member": name,
+                "size_bytes": blob.size,
+                "sha256_metadata_ok": sha_meta == exp["sha256"],
+                "md5_matches_local": blob.md5_hash == md5_here,
+                "rows": n_rows,
+                "rows_in_period": in_period,
+                "generation": blob.generation,
+            }
+        )
+        print(
+            f"  {name:<14} size ok={blob.size == exp['size_bytes']} "
+            f"sha256 ok={sha_meta == exp['sha256']} md5 ok={blob.md5_hash == md5_here} "
+            f"rows={n_rows:,} in_period={in_period:,}"
+        )
 
     if rows_in_period != man["expected_rows_in_period"]:
-        failures.append(f"in-period rows {rows_in_period:,} != "
-                        f"manifest {man['expected_rows_in_period']:,}")
+        failures.append(
+            f"in-period rows {rows_in_period:,} != " f"manifest {man['expected_rows_in_period']:,}"
+        )
 
     report = {
         "bucket": args.bucket,

@@ -30,8 +30,16 @@ from __future__ import annotations
 DIGEST_BUCKETS = 512
 
 #: The columns whose values the digest covers, in a fixed order.
-DIGEST_COLUMNS = ("period", "recording_mbid", "rights_holder_id", "split_version_id",
-                  "rate_card_id", "holder_share_pct", "holder_payout", "gross_royalty")
+DIGEST_COLUMNS = (
+    "period",
+    "recording_mbid",
+    "rights_holder_id",
+    "split_version_id",
+    "rate_card_id",
+    "holder_share_pct",
+    "holder_payout",
+    "gross_royalty",
+)
 
 
 def row_key_sql(alias: str = "") -> str:

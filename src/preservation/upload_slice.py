@@ -57,8 +57,10 @@ def main() -> None:
     iam_cfg = bucket._properties.get("iamConfiguration", {})
     pap = iam_cfg.get("publicAccessPrevention")
     ubla = iam_cfg.get("uniformBucketLevelAccess", {}).get("enabled")
-    print(f"bucket {args.bucket}: location={bucket.location} class={bucket.storage_class} "
-          f"public_access_prevention={pap} ubla={ubla} versioning={bucket.versioning_enabled}")
+    print(
+        f"bucket {args.bucket}: location={bucket.location} class={bucket.storage_class} "
+        f"public_access_prevention={pap} ubla={ubla} versioning={bucket.versioning_enabled}"
+    )
     if pap != "enforced" or not ubla:
         raise SystemExit("refusing to upload: bucket is not hardened as expected")
 
@@ -77,12 +79,21 @@ def main() -> None:
             raise SystemExit(f"{name}: local file no longer matches manifest SHA-256")
 
         existing = bucket.get_blob(blob_name)
-        if (existing is not None and existing.size == entry["size_bytes"]
-                and (existing.metadata or {}).get("sha256") == sha):
+        if (
+            existing is not None
+            and existing.size == entry["size_bytes"]
+            and (existing.metadata or {}).get("sha256") == sha
+        ):
             skipped += 1
-            records.append({"member": name, "state": "already_present",
-                            "size_bytes": existing.size, "sha256": sha,
-                            "gcs_md5": existing.md5_hash})
+            records.append(
+                {
+                    "member": name,
+                    "state": "already_present",
+                    "size_bytes": existing.size,
+                    "sha256": sha,
+                    "gcs_md5": existing.md5_hash,
+                }
+            )
             print(f"  {name:<14} already present, verified")
             continue
 
@@ -115,9 +126,17 @@ def main() -> None:
             raise SystemExit(f"{name}: GCS MD5 {blob.md5_hash} != local {md5_b64}")
         uploaded += 1
         bytes_sent += entry["size_bytes"]
-        records.append({"member": name, "state": "uploaded", "size_bytes": blob.size,
-                        "sha256": sha, "gcs_md5": blob.md5_hash,
-                        "gcs_crc32c": blob.crc32c, "generation": blob.generation})
+        records.append(
+            {
+                "member": name,
+                "state": "uploaded",
+                "size_bytes": blob.size,
+                "sha256": sha,
+                "gcs_md5": blob.md5_hash,
+                "gcs_crc32c": blob.crc32c,
+                "generation": blob.generation,
+            }
+        )
         print(f"  {name:<14} {blob.size:>12,}B uploaded, md5 verified")
 
     # The manifest travels with the data so the bucket is self-describing.
@@ -148,8 +167,10 @@ def main() -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1)
-    print(f"\nuploaded={uploaded} skipped={skipped} bytes_sent={bytes_sent:,} "
-          f"retries={retries} failures={failures} in {elapsed:.1f}s")
+    print(
+        f"\nuploaded={uploaded} skipped={skipped} bytes_sent={bytes_sent:,} "
+        f"retries={retries} failures={failures} in {elapsed:.1f}s"
+    )
 
 
 if __name__ == "__main__":

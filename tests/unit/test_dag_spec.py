@@ -67,15 +67,11 @@ def test_publication_is_off_by_default_and_never_retried():
     assert publish.command.startswith(spec.PUBLISH_GUARD)
 
 
-@pytest.mark.parametrize(
-    ("allow_publication", "expected_exit"), [("False", 1), ("True", 0)]
-)
+@pytest.mark.parametrize(("allow_publication", "expected_exit"), [("False", 1), ("True", 0)])
 def test_publish_guard_refuses_unless_explicitly_enabled(allow_publication, expected_exit):
     """The guard is shell, so it is proved by running the shell, not by reading it."""
     guard = spec.PUBLISH_GUARD.replace("{{ params.allow_publication }}", allow_publication)
-    result = subprocess.run(
-        ["bash", "-c", guard], capture_output=True, text=True, check=False
-    )
+    result = subprocess.run(["bash", "-c", guard], capture_output=True, text=True, check=False)
     assert result.returncode == expected_exit
     assert ("refusing to publish" in result.stdout) == (expected_exit == 1)
 
@@ -87,7 +83,10 @@ def test_importing_the_spec_reaches_neither_airflow_nor_gcp():
     )
     loaded = subprocess.run(
         [sys.executable, "-c", probe],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=False,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
     )
     assert loaded.returncode == 0, loaded.stderr
     assert loaded.stdout.strip() == "[]"
@@ -125,16 +124,21 @@ def test_defaults_render_the_frozen_identities_and_a_run_scoped_output_directory
 # Every task whose output identity depends on the normalization rules. Resolving those
 # rules from whatever file happens to be current is what rebuilt canonical_match_texts
 # under 1.1.0 while this DAG was pinned to 1.0.0.
-NORM_VERSION_TASKS = ("run_normalization_job", "run_blocking_job",
-                      "build_candidate_features", "build_match_results")
+NORM_VERSION_TASKS = (
+    "run_normalization_job",
+    "run_blocking_job",
+    "build_candidate_features",
+    "build_match_results",
+)
 
 
 def test_every_task_that_depends_on_normalization_is_given_the_version():
     by_id = {t.task_id: t for t in spec.TASKS}
     for task_id in NORM_VERSION_TASKS:
         command = by_id[task_id].command
-        assert "--norm-version '{{ params.norm_version }}'" in command, (
-            f"{task_id} must be told which normalization version to use")
+        assert (
+            "--norm-version '{{ params.norm_version }}'" in command
+        ), f"{task_id} must be told which normalization version to use"
 
 
 def test_no_task_leaves_the_normalization_version_to_be_resolved_implicitly():
@@ -191,8 +195,9 @@ def test_the_container_venv_is_isolated_from_the_host_one():
     mounts = _mounts()
     assert mounts["/opt/splitsheet"][0] == "../", "the repo is expected to stay bind-mounted"
     source, _mode = mounts[CONTAINER_VENV]
-    assert "/" not in source and "$" not in source, (
-        f"{CONTAINER_VENV} must be a named volume, not a host path: {source}")
+    assert (
+        "/" not in source and "$" not in source
+    ), f"{CONTAINER_VENV} must be a named volume, not a host path: {source}"
     assert source in (_compose()["volumes"] or {}), f"named volume {source} is not declared"
 
 
@@ -218,8 +223,9 @@ def test_only_the_init_service_is_root_and_it_reaches_only_the_venv_volume():
     init = services[INIT_SERVICE]
     assert init["user"] in ("0:0", "0", "root")
     assert "user" not in services["airflow"], "the Airflow service must not be given root"
-    assert init["volumes"] == [f"venv-linux:{CONTAINER_VENV}"], (
-        "the init service mounts the venv volume and nothing else")
+    assert init["volumes"] == [
+        f"venv-linux:{CONTAINER_VENV}"
+    ], "the init service mounts the venv volume and nothing else"
 
 
 ADC_TARGET = "/home/airflow/.config/gcloud/application_default_credentials.json"
@@ -230,8 +236,9 @@ def test_only_the_adc_file_is_mounted_and_it_is_read_only():
     ~/.config/gcloud would hand the container every other credential stored beside it, and
     a writable mount would let it rewrite the host's copy."""
     source, mode = _mounts()[ADC_TARGET]
-    assert source.endswith("/application_default_credentials.json"), (
-        f"the ADC mount must name the file, not a directory: {source}")
+    assert source.endswith(
+        "/application_default_credentials.json"
+    ), f"the ADC mount must name the file, not a directory: {source}"
     assert not source.rstrip("/").endswith(".config/gcloud")
     assert mode == "ro"
     assert source.startswith("${HOME}/"), "use ${HOME}; YAML does not expand ~"
@@ -258,9 +265,13 @@ def test_the_project_is_named_because_the_credential_file_does_not_carry_one():
 def test_no_credential_material_is_committed_to_the_repo():
     """The credential is mounted from the host at run time and never copied in."""
     tracked = subprocess.run(
-        ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True)
-    offenders = [f for f in tracked.stdout.split()
-                 if "application_default_credentials" in f or f.endswith(".p12")]
+        ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+    )
+    offenders = [
+        f
+        for f in tracked.stdout.split()
+        if "application_default_credentials" in f or f.endswith(".p12")
+    ]
     assert offenders == [], offenders
     assert "refresh_token" not in COMPOSE.read_text()
 
@@ -282,8 +293,9 @@ def test_the_executor_is_one_sqlite_can_actually_run():
     """`LocalExecutor` on SQLite is accepted by compose and rejected by Airflow, so the
     container exits 1 before the scheduler starts. A file read catches it; a pull does not."""
     env = _compose()["services"]["airflow"]["environment"]
-    assert "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN" not in env, (
-        "this compose is the SQLite one; naming a real backend changes which executors are legal")
+    assert (
+        "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN" not in env
+    ), "this compose is the SQLite one; naming a real backend changes which executors are legal"
     executor = env["AIRFLOW__CORE__EXECUTOR"]
     assert executor not in EXECUTORS_SQLITE_REFUSES, f"{executor} cannot run against SQLite"
     assert executor == "SequentialExecutor"

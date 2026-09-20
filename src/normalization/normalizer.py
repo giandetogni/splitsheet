@@ -31,8 +31,7 @@ from .rules import NormalizationRules, load_rules
 _BRACKETED = re.compile(r"[\(\[\{][^\)\]\}]*[\)\]\}]")
 _WHITESPACE = re.compile(r"\s+")
 _TRAILING_SEPARATORS = " -–—_/|,:;."
-_ASCII_DELETE = str.maketrans("", "", "".join(
-    c for c in map(chr, range(128)) if not c.isalnum()))
+_ASCII_DELETE = str.maketrans("", "", "".join(c for c in map(chr, range(128)) if not c.isalnum()))
 
 
 class NormalizationStatus(str, Enum):
@@ -183,8 +182,7 @@ def _strip_year_structures(text: str, rules: NormalizationRules, applied: list[s
     return out
 
 
-def _strip_version_suffixes(text: str, rules: NormalizationRules,
-                            applied: list[str]) -> str:
+def _strip_version_suffixes(text: str, rules: NormalizationRules, applied: list[str]) -> str:
     """Remove version markers, but only where something precedes them.
 
     A version marker is by definition a SUFFIX. Anchoring at position 0 is what preserves
@@ -195,9 +193,9 @@ def _strip_version_suffixes(text: str, rules: NormalizationRules,
         pattern = re.compile(rf"(?<![a-z0-9]){re.escape(suffix)}(?![a-z0-9])", re.IGNORECASE)
         pieces, last, changed = [], 0, False
         for m in pattern.finditer(out):
-            if m.start() == 0 or not out[:m.start()].strip(_TRAILING_SEPARATORS).strip():
+            if m.start() == 0 or not out[: m.start()].strip(_TRAILING_SEPARATORS).strip():
                 continue  # leading token: part of the title, not a suffix
-            pieces.append(out[last:m.start()])
+            pieces.append(out[last : m.start()])
             last, changed = m.end(), True
         if changed:
             pieces.append(out[last:])
@@ -212,12 +210,11 @@ def _strip_leading_article(text: str, rules: NormalizationRules, applied: list[s
     for article in rules.leading_articles:
         if lowered.startswith(article + " "):
             applied.append(f"leading_article:{article}")
-            return stripped[len(article) + 1:]
+            return stripped[len(article) + 1 :]
     return text
 
 
-def aggressive(text: str, rules: NormalizationRules,
-               applied: list[str] | None = None) -> str:
+def aggressive(text: str, rules: NormalizationRules, applied: list[str] | None = None) -> str:
     """The fallback stage. Order matters and is not arbitrary.
 
     Bracketed segments first, then featuring, then year STRUCTURES (before bare suffix
@@ -262,10 +259,12 @@ def _key_status(a: str, b: str) -> KeyStatus:
     return KeyStatus.EMPTY
 
 
-def normalize(artist_name: str | None,
-              recording_name: str | None,
-              release_name: str | None = None,
-              rules: NormalizationRules | None = None) -> NormalizedFields:
+def normalize(
+    artist_name: str | None,
+    recording_name: str | None,
+    release_name: str | None = None,
+    rules: NormalizationRules | None = None,
+) -> NormalizedFields:
     """Normalize one listen. Content validity and key availability are reported separately."""
     r = rules or _default_rules()
     artist_raw, recording_raw = artist_name or "", recording_name or ""
@@ -287,8 +286,10 @@ def normalize(artist_name: str | None,
     if not artist_raw.strip():
         status, detail = NormalizationStatus.MISSING_ARTIST, "artist_name is absent or blank"
     elif not recording_raw.strip():
-        status, detail = (NormalizationStatus.MISSING_RECORDING,
-                          "recording_name is absent or blank")
+        status, detail = (
+            NormalizationStatus.MISSING_RECORDING,
+            "recording_name is absent or blank",
+        )
     elif not artist_uni or not recording_uni:
         which = "artist" if not artist_uni else "recording"
         status = NormalizationStatus.NO_ALPHANUMERIC_CONTENT
@@ -301,8 +302,10 @@ def normalize(artist_name: str | None,
     if status is not NormalizationStatus.VALID:
         detail = detail or ""
     elif exact_status is not KeyStatus.AVAILABLE:
-        detail = ("content is valid but has no ASCII lookup key; "
-                  "MusicBrainz romanises these and we have no transliteration table")
+        detail = (
+            "content is valid but has no ASCII lookup key; "
+            "MusicBrainz romanises these and we have no transliteration table"
+        )
 
     return NormalizedFields(
         artist_normalized_unicode=artist_uni,
@@ -312,12 +315,14 @@ def normalize(artist_name: str | None,
         recording_lookup_exact=recording_exact,
         release_lookup_exact=release_exact,
         # Only ever emitted when BOTH halves exist.
-        lookup_exact=(artist_exact + recording_exact
-                      if exact_status is KeyStatus.AVAILABLE else ""),
+        lookup_exact=(
+            artist_exact + recording_exact if exact_status is KeyStatus.AVAILABLE else ""
+        ),
         artist_lookup_fallback=artist_fb,
         recording_lookup_fallback=recording_fb,
-        lookup_fallback=(artist_fb + recording_fb
-                         if fallback_status is KeyStatus.AVAILABLE else ""),
+        lookup_fallback=(
+            artist_fb + recording_fb if fallback_status is KeyStatus.AVAILABLE else ""
+        ),
         normalization_status=status,
         exact_key_status=exact_status,
         fallback_key_status=fallback_status,

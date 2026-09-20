@@ -40,8 +40,10 @@ def main() -> None:
         idx = json.load(fh)
     members = [m for m in idx["members"] if m["name"].endswith(".parquet")]
     members.sort(key=lambda m: int(m["name"].rsplit("/", 1)[-1].split(".")[0]))
-    print(f"{len(members)} parquet members; target {args.period} "
-          f"[{start.isoformat()}, {end.isoformat()})")
+    print(
+        f"{len(members)} parquet members; target {args.period} "
+        f"[{start.isoformat()}, {end.isoformat()})"
+    )
 
     import pyarrow.compute as pc
     import pyarrow.parquet as pq
@@ -60,14 +62,23 @@ def main() -> None:
         col = pf.read(columns=["listened_at"]).column(0)
         lo, hi = pc.min(col).as_py(), pc.max(col).as_py()
         in_range = pc.sum(pc.and_(pc.greater_equal(col, start), pc.less(col, end))).as_py() or 0
-        info = {"i": i, "name": m["name"].rsplit("/", 1)[-1], "bytes": m["size"],
-                "rows": pf.metadata.num_rows, "ts_min": lo.isoformat(), "ts_max": hi.isoformat(),
-                "rows_in_period": int(in_range),
-                "read_requests": r.requests - q0, "read_bytes": r.bytes - b0}
+        info = {
+            "i": i,
+            "name": m["name"].rsplit("/", 1)[-1],
+            "bytes": m["size"],
+            "rows": pf.metadata.num_rows,
+            "ts_min": lo.isoformat(),
+            "ts_max": hi.isoformat(),
+            "rows_in_period": int(in_range),
+            "read_requests": r.requests - q0,
+            "read_bytes": r.bytes - b0,
+        }
         cache[i] = info
-        print(f"  probe[{i:>4}] {info['name']:<12} {info['ts_min'][:10]} .. "
-              f"{info['ts_max'][:10]}  rows={info['rows']:>9,}  "
-              f"in_period={info['rows_in_period']:>8,}  read={info['read_bytes']:>10,}B")
+        print(
+            f"  probe[{i:>4}] {info['name']:<12} {info['ts_min'][:10]} .. "
+            f"{info['ts_max'][:10]}  rows={info['rows']:>9,}  "
+            f"in_period={info['rows_in_period']:>8,}  read={info['read_bytes']:>10,}B"
+        )
         return info
 
     # First member whose max reaches into the period.
@@ -108,6 +119,7 @@ def main() -> None:
     if interior and not interior_rows:
         # The header walk records bytes, not rows; fetch row counts from footers only.
         import pyarrow.parquet as pq2
+
         for i in interior:
             m = members[i]
             n = pq2.ParquetFile(MemberFile(r, m["offset"], m["size"])).metadata.num_rows
@@ -124,8 +136,7 @@ def main() -> None:
         "last_member": members[last]["name"].rsplit("/", 1)[-1],
         "member_count_covering_period": len(covering),
         "bytes_covering_period": total_bytes,
-        "bytes_covering_period_pct_of_archive": round(
-            100 * total_bytes / idx["archive_bytes"], 4),
+        "bytes_covering_period_pct_of_archive": round(100 * total_bytes / idx["archive_bytes"], 4),
         "rows_in_period_measured": boundary_rows + interior_rows,
         "boundary_rows_counted": boundary_rows,
         "interior_rows_from_footers": interior_rows,
@@ -137,9 +148,11 @@ def main() -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1)
-    print(f"\nperiod {args.period}: members {report['first_member']}..{report['last_member']} "
-          f"({len(covering)} files, {total_bytes:,} B = "
-          f"{report['bytes_covering_period_pct_of_archive']}% of archive)")
+    print(
+        f"\nperiod {args.period}: members {report['first_member']}..{report['last_member']} "
+        f"({len(covering)} files, {total_bytes:,} B = "
+        f"{report['bytes_covering_period_pct_of_archive']}% of archive)"
+    )
     print(f"rows in period (measured): {report['rows_in_period_measured']:,}")
     print(f"probes: {len(cache)} members, {r.requests} requests, {r.bytes:,} bytes")
     r.close()

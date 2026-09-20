@@ -76,12 +76,15 @@ def main() -> None:
             "counts": dict(c),
             "distinct_recording_mbid": len(seen),
             "recording_mbids_with_multiple_rows": len(repeated),
-            "excess_rows_over_distinct_mbid": c["source_rows"] - len(seen)
+            "excess_rows_over_distinct_mbid": c["source_rows"]
+            - len(seen)
             - c["rows_without_recording_mbid"],
             "combined_lookup_coverage_pct": round(
-                100 * c["combined_lookup_present"] / max(c["source_rows"], 1), 4),
+                100 * c["combined_lookup_present"] / max(c["source_rows"], 1), 4
+            ),
             "blocking_fields_coverage_pct": round(
-                100 * c["blocking_fields_present"] / max(c["source_rows"], 1), 4),
+                100 * c["blocking_fields_present"] / max(c["source_rows"], 1), 4
+            ),
             "_repeated_hashes": sorted(repeated),
         }
         with open(args.out, "w") as fh:
@@ -100,8 +103,10 @@ def main() -> None:
         k = h(row[i_mbid])
         if k not in repeated:
             continue
-        v = variants.setdefault(k, {"artist": set(), "recording": set(),
-                                    "release": set(), "lookup": set(), "rows": set()})
+        v = variants.setdefault(
+            k,
+            {"artist": set(), "recording": set(), "release": set(), "lookup": set(), "rows": set()},
+        )
         v["artist"].add(row[col["artist_credit_name"]])
         v["recording"].add(row[col["recording_name"]])
         v["release"].add(row[col["release_name"]])

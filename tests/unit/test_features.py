@@ -13,6 +13,7 @@ from matching import features as F
 
 # --- unicode_exact ----------------------------------------------------------------------
 
+
 def test_unicode_exact_is_true_only_for_identical_non_empty_values():
     assert F.unicode_exact("radiohead", "radiohead")
     assert not F.unicode_exact("radiohead", "radio head")
@@ -30,6 +31,7 @@ def test_unicode_exact_preserves_script():
 
 
 # --- token_similarity -------------------------------------------------------------------
+
 
 def test_token_similarity_is_order_insensitive():
     assert F.token_similarity("the beatles", "beatles the") == 1.0
@@ -51,10 +53,19 @@ def test_token_similarity_handles_repeated_tokens_as_sets():
 
 # --- edit distance and string_similarity ------------------------------------------------
 
-@pytest.mark.parametrize(("a", "b", "d"), [
-    ("", "", 0), ("abc", "abc", 0), ("abc", "abd", 1), ("abc", "ab", 1),
-    ("kitten", "sitting", 3), ("", "abc", 3), ("flaw", "lawn", 2),
-])
+
+@pytest.mark.parametrize(
+    ("a", "b", "d"),
+    [
+        ("", "", 0),
+        ("abc", "abc", 0),
+        ("abc", "abd", 1),
+        ("abc", "ab", 1),
+        ("kitten", "sitting", 3),
+        ("", "abc", 3),
+        ("flaw", "lawn", 2),
+    ],
+)
 def test_edit_distance(a, b, d):
     assert F.edit_distance(a, b) == d
     assert F.edit_distance(b, a) == d, "edit distance must be symmetric"
@@ -78,6 +89,7 @@ def test_string_similarity_counts_code_points_not_bytes():
 
 
 # --- ascii retention and the information class -------------------------------------------
+
 
 def test_ascii_retention_ratio_of_pure_latin_content_is_one():
     r = F.ascii_retention_ratio("radiohead", "creep", "radiohead creep")
@@ -110,12 +122,17 @@ def test_undefined_ratio_is_not_called_low_information():
 
 # --- the bundle used by the builder ------------------------------------------------------
 
+
 def test_features_for_pair_returns_every_scored_feature():
     got = F.features_for_pair("radiohead", "creep", "radiohead", "creep")
     assert set(got) == {
-        "artist_unicode_exact", "recording_unicode_exact",
-        "artist_token_similarity", "recording_token_similarity",
-        "artist_string_similarity", "recording_string_similarity"}
+        "artist_unicode_exact",
+        "recording_unicode_exact",
+        "artist_token_similarity",
+        "recording_token_similarity",
+        "artist_string_similarity",
+        "recording_string_similarity",
+    }
     assert all(v == 1.0 or v is True for v in got.values())
 
 
@@ -127,13 +144,17 @@ def test_features_for_pair_on_a_complete_mismatch():
 
 # --- the generated SQL is at least well-formed and references the right columns ----------
 
+
 def test_sql_generators_mention_both_sides():
     sql = F.sql_feature_columns("l", "k")
-    for col in ("l.artist_normalized_unicode", "k.artist_normalized_unicode",
-                "l.recording_normalized_unicode", "k.recording_normalized_unicode"):
+    for col in (
+        "l.artist_normalized_unicode",
+        "k.artist_normalized_unicode",
+        "l.recording_normalized_unicode",
+        "k.recording_normalized_unicode",
+    ):
         assert col in sql
-    for name in ("artist_unicode_exact", "recording_token_similarity",
-                 "artist_string_similarity"):
+    for name in ("artist_unicode_exact", "recording_token_similarity", "artist_string_similarity"):
         assert f"AS {name}" in sql
 
 

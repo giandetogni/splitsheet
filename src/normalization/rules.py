@@ -65,11 +65,13 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
         if unknown:
             raise ValueError(
                 f"transliteration names scripts with no algorithmic romanisation: {sorted(unknown)}. "
-                f"Han/kanji needs a dictionary and is deliberately unsupported.")
+                f"Han/kanji needs a dictionary and is deliberately unsupported."
+            )
         if not translit["require_full_coverage"]:
             raise ValueError(
                 "partial-coverage transliteration would key on a fragment of the title, which is "
-                "the low-information key the Phase 4 preflight measured; it is not permitted")
+                "the low-information key the Phase 4 preflight measured; it is not permitted"
+            )
 
     if common["keep"] != "ascii_alphanumeric":
         raise ValueError(f"unsupported keep policy: {common['keep']!r}")
@@ -78,8 +80,7 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
 
     effective = {
         "version": raw["version"],
-        "common": {k: common[k] for k in
-                   ("unicode_form", "strip_diacritics", "lowercase", "keep")},
+        "common": {k: common[k] for k in ("unicode_form", "strip_diacritics", "lowercase", "keep")},
         "fallback": {
             "strip_bracketed_segments": fallback["strip_bracketed_segments"],
             "year_structures": sorted(fallback["year_structures"]),
@@ -104,7 +105,6 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
         }
     digest = hashlib.sha256(_canonical(effective).encode()).hexdigest()[:12]
 
-
     return NormalizationRules(
         semantic_version=str(raw["version"]),
         unicode_form=common["unicode_form"],
@@ -125,6 +125,7 @@ def load_rules(path: str | pathlib.Path | None = None) -> NormalizationRules:
         transliteration_enabled=bool(translit["enabled"]) if translit else False,
         transliteration_scripts=tuple(sorted(translit["scripts"])) if translit else (),
         transliteration_require_full_coverage=(
-            bool(translit["require_full_coverage"]) if translit else True),
+            bool(translit["require_full_coverage"]) if translit else True
+        ),
         rules_digest=digest,
     )

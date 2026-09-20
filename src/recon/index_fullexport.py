@@ -21,9 +21,11 @@ import json
 import time
 
 HOST = "data.metabrainz.org"
-PATH = ("/pub/musicbrainz/listenbrainz/fullexport/"
-        "listenbrainz-dump-2593-20260712-000004-full/"
-        "listenbrainz-spark-dump-2593-20260712-000004-full.tar")
+PATH = (
+    "/pub/musicbrainz/listenbrainz/fullexport/"
+    "listenbrainz-dump-2593-20260712-000004-full/"
+    "listenbrainz-spark-dump-2593-20260712-000004-full.tar"
+)
 BLOCK = 512
 
 
@@ -59,8 +61,9 @@ class RangeReader:
         for attempt in range(3):
             try:
                 conn = self._connect()
-                conn.request("GET", self.path,
-                             headers={"Range": f"bytes={offset}-{offset + length - 1}"})
+                conn.request(
+                    "GET", self.path, headers={"Range": f"bytes={offset}-{offset + length - 1}"}
+                )
                 r = conn.getresponse()
                 data = r.read()
                 if r.status != 206:
@@ -114,10 +117,10 @@ class MemberFile(io.RawIOBase):
             return 0
         if self._pos >= self._tail_start:
             start = self._pos - self._tail_start
-            data = self._tail[start:start + n]
+            data = self._tail[start : start + n]
         else:
             data = self._r.get(self._off + self._pos, n)
-        buf[:len(data)] = data
+        buf[: len(data)] = data
         self._pos += len(data)
         return len(data)
 
@@ -147,14 +150,14 @@ def walk_members(reader: RangeReader, limit: int = 0, chunk: int = 4096):
         cur = 0
         pax_name = None
         while True:
-            h = parse_header(buf[cur:cur + BLOCK])
+            h = parse_header(buf[cur : cur + BLOCK])
             if h is None:
                 return
             name, size, typ = h
             payload = off + cur + BLOCK
             padded = ((size + BLOCK - 1) // BLOCK) * BLOCK
             if typ == b"x":
-                blob = buf[cur + BLOCK:cur + BLOCK + size]
+                blob = buf[cur + BLOCK : cur + BLOCK + size]
                 for field in blob.split(b"\n"):
                     if b" path=" in field:
                         pax_name = field.split(b" path=", 1)[1].decode()
@@ -173,12 +176,17 @@ def walk_members(reader: RangeReader, limit: int = 0, chunk: int = 4096):
 
 def listened_at_stats(mf: MemberFile) -> dict:
     import pyarrow.parquet as pq
+
     pf = pq.ParquetFile(mf)
     md = pf.metadata
     names = [md.schema.column(i).name for i in range(md.num_columns)]
     target = next((n for n in names if n.split(".")[-1] in ("listened_at", "timestamp")), None)
-    out = {"num_rows": md.num_rows, "num_row_groups": md.num_row_groups,
-           "columns": len(names), "ts_column": target}
+    out = {
+        "num_rows": md.num_rows,
+        "num_row_groups": md.num_row_groups,
+        "columns": len(names),
+        "ts_column": target,
+    }
     if target is None:
         out["schema_sample"] = names[:30]
         return out
@@ -199,16 +207,19 @@ def listened_at_stats(mf: MemberFile) -> dict:
         # footer read anyway: listened_at is so well sorted that a 550k-row chunk
         # compresses to a few KB under ZSTD.
         import pyarrow.compute as pc
+
         col = pf.read(columns=[target]).column(0)
         lo, hi = pc.min(col).as_py(), pc.max(col).as_py()
         out["source"] = "column_read"
     else:
         out["source"] = "footer_statistics"
     if lo is not None:
+
         def iso(v):
             if hasattr(v, "isoformat"):
                 return v.isoformat()
             return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(v)))
+
         out["ts_min"], out["ts_max"] = iso(lo), iso(hi)
         out["ts_min_raw"], out["ts_max_raw"] = str(lo), str(hi)
     return out
@@ -229,29 +240,40 @@ def main() -> None:
     print(f"archive: {size:,} bytes, Accept-Ranges: bytes")
 
     if args.mode == "probe":
-        members = [{"name": n, "offset": o, "size": s}
-                   for n, o, s in walk_members(r, limit=args.members + 3)]
+        members = [
+            {"name": n, "offset": o, "size": s}
+            for n, o, s in walk_members(r, limit=args.members + 3)
+        ]
         big = [m for m in members if m["name"].endswith(".parquet") and m["size"] > 10**6]
         print(f"walked {len(members)} members: {r.requests} requests, {r.bytes:,} bytes")
-        for m in big[:args.members]:
+        for m in big[: args.members]:
             q0, b0 = r.requests, r.bytes
             st = listened_at_stats(MemberFile(r, m["offset"], m["size"]))
             pct = 100 * (r.bytes - b0) / m["size"]
             print(f"\n{m['name']}  size={m['size']:,}")
-            print(f"  footer: {r.requests - q0} requests, {r.bytes - b0:,} bytes "
-                  f"({pct:.4f}% of member)")
+            print(
+                f"  footer: {r.requests - q0} requests, {r.bytes - b0:,} bytes "
+                f"({pct:.4f}% of member)"
+            )
             print(f"  {json.dumps(st, default=str)}")
         print(f"\nTOTAL {r.requests} requests, {r.bytes:,} bytes, {time.time() - t0:.1f}s")
 
     elif args.mode == "walk":
         members = [{"name": n, "offset": o, "size": s} for n, o, s in walk_members(r)]
-        payload = {"archive_bytes": size, "member_count": len(members),
-                   "walk_requests": r.requests, "walk_bytes": r.bytes,
-                   "walk_seconds": round(time.time() - t0, 1), "members": members}
+        payload = {
+            "archive_bytes": size,
+            "member_count": len(members),
+            "walk_requests": r.requests,
+            "walk_bytes": r.bytes,
+            "walk_seconds": round(time.time() - t0, 1),
+            "members": members,
+        }
         with open(args.out, "w") as fh:
             json.dump(payload, fh, indent=1)
-        print(f"indexed {len(members)} members: {r.requests} requests, "
-              f"{r.bytes:,} bytes, {time.time() - t0:.1f}s -> {args.out}")
+        print(
+            f"indexed {len(members)} members: {r.requests} requests, "
+            f"{r.bytes:,} bytes, {time.time() - t0:.1f}s -> {args.out}"
+        )
 
     else:
         with open(args.index) as fh:
@@ -263,14 +285,32 @@ def main() -> None:
             m = members[i]
             q0, b0 = r.requests, r.bytes
             st = listened_at_stats(MemberFile(r, m["offset"], m["size"]))
-            st.update({"index": i, "name": m["name"], "member_bytes": m["size"],
-                       "footer_bytes": r.bytes - b0, "footer_requests": r.requests - q0})
+            st.update(
+                {
+                    "index": i,
+                    "name": m["name"],
+                    "member_bytes": m["size"],
+                    "footer_bytes": r.bytes - b0,
+                    "footer_requests": r.requests - q0,
+                }
+            )
             results.append(st)
-            print(json.dumps({k: st[k] for k in ("index", "name", "num_rows",
-                                                 "ts_min", "ts_max", "footer_bytes")
-                              if k in st}, default=str))
-        out = {"stats_requests": r.requests, "stats_bytes": r.bytes,
-               "stats_seconds": round(time.time() - t0, 1), "members": results}
+            print(
+                json.dumps(
+                    {
+                        k: st[k]
+                        for k in ("index", "name", "num_rows", "ts_min", "ts_max", "footer_bytes")
+                        if k in st
+                    },
+                    default=str,
+                )
+            )
+        out = {
+            "stats_requests": r.requests,
+            "stats_bytes": r.bytes,
+            "stats_seconds": round(time.time() - t0, 1),
+            "members": results,
+        }
         if args.out:
             with open(args.out, "w") as fh:
                 json.dump(out, fh, indent=1)

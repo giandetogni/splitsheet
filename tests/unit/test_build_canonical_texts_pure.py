@@ -25,9 +25,16 @@ from normalization.build_canonical_texts import (
 
 UNIVERSE = "blk:c005e9a56b1ec542"
 PUBLISHED = {
-    "n": 368795, "runs": 1, "run_id": "cantext:8a38e905f9d3577d",
-    "versions": 1, "version": "1.0.0+0bc0dd643e06", "rules_digest": "0bc0dd643e06",
-    "universes": 1, "universe": UNIVERSE, "snapshots": 1, "snapshot": SNAPSHOT,
+    "n": 368795,
+    "runs": 1,
+    "run_id": "cantext:8a38e905f9d3577d",
+    "versions": 1,
+    "version": "1.0.0+0bc0dd643e06",
+    "rules_digest": "0bc0dd643e06",
+    "universes": 1,
+    "universe": UNIVERSE,
+    "snapshots": 1,
+    "snapshot": SNAPSHOT,
 }
 
 
@@ -51,6 +58,7 @@ class FakeClient:
         class _Job:
             def result(self):
                 return iter([row])
+
         return _Job()
 
 
@@ -87,9 +95,14 @@ def test_a_different_candidate_universe_does_not_satisfy_the_guard():
 
 
 def test_an_empty_or_mixed_target_does_not_satisfy_the_guard():
-    for bad in ({**PUBLISHED, "n": 0}, {**PUBLISHED, "runs": 2}, {**PUBLISHED, "versions": 2},
-                {**PUBLISHED, "universes": 2}, {**PUBLISHED, "snapshots": 2},
-                {**PUBLISHED, "snapshot": "2025-01-01"}):
+    for bad in (
+        {**PUBLISHED, "n": 0},
+        {**PUBLISHED, "runs": 2},
+        {**PUBLISHED, "versions": 2},
+        {**PUBLISHED, "universes": 2},
+        {**PUBLISHED, "snapshots": 2},
+        {**PUBLISHED, "snapshot": "2025-01-01"},
+    ):
         assert published_identity(FakeClient(bad), FakeRules(), UNIVERSE) is None
 
 
@@ -101,8 +114,10 @@ def test_the_source_query_is_deterministically_ordered():
 def _serialise(rows):
     """The builder's framing: deterministic gzip over a tab-separated payload."""
     buf = io.BytesIO()
-    with gzip.GzipFile(filename="", mode="wb", fileobj=buf, mtime=0) as gz, \
-            io.TextIOWrapper(gz, encoding="utf-8", newline="") as fh:
+    with (
+        gzip.GzipFile(filename="", mode="wb", fileobj=buf, mtime=0) as gz,
+        io.TextIOWrapper(gz, encoding="utf-8", newline="") as fh,
+    ):
         w = csv.writer(fh, delimiter="\t", lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
         for r in rows:
             w.writerow(r)
@@ -127,8 +142,9 @@ def test_the_gzip_header_carries_no_timestamp():
 def test_the_run_id_formula_is_unchanged():
     """Guarding the formula itself: changing it would recompute every published identity,
     including cantext:8a38e905f9d3577d."""
-    body = inspect.getsource(main)
-    assert 'digest = hashlib.sha256(local.read_bytes()).hexdigest()' in body
-    assert ('f"{rules.version}|{rules.rules_digest}|{args.candidate_run_id}|{n}|{digest}"'
-            in body)
+    # Whitespace-collapsed, so the assertions below pin the formula rather than the
+    # line wrapping a formatter chose for it.
+    body = " ".join(inspect.getsource(main).split())
+    assert "digest = hashlib.sha256(local.read_bytes()).hexdigest()" in body
+    assert 'f"{rules.version}|{rules.rules_digest}|{args.candidate_run_id}|{n}|{digest}"' in body
     assert '"cantext:" + hashlib.sha256(' in body

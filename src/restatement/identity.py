@@ -83,9 +83,17 @@ SCRIPT_PATTERNS = {
 
 #: Fields deliberately NOT hashed. Present so the exclusion is a declaration rather than an
 #: accident of which keys the code happened to read.
-COHORT_FIELDS_EXCLUDED_FROM_HASH = ("status", "measured_listens", "measured_distinct_pairs",
-                                    "notes", "cohort_sha256", "cohort_key", "mart_run_id",
-                                    "rows_in_delta_mart", "recorded_delta")
+COHORT_FIELDS_EXCLUDED_FROM_HASH = (
+    "status",
+    "measured_listens",
+    "measured_distinct_pairs",
+    "notes",
+    "cohort_sha256",
+    "cohort_key",
+    "mart_run_id",
+    "rows_in_delta_mart",
+    "recorded_delta",
+)
 
 #: The canonical inputs, in the order they are documented. Hashing reads this tuple, so adding an
 #: input is a visible change to identity rather than a silent one.
@@ -107,8 +115,9 @@ CANONICAL_INPUT_FIELDS = (
 
 def _canonical_json(payload: dict) -> str:
     """Sorted keys, compact separators, ASCII-escaped. Formatting cannot reach the hash."""
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-                      default=str)
+    return json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str
+    )
 
 
 @dataclass(frozen=True)
@@ -145,8 +154,12 @@ class CohortDefinition:
     def digest(self) -> str:
         return hashlib.sha256(_canonical_json(self.canonical_predicate()).encode()).hexdigest()
 
-    def sql_predicate(self, normalized_alias: str = "n", matches_alias: str = "m",
-                      script_patterns: dict[str, str] | None = None) -> str:
+    def sql_predicate(
+        self,
+        normalized_alias: str = "n",
+        matches_alias: str = "m",
+        script_patterns: dict[str, str] | None = None,
+    ) -> str:
         """SQL GENERATED FROM the predicate -- never the source of its identity.
 
         The direction matters: the structured predicate is the identity and the SQL is derived from
@@ -191,8 +204,10 @@ class RestatementInputs:
         unexpected = set(payload) - set(CANONICAL_INPUT_FIELDS)
         if unexpected:
             raise ValueError(f"unhashed fields present in the inputs: {sorted(unexpected)}")
-        return {"identity_scheme": IDENTITY_SCHEME,
-                **{f: str(payload[f]) for f in CANONICAL_INPUT_FIELDS}}
+        return {
+            "identity_scheme": IDENTITY_SCHEME,
+            **{f: str(payload[f]) for f in CANONICAL_INPUT_FIELDS},
+        }
 
     @property
     def inputs_digest(self) -> str:
@@ -216,15 +231,21 @@ LEGACY_INPUTS = {
 }
 
 
-def legacy_run_id(new_normalization_version: str, scoring_version: str, prior_match_run_id: str,
-                  blocking_version: str) -> str:
+def legacy_run_id(
+    new_normalization_version: str,
+    scoring_version: str,
+    prior_match_run_id: str,
+    blocking_version: str,
+) -> str:
     """The superseded formula, kept executable so its defect is demonstrable.
 
     Note what is absent from the signature: the period, the prior publication, the payout policy,
     the rights version and -- the one that matters -- the cohort. Any two runs agreeing on these
     four strings are indistinguishable under this scheme no matter which rows they touched.
     """
-    payload = f"{new_normalization_version}|{scoring_version}|{prior_match_run_id}|{blocking_version}"
+    payload = (
+        f"{new_normalization_version}|{scoring_version}|{prior_match_run_id}|{blocking_version}"
+    )
     return "restate:" + hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
@@ -251,14 +272,27 @@ class LegacyRunId:
 LEGACY_RUN_ID = LegacyRunId(
     run_id="restate:6b3923771883e860",
     scheme="legacy-unversioned",
-    hashed_inputs=("new_normalization_version", "scoring_version", "prior_match_run_id",
-                   "blocking_version"),
-    missing_inputs=("period", "prior_publication_id", "prior_normalization_version",
-                    "payout_policy_version", "rights_version", "rule_version_id",
-                    "trigger_reason", "canonical_snapshot_date", "cohort_definition"),
+    hashed_inputs=(
+        "new_normalization_version",
+        "scoring_version",
+        "prior_match_run_id",
+        "blocking_version",
+    ),
+    missing_inputs=(
+        "period",
+        "prior_publication_id",
+        "prior_normalization_version",
+        "payout_policy_version",
+        "rights_version",
+        "rule_version_id",
+        "trigger_reason",
+        "canonical_snapshot_date",
+        "cohort_definition",
+    ),
     why_insufficient=(
         "the cohort was not part of the hash, so the rejected 1,377,862-listen cohort and the "
-        "published 982,322-listen cohort produced the SAME identifier under the same versions"),
+        "published 982,322-listen cohort produced the SAME identifier under the same versions"
+    ),
     published_rows_carry_it=True,
 )
 
@@ -294,17 +328,20 @@ def load_legacy_runs(path: str | pathlib.Path | None = None) -> list[LegacyRun]:
         if entry.get("canonical_inputs_available"):
             raise ValueError(
                 f"{entry['restatement_run_id']!r} claims canonical inputs are available; a run with "
-                f"canonical inputs belongs in the cohort registry, not among the legacy runs")
-        out.append(LegacyRun(
-            restatement_run_id=entry["restatement_run_id"],
-            run_type=entry["run_type"],
-            is_legacy=bool(entry["is_legacy"]),
-            is_financially_effective=bool(entry["is_financially_effective"]),
-            recorded_delta=str(entry["recorded_delta"]),
-            rows_in_delta_mart=int(entry["rows_in_delta_mart"]),
-            canonical_inputs_available=False,
-            provenance=" ".join(str(entry["provenance"]).split()),
-        ))
+                f"canonical inputs belongs in the cohort registry, not among the legacy runs"
+            )
+        out.append(
+            LegacyRun(
+                restatement_run_id=entry["restatement_run_id"],
+                run_type=entry["run_type"],
+                is_legacy=bool(entry["is_legacy"]),
+                is_financially_effective=bool(entry["is_financially_effective"]),
+                recorded_delta=str(entry["recorded_delta"]),
+                rows_in_delta_mart=int(entry["rows_in_delta_mart"]),
+                canonical_inputs_available=False,
+                provenance=" ".join(str(entry["provenance"]).split()),
+            )
+        )
     return out
 
 
@@ -321,12 +358,16 @@ def load_cohorts(path: str | pathlib.Path | None = None) -> dict[str, CohortDefi
         predicate = entry["predicate"]
         unknown = set(predicate) - set(PREDICATE_FIELDS)
         if unknown:
-            raise ValueError(f"cohort {entry['cohort_key']!r} uses fields outside the predicate "
-                             f"vocabulary: {sorted(unknown)}")
+            raise ValueError(
+                f"cohort {entry['cohort_key']!r} uses fields outside the predicate "
+                f"vocabulary: {sorted(unknown)}"
+            )
         bad_scripts = set(predicate["required_scripts_any"]) - set(KNOWN_SCRIPTS)
         if bad_scripts:
-            raise ValueError(f"cohort {entry['cohort_key']!r} names scripts with no algorithmic "
-                             f"transliteration: {sorted(bad_scripts)}")
+            raise ValueError(
+                f"cohort {entry['cohort_key']!r} names scripts with no algorithmic "
+                f"transliteration: {sorted(bad_scripts)}"
+            )
         cohort = CohortDefinition(
             cohort_key=entry["cohort_key"],
             period_start=str(predicate["period_start"]),
@@ -347,7 +388,8 @@ def load_cohorts(path: str | pathlib.Path | None = None) -> dict[str, CohortDefi
             raise ValueError(
                 f"cohort {cohort.cohort_key!r} records digest {recorded} but its predicate hashes "
                 f"to {cohort.digest}. The predicate changed without the digest being updated: "
-                f"refusing to identify a restatement by a stale cohort id.")
+                f"refusing to identify a restatement by a stale cohort id."
+            )
         out[cohort.cohort_key] = cohort
     return out
 
@@ -356,9 +398,9 @@ PUBLISHED_COHORT_KEY = "partial-empty-hangul-kana"
 REJECTED_COHORT_KEY = "script-only-no-failure-reason-restriction"
 
 
-def inputs_for_published_restatement(cohorts: dict[str, CohortDefinition] | None = None,
-                                     cohort_key: str = PUBLISHED_COHORT_KEY
-                                     ) -> RestatementInputs:
+def inputs_for_published_restatement(
+    cohorts: dict[str, CohortDefinition] | None = None, cohort_key: str = PUBLISHED_COHORT_KEY
+) -> RestatementInputs:
     """The canonical inputs of the restatement that produced pub:v2.
 
     Values come from the frozen manifests, not from the warehouse: identity must be derivable from

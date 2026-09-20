@@ -31,42 +31,76 @@ class FakeClient:
     pass
 
 
-REGISTERED = {"publication_id": "pub:v1", "row_count": 5_925_913,
-              "portfolio_paid": "98284.22", "content_digest": "51193c1f2c4e8fcd",
-              "frozen": True}
+REGISTERED = {
+    "publication_id": "pub:v1",
+    "row_count": 5_925_913,
+    "portfolio_paid": "98284.22",
+    "content_digest": "51193c1f2c4e8fcd",
+    "frozen": True,
+}
 
 
 def fake_rows(label: str, run_id: str):
     """One canned answer per labelled query, keyed the way run_query is called."""
     if label == "verify frozen inputs":
-        return [{"match_runs": 1, "match_run_id": POLICY.match_run_id,
-                 "scoring_version": POLICY.scoring_version,
-                 "rights_version": POLICY.rights_version,
-                 "rights_generation_run_id": POLICY.rights_generation_run_id,
-                 "rule_version_id": POLICY.rule_version_id}]
+        return [
+            {
+                "match_runs": 1,
+                "match_run_id": POLICY.match_run_id,
+                "scoring_version": POLICY.scoring_version,
+                "rights_version": POLICY.rights_version,
+                "rights_generation_run_id": POLICY.rights_generation_run_id,
+                "rule_version_id": POLICY.rule_version_id,
+            }
+        ]
     if label == "ensure pointer table":
         return []
     if label.endswith(": published_at"):
         return [{"first_published_at": "2026-08-15 23:47:45.331701+00:00"}]
     if "digest" in label:
-        return [{"row_count": 5_925_913, "content_digest": "51193c1f2c4e8fcd",
-                 "total_holder_payout": "98284.22"}]
+        return [
+            {
+                "row_count": 5_925_913,
+                "content_digest": "51193c1f2c4e8fcd",
+                "total_holder_payout": "98284.22",
+            }
+        ]
     if label == "existing publication registry":
         return [dict(REGISTERED)]
     if label == "current view while pointer moved away":
         return [{"n": 5_925_913}]
     if label == "reconciliation":
-        return [{"attribution_status": "ATTRIBUTABLE", "listens": 28_386_887, "streams": 1,
-                 "pct_of_all_listens": 74.3, "distinct_recordings": 1,
-                 "total_gross_royalty": "98284.22", "total_holder_payout": "98284.22",
-                 "holder_rows": 5_925_913, "recordings_paid": 1, "holders_paid": 1}]
+        return [
+            {
+                "attribution_status": "ATTRIBUTABLE",
+                "listens": 28_386_887,
+                "streams": 1,
+                "pct_of_all_listens": 74.3,
+                "distinct_recordings": 1,
+                "total_gross_royalty": "98284.22",
+                "total_holder_payout": "98284.22",
+                "holder_rows": 5_925_913,
+                "recordings_paid": 1,
+                "holders_paid": 1,
+            }
+        ]
     if label == "money summary":
-        return [{"holder_rows": 5_925_913, "total_holder_payout": "98284.22",
-                 "min_holder_payout": "0.01", "max_holder_payout": "1.00",
-                 "negative_payouts": 0, "zero_payouts": 0, "holders_paid": 1,
-                 "recordings_paid": 1, "financial_groups": 1,
-                 "total_gross_royalty": "98284.22", "remainder_cents_distributed": 0,
-                 "groups_that_do_not_close": 0}]
+        return [
+            {
+                "holder_rows": 5_925_913,
+                "total_holder_payout": "98284.22",
+                "min_holder_payout": "0.01",
+                "max_holder_payout": "1.00",
+                "negative_payouts": 0,
+                "zero_payouts": 0,
+                "holders_paid": 1,
+                "recordings_paid": 1,
+                "financial_groups": 1,
+                "total_gross_royalty": "98284.22",
+                "remainder_cents_distributed": 0,
+                "groups_that_do_not_close": 0,
+            }
+        ]
     return [{}]
 
 
@@ -75,8 +109,17 @@ def fake_rows(label: str, run_id: str):
 NEW_PUBLICATION = {"existing_rows": 0, "registry": []}
 
 
-def drive(monkeypatch, tmp_path, argv_extra, digest_rows=5_925_913, fail_before_publish=False,
-          registry=..., fact_digest=None, fact_paid=None, existing_rows=5_925_913):
+def drive(
+    monkeypatch,
+    tmp_path,
+    argv_extra,
+    digest_rows=5_925_913,
+    fail_before_publish=False,
+    registry=...,
+    fact_digest=None,
+    fact_paid=None,
+    existing_rows=5_925_913,
+):
     """Run main() against fakes and report how often the pointer was set, and to what."""
     out = tmp_path / "payout_publication.json"
     pointer_calls: list[tuple[str, str]] = []
@@ -88,8 +131,9 @@ def drive(monkeypatch, tmp_path, argv_extra, digest_rows=5_925_913, fail_before_
         if dry_run:
             stats.append({"step": label, "dry_run": True, "estimated_bytes": 0})
             return None
-        stats.append({"step": label, "job_id": "fake", "bytes_billed": 0, "slot_ms": 0,
-                      "duration_ms": 0})
+        stats.append(
+            {"step": label, "job_id": "fake", "bytes_billed": 0, "slot_ms": 0, "duration_ms": 0}
+        )
         rows = fake_rows(label, PUBLISHED_RUN_ID)
         if label == "existing publication registry" and registry is not ...:
             return list(registry)
@@ -117,19 +161,26 @@ def drive(monkeypatch, tmp_path, argv_extra, digest_rows=5_925_913, fail_before_
     monkeypatch.setattr(mod, "dbt", fake_dbt)
     monkeypatch.setattr(mod, "bq_client", lambda: FakeClient())
     monkeypatch.setattr(mod, "publication_digest_sql", lambda table, run_id: "SELECT 1")
-    monkeypatch.setattr(sys, "argv",
-                        ["publish.py", "--out", str(out), "--skip-dry-run", *argv_extra])
+    monkeypatch.setattr(
+        sys, "argv", ["publish.py", "--out", str(out), "--skip-dry-run", *argv_extra]
+    )
     failure = None
     try:
         mod.main()
     except SystemExit as e:
         failure = e
     report = json.loads(out.read_text()) if out.exists() else None
-    return types.SimpleNamespace(pointer_calls=pointer_calls, queries=queries,
-                                 dbt_calls=dbt_calls, failure=failure, report=report)
+    return types.SimpleNamespace(
+        pointer_calls=pointer_calls,
+        queries=queries,
+        dbt_calls=dbt_calls,
+        failure=failure,
+        report=report,
+    )
 
 
 # --- the pointer is not moved unless it is explicitly authorised ------------------------
+
 
 def test_the_default_run_does_not_move_the_pointer(monkeypatch, tmp_path):
     """This is the scheduler's command: publish and validate, promote nothing."""
@@ -174,8 +225,8 @@ def test_both_flags_together_are_accepted(monkeypatch, tmp_path):
 
 # --- the pointer is not moved when the publication is not there -------------------------
 
-def test_move_pointer_without_a_valid_publication_fails_and_moves_nothing(
-        monkeypatch, tmp_path):
+
+def test_move_pointer_without_a_valid_publication_fails_and_moves_nothing(monkeypatch, tmp_path):
     """The precondition for promoting is a publication that exists. Zero rows is refused
     before the pointer is touched."""
     r = drive(monkeypatch, tmp_path, ["--move-pointer"], digest_rows=0, **NEW_PUBLICATION)
@@ -185,8 +236,9 @@ def test_move_pointer_without_a_valid_publication_fails_and_moves_nothing(
 
 
 def test_a_failure_before_publication_leaves_the_pointer_alone(monkeypatch, tmp_path):
-    r = drive(monkeypatch, tmp_path, ["--move-pointer"], fail_before_publish=True,
-              **NEW_PUBLICATION)
+    r = drive(
+        monkeypatch, tmp_path, ["--move-pointer"], fail_before_publish=True, **NEW_PUBLICATION
+    )
     assert r.pointer_calls == []
     assert isinstance(r.failure, SystemExit)
 
@@ -200,6 +252,7 @@ def test_an_existing_publication_is_not_promoted_without_the_flag(monkeypatch, t
 
 
 # --- nothing else moved -----------------------------------------------------------------
+
 
 def test_the_attribution_identity_is_unchanged(monkeypatch, tmp_path):
     """The run id is still derived from the frozen policy inputs and the label, with no
@@ -243,6 +296,7 @@ def test_the_scheduler_command_carries_no_pointer_authorisation(flag):
 
 
 # --- an existing publication is validated, not rebuilt ----------------------------------
+
 
 def test_an_existing_compatible_publication_is_a_no_op(monkeypatch, tmp_path):
     """The fact table and the registry agree on count, total and digest: nothing to build."""
@@ -305,8 +359,12 @@ def test_a_paid_total_that_disagrees_with_the_registry_is_refused(monkeypatch, t
 
 
 def test_more_than_one_registry_entry_for_one_run_id_is_refused(monkeypatch, tmp_path):
-    r = drive(monkeypatch, tmp_path, [],
-              registry=[dict(REGISTERED), {**REGISTERED, "publication_id": "pub:v9"}])
+    r = drive(
+        monkeypatch,
+        tmp_path,
+        [],
+        registry=[dict(REGISTERED), {**REGISTERED, "publication_id": "pub:v9"}],
+    )
     assert isinstance(r.failure, SystemExit)
     assert "registry entries" in str(r.failure)
     assert r.dbt_calls == []

@@ -26,10 +26,14 @@ EXPECTED_RUN_ID = "feat:7411e987640a1051"
 
 PUBLISHED = {
     "n": 3_045_208,
-    "fruns": 1, "frun": EXPECTED_RUN_ID,
-    "cruns": 1, "crun": CANDIDATE,
-    "nvers": 1, "nver": NORM,
-    "fvers": 1, "fver": F.FEATURE_VERSION,
+    "fruns": 1,
+    "frun": EXPECTED_RUN_ID,
+    "cruns": 1,
+    "crun": CANDIDATE,
+    "nvers": 1,
+    "nver": NORM,
+    "fvers": 1,
+    "fver": F.FEATURE_VERSION,
 }
 
 
@@ -46,16 +50,40 @@ def drive(monkeypatch, tmp_path, target_row, norm=NORM, candidate=CANDIDATE):
         calls.append(label)
         if label == "inspect_target":
             stats.append({"step": label, "bytes_billed": 0, "slot_ms": 0})
-            return [dict(target_row)] if target_row is not None else [
-                {"n": 0, "fruns": 0, "frun": None, "cruns": 0, "crun": None,
-                 "nvers": 0, "nver": None, "fvers": 0, "fver": None}]
+            return (
+                [dict(target_row)]
+                if target_row is not None
+                else [
+                    {
+                        "n": 0,
+                        "fruns": 0,
+                        "frun": None,
+                        "cruns": 0,
+                        "crun": None,
+                        "nvers": 0,
+                        "nver": None,
+                        "fvers": 0,
+                        "fver": None,
+                    }
+                ]
+            )
         raise ReachedHeavyWork(label)
 
     monkeypatch.setattr(mod, "run", fake_run)
     monkeypatch.setattr(mod, "client_as_matcher", lambda: object())
-    monkeypatch.setattr(sys, "argv", [
-        "build_candidate_features.py", "--norm-version", norm,
-        "--candidate-run-id", candidate, "--out", str(out)])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_candidate_features.py",
+            "--norm-version",
+            norm,
+            "--candidate-run-id",
+            candidate,
+            "--out",
+            str(out),
+        ],
+    )
     try:
         mod.main()
         return calls, json.loads(out.read_text())
@@ -72,8 +100,13 @@ def test_an_existing_output_under_the_same_identity_satisfies_the_guard(monkeypa
 def test_the_guard_reaches_no_generation_and_no_write(monkeypatch, tmp_path):
     calls, _report = drive(monkeypatch, tmp_path, PUBLISHED)
     assert calls == ["inspect_target"], f"the builder went past the guard: {calls}"
-    for step in ("stage_features", "validate_features", "publish_atomic", "drop_staging",
-                 "profile"):
+    for step in (
+        "stage_features",
+        "validate_features",
+        "publish_atomic",
+        "drop_staging",
+        "profile",
+    ):
         assert step not in calls
 
 
@@ -87,26 +120,26 @@ def test_the_guard_returns_the_identity_already_published(monkeypatch, tmp_path)
 
 
 def test_an_output_built_from_another_candidate_set_does_not_satisfy_the_guard(
-        monkeypatch, tmp_path):
+    monkeypatch, tmp_path
+):
     """A different blocking run derives a different feature id, so the rows published for
     the old one must not be mistaken for this run's output."""
     other = "blk:0000000000000000"
-    calls, outcome = drive(
-        monkeypatch, tmp_path, {**PUBLISHED, "crun": other}, candidate=other)
+    calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, "crun": other}, candidate=other)
     assert isinstance(outcome, ReachedHeavyWork)
     assert "stage_features" in calls
 
 
 def test_an_output_built_under_another_normalization_does_not_satisfy_the_guard(
-        monkeypatch, tmp_path):
+    monkeypatch, tmp_path
+):
     other = "1.1.0+b3253b155934"
     calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, "nver": other}, norm=other)
     assert isinstance(outcome, ReachedHeavyWork)
     assert "stage_features" in calls
 
 
-def test_an_output_under_another_feature_version_does_not_satisfy_the_guard(
-        monkeypatch, tmp_path):
+def test_an_output_under_another_feature_version_does_not_satisfy_the_guard(monkeypatch, tmp_path):
     """FEATURE_VERSION is in the run id, so a table written by a different scorer carries
     a different id -- and the version column has to disagree too."""
     calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, "fver": "2.0.0"})
@@ -114,11 +147,20 @@ def test_an_output_under_another_feature_version_does_not_satisfy_the_guard(
     assert "stage_features" in calls
 
 
-@pytest.mark.parametrize("broken", [
-    {"n": 3_045_207}, {"n": 3_045_209}, {"n": 0}, {"n": 1},
-    {"fruns": 2}, {"cruns": 2}, {"nvers": 2}, {"fvers": 2},
-    {"frun": "feat:0000000000000000"},
-])
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"n": 3_045_207},
+        {"n": 3_045_209},
+        {"n": 0},
+        {"n": 1},
+        {"fruns": 2},
+        {"cruns": 2},
+        {"nvers": 2},
+        {"fvers": 2},
+        {"frun": "feat:0000000000000000"},
+    ],
+)
 def test_any_mismatched_invariant_does_not_satisfy_the_guard(monkeypatch, tmp_path, broken):
     calls, outcome = drive(monkeypatch, tmp_path, {**PUBLISHED, **broken})
     assert isinstance(outcome, ReachedHeavyWork), f"{broken} wrongly satisfied the guard"
@@ -142,11 +184,15 @@ def test_the_normal_path_is_still_reachable(monkeypatch, tmp_path):
 def test_the_feature_run_id_formula_is_unchanged():
     """The identity is derived from inputs alone; changing the formula would orphan
     feat:7411e987640a1051."""
-    body = inspect.getsource(mod.main)
+    # Whitespace-collapsed, so the assertions below pin the formula rather than the
+    # line wrapping a formatter chose for it.
+    body = " ".join(inspect.getsource(mod.main).split())
     assert 'f"{args.norm_version}|{args.candidate_run_id}|{F.FEATURE_VERSION}"' in body
     assert '"feat:" + hashlib.sha256(' in body
-    recomputed = "feat:" + hashlib.sha256(
-        f"{NORM}|{CANDIDATE}|{F.FEATURE_VERSION}".encode()).hexdigest()[:16]
+    recomputed = (
+        "feat:"
+        + hashlib.sha256(f"{NORM}|{CANDIDATE}|{F.FEATURE_VERSION}".encode()).hexdigest()[:16]
+    )
     assert recomputed == EXPECTED_RUN_ID
 
 

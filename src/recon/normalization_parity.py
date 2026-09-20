@@ -34,8 +34,12 @@ from recon.probe_candidate_space import keys_for as legacy_keys_for
 RULES = load_rules()
 
 _SCRIPT_RANGES = [
-    ("Latin", "LATIN"), ("Cyrillic", "CYRILLIC"), ("Greek", "GREEK"),
-    ("Arabic", "ARABIC"), ("Hebrew", "HEBREW"), ("Thai", "THAI"),
+    ("Latin", "LATIN"),
+    ("Cyrillic", "CYRILLIC"),
+    ("Greek", "GREEK"),
+    ("Arabic", "ARABIC"),
+    ("Hebrew", "HEBREW"),
+    ("Thai", "THAI"),
 ]
 _CJK_PREFIXES = ("CJK", "HIRAGANA", "KATAKANA", "HANGUL")
 
@@ -103,12 +107,18 @@ def mode_keys(args: argparse.Namespace) -> None:
             pairs[key] = row
         row["n"] += 1
 
-    out = {"counts": dict(c), "distinct_pairs": len(pairs),
-           "pairs": [{"a": a, "r": r, **v} for (a, r), v in pairs.items()]}
+    out = {
+        "counts": dict(c),
+        "distinct_pairs": len(pairs),
+        "pairs": [{"a": a, "r": r, **v} for (a, r), v in pairs.items()],
+    }
     with open(args.out, "w") as fh:
         json.dump(out, fh)
-    print(json.dumps({"listens_evaluated": c["listens_evaluated"],
-                      "distinct_pairs": len(pairs)}, indent=1))
+    print(
+        json.dumps(
+            {"listens_evaluated": c["listens_evaluated"], "distinct_pairs": len(pairs)}, indent=1
+        )
+    )
 
 
 def mode_join(args: argparse.Namespace) -> None:
@@ -208,9 +218,7 @@ def mode_join(args: argparse.Namespace) -> None:
             "fallback_key_partial_pct": pct("fallback_key_PARTIAL"),
             "fallback_key_empty_pct": pct("fallback_key_EMPTY"),
         },
-        "content_status_pct": {
-            k.replace("norm_", ""): pct(k) for k in m if k.startswith("norm_")
-        },
+        "content_status_pct": {k.replace("norm_", ""): pct(k) for k in m if k.startswith("norm_")},
         "agreement_with_legacy_probe": {
             "exact_key_identical_pct": pct("legacy_exact_identical"),
             "fallback_key_identical_pct": pct("legacy_fallback_identical"),
@@ -251,10 +259,22 @@ def mode_join(args: argparse.Namespace) -> None:
     }
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1)
-    print(json.dumps({k: report[k] for k in
-                      ("listens_evaluated", "coverage", "agreement_with_legacy_probe",
-                       "exact_stage", "staged_fallback",
-                       "blanket_aggressive_for_comparison")}, indent=1))
+    print(
+        json.dumps(
+            {
+                k: report[k]
+                for k in (
+                    "listens_evaluated",
+                    "coverage",
+                    "agreement_with_legacy_probe",
+                    "exact_stage",
+                    "staged_fallback",
+                    "blanket_aggressive_for_comparison",
+                )
+            },
+            indent=1,
+        )
+    )
 
 
 def main() -> None:

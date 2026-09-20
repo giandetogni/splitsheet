@@ -88,13 +88,18 @@ def main() -> None:
         "est_distinct_combined_lookup": len(sizes) * MOD,
         "recordings_per_lookup": {
             "mean": round(statistics.fmean(sizes), 4) if sizes else 0,
-            "p50": pct(0.50), "p90": pct(0.90), "p95": pct(0.95),
-            "p99": pct(0.99), "p999": pct(0.999), "max": sizes[-1] if sizes else 0,
+            "p50": pct(0.50),
+            "p90": pct(0.90),
+            "p95": pct(0.95),
+            "p99": pct(0.99),
+            "p999": pct(0.999),
+            "max": sizes[-1] if sizes else 0,
         },
         "lookups_with_gt1_recording": amb,
         "lookups_with_gt1_recording_pct": round(100 * amb / max(len(sizes), 1), 4),
     }
     import json
+
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=2, ensure_ascii=False)
     json.dump(report, sys.stdout, indent=2, ensure_ascii=False)

@@ -53,10 +53,12 @@ def _write(tmp_path, raw: dict):
 
 # --- versioning, proven by mutation -------------------------------------------------------
 
+
 def test_policy_version_is_pinned():
     assert POLICY.version == EXPECTED_POLICY_VERSION, (
         "the payout policy changed without updating EXPECTED_POLICY_VERSION. A new policy means a "
-        f"new publication, not an edited one: set it to {POLICY.version!r} in the same commit.")
+        f"new publication, not an edited one: set it to {POLICY.version!r} in the same commit."
+    )
 
 
 def test_the_dbt_project_applies_the_policy_it_claims_to(tmp_path):
@@ -66,16 +68,27 @@ def test_the_dbt_project_applies_the_policy_it_claims_to(tmp_path):
     assert project["vars"]["payout_policy_version"] == POLICY.version
 
 
-@pytest.mark.parametrize("mutate", [
-    pytest.param(lambda r: r["match_risk"].update({"hold_methods": []}), id="hold_methods"),
-    pytest.param(lambda r: r["ownership"].update(
-        {"payable_statuses": ["OWNERSHIP_RESOLVED", "OWNERSHIP_DEFECTIVE"]}), id="ownership_gate"),
-    pytest.param(lambda r: r["money"]["rounding"].update({"tiebreak": "random"}), id="tiebreak"),
-    pytest.param(lambda r: r["money"].update({"published_scale": 4}), id="published_scale"),
-    pytest.param(lambda r: r["inputs"].update({"match_run_id": "match:something_else"}),
-                 id="input_binding"),
-    pytest.param(lambda r: r.update({"fact_grain": ["period", "recording_mbid"]}), id="grain"),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda r: r["match_risk"].update({"hold_methods": []}), id="hold_methods"),
+        pytest.param(
+            lambda r: r["ownership"].update(
+                {"payable_statuses": ["OWNERSHIP_RESOLVED", "OWNERSHIP_DEFECTIVE"]}
+            ),
+            id="ownership_gate",
+        ),
+        pytest.param(
+            lambda r: r["money"]["rounding"].update({"tiebreak": "random"}), id="tiebreak"
+        ),
+        pytest.param(lambda r: r["money"].update({"published_scale": 4}), id="published_scale"),
+        pytest.param(
+            lambda r: r["inputs"].update({"match_run_id": "match:something_else"}),
+            id="input_binding",
+        ),
+        pytest.param(lambda r: r.update({"fact_grain": ["period", "recording_mbid"]}), id="grain"),
+    ],
+)
 def test_changing_the_policy_without_the_digest_fails_the_load(tmp_path, mutate):
     raw = copy.deepcopy(_raw())
     mutate(raw)
@@ -91,16 +104,26 @@ def test_prose_edits_do_not_change_the_digest(tmp_path):
     load_payout_policy(_write(tmp_path, raw))
 
 
-@pytest.mark.parametrize(("mutate", "match"), [
-    (lambda r: r["rate"].update({"imputation": "previous_rate"}), "imputation"),
-    (lambda r: r["money"].update({"negative_payout": "ALLOWED"}), "negative"),
-    (lambda r: r["money"]["rounding"].update({"single_rounding_point": False}), "close in cents"),
-    (lambda r: r["money"]["rounding"].update({"method": "round_half_up_per_holder"}),
-     "unsupported rounding"),
-    (lambda r: r["publication"].update({"destructive_update": "ALLOWED"}), "destructively"),
-    (lambda r: r.update({"attribution_states": [*r["attribution_states"], "UNKNOWN"]}),
-     "UNKNOWN"),
-])
+@pytest.mark.parametrize(
+    ("mutate", "match"),
+    [
+        (lambda r: r["rate"].update({"imputation": "previous_rate"}), "imputation"),
+        (lambda r: r["money"].update({"negative_payout": "ALLOWED"}), "negative"),
+        (
+            lambda r: r["money"]["rounding"].update({"single_rounding_point": False}),
+            "close in cents",
+        ),
+        (
+            lambda r: r["money"]["rounding"].update({"method": "round_half_up_per_holder"}),
+            "unsupported rounding",
+        ),
+        (lambda r: r["publication"].update({"destructive_update": "ALLOWED"}), "destructively"),
+        (
+            lambda r: r.update({"attribution_states": [*r["attribution_states"], "UNKNOWN"]}),
+            "UNKNOWN",
+        ),
+    ],
+)
 def test_a_policy_that_would_invent_money_is_refused(tmp_path, mutate, match):
     """These are not style preferences. Each one, if permitted, changes a published amount or hides
     why it was not published."""
@@ -112,6 +135,7 @@ def test_a_policy_that_would_invent_money_is_refused(tmp_path, mutate, match):
 
 
 # --- the gates ----------------------------------------------------------------------------
+
 
 def test_unmatched_is_never_payable():
     for method in ("NO_CANDIDATES", "SCORED_EXACT_MULTIPLE", "SCORED_FALLBACK_MULTIPLE"):
@@ -129,14 +153,21 @@ def test_fallback_unique_stays_matched_and_is_held_not_downgraded():
 
 
 def test_a_held_method_is_held_even_when_ownership_and_rate_are_perfect():
-    assert POLICY.disposition("MATCHED", "SCORED_FALLBACK_UNIQUE", "RESOLVED", 1) \
-        == MATCH_RISK_POLICY
+    assert (
+        POLICY.disposition("MATCHED", "SCORED_FALLBACK_UNIQUE", "RESOLVED", 1) == MATCH_RISK_POLICY
+    )
 
 
-@pytest.mark.parametrize("resolution", [
-    "DEFECTIVE_OWNERSHIP", "COVERED_ONLY_BY_INVALID_SET", "NO_OWNERSHIP_RECORD",
-    "OWNERSHIP_GAP_FOR_DATE", "MULTIPLE_VALID_SETS",
-])
+@pytest.mark.parametrize(
+    "resolution",
+    [
+        "DEFECTIVE_OWNERSHIP",
+        "COVERED_ONLY_BY_INVALID_SET",
+        "NO_OWNERSHIP_RECORD",
+        "OWNERSHIP_GAP_FOR_DATE",
+        "MULTIPLE_VALID_SETS",
+    ],
+)
 def test_every_ownership_problem_blocks_payment(resolution):
     got = POLICY.disposition("MATCHED", "STRUCTURAL_EXACT_UNIQUE", resolution, 1)
     assert got == DEFECTIVE_OWNERSHIP
@@ -146,8 +177,10 @@ def test_every_ownership_problem_blocks_payment(resolution):
 def test_ownership_is_checked_before_rate():
     """A listen failing both gates is reported as the ownership problem: an unknown owner cannot be
     paid at any rate, so reporting it as a pricing issue would misdirect the fix."""
-    assert POLICY.disposition("MATCHED", "STRUCTURAL_EXACT_UNIQUE",
-                              "DEFECTIVE_OWNERSHIP", 0) == DEFECTIVE_OWNERSHIP
+    assert (
+        POLICY.disposition("MATCHED", "STRUCTURAL_EXACT_UNIQUE", "DEFECTIVE_OWNERSHIP", 0)
+        == DEFECTIVE_OWNERSHIP
+    )
 
 
 def test_a_missing_rate_is_a_gap_and_never_an_imputed_value():
@@ -183,6 +216,7 @@ def test_terminal_states_contain_no_unknown():
 
 # --- run ids ------------------------------------------------------------------------------
 
+
 def test_attribution_run_id_is_deterministic_and_label_specific():
     a = attribution_run_id(POLICY)
     assert a == attribution_run_id(POLICY)
@@ -198,10 +232,19 @@ def test_the_fact_grain_includes_rate_card_id_and_says_why():
 
 # --- the generated SQL matches the Python -------------------------------------------------
 
+
 def test_sql_disposition_encodes_the_same_gates_in_the_same_order():
     sql = POLICY.sql_disposition()
-    order = [sql.index(state) for state in
-             (UNMATCHED, MATCH_RISK_POLICY, DEFECTIVE_OWNERSHIP, RATE_CARD_GAP, ATTRIBUTABLE)]
+    order = [
+        sql.index(state)
+        for state in (
+            UNMATCHED,
+            MATCH_RISK_POLICY,
+            DEFECTIVE_OWNERSHIP,
+            RATE_CARD_GAP,
+            ATTRIBUTABLE,
+        )
+    ]
     assert order == sorted(order), "the SQL gates are not in the policy order"
     assert "SCORED_FALLBACK_UNIQUE" in sql
     assert "UNKNOWN" not in sql

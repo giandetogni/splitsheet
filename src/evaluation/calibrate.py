@@ -67,17 +67,20 @@ SCORED_STAGES = ("EXACT_MULTI", "FALLBACK_UNIQUE", "FALLBACK_MULTI")
 # recording_token_similarity, artist_string_similarity, recording_string_similarity,
 # release_lower_exact.
 WEIGHT_SETS: dict[str, tuple[float, ...]] = {
-    "equal_six":            (1, 1, 1, 1, 1, 1, 0),
-    "auc_proportional":     (0.29, 0.44, 0.32, 0.46, 0.31, 0.45, 0.43),
-    "recording_only":       (0, 1, 0, 1, 0, 1, 0),
-    "recording_release":    (0, 1, 0, 1, 0, 1, 1),
-    "recording_heavy":      (0.1, 1, 0.1, 1, 0.1, 1, 0.5),
+    "equal_six": (1, 1, 1, 1, 1, 1, 0),
+    "auc_proportional": (0.29, 0.44, 0.32, 0.46, 0.31, 0.45, 0.43),
+    "recording_only": (0, 1, 0, 1, 0, 1, 0),
+    "recording_release": (0, 1, 0, 1, 0, 1, 1),
+    "recording_heavy": (0.1, 1, 0.1, 1, 0.1, 1, 0.5),
     "recording_release_eq": (0, 0.8, 0, 1, 0, 0.9, 0.9),
 }
 FEATURE_NAMES = [
-    "artist_unicode_exact", "recording_unicode_exact",
-    "artist_token_similarity", "recording_token_similarity",
-    "artist_string_similarity", "recording_string_similarity",
+    "artist_unicode_exact",
+    "recording_unicode_exact",
+    "artist_token_similarity",
+    "recording_token_similarity",
+    "artist_string_similarity",
+    "recording_string_similarity",
     "release_lower_exact",
 ]
 FEATURE_EXPRS = [
@@ -106,9 +109,14 @@ MIN_ACCEPTED_FOR_ELIGIBILITY = 1_000
 
 
 def weight_struct_array() -> str:
-    rows = ["STRUCT('" + name + "' AS weight_set, "
-            + ", ".join(f"CAST({v} AS FLOAT64) AS w{i}" for i, v in enumerate(w)) + ")"
-            for name, w in WEIGHT_SETS.items()]
+    rows = [
+        "STRUCT('"
+        + name
+        + "' AS weight_set, "
+        + ", ".join(f"CAST({v} AS FLOAT64) AS w{i}" for i, v in enumerate(w))
+        + ")"
+        for name, w in WEIGHT_SETS.items()
+    ]
     return "[" + ", ".join(rows) + "]"
 
 
@@ -120,18 +128,21 @@ def score_expr(prefix: str = "w.w") -> str:
     weight from the denominator, so a listen without a release is scored on the features it
     does have instead of being penalised for a field it never sent.
     """
-    num = " + ".join(f"IF({e} IS NULL, 0, {prefix}{i} * {e})"
-                     for i, e in enumerate(FEATURE_EXPRS))
+    num = " + ".join(f"IF({e} IS NULL, 0, {prefix}{i} * {e})" for i, e in enumerate(FEATURE_EXPRS))
     den = " + ".join(f"IF({e} IS NULL, 0, {prefix}{i})" for i, e in enumerate(FEATURE_EXPRS))
     return f"SAFE_DIVIDE({num}, NULLIF({den}, 0))"
 
 
 def per_listen_cte(partition_sql: str, partition: str) -> str:
     """Top-1 and top-2 per listen per weight set, plus the segmentation dimensions."""
-    latin = (r"CHAR_LENGTH(REGEXP_REPLACE(CONCAT(artist_normalized_unicode, "
-             r"recording_normalized_unicode), r'[^\p{Latin}0-9]', ''))")
-    alnum = (r"CHAR_LENGTH(REGEXP_REPLACE(CONCAT(artist_normalized_unicode, "
-             r"recording_normalized_unicode), r'[^\p{L}\p{N}]', ''))")
+    latin = (
+        r"CHAR_LENGTH(REGEXP_REPLACE(CONCAT(artist_normalized_unicode, "
+        r"recording_normalized_unicode), r'[^\p{Latin}0-9]', ''))"
+    )
+    alnum = (
+        r"CHAR_LENGTH(REGEXP_REPLACE(CONCAT(artist_normalized_unicode, "
+        r"recording_normalized_unicode), r'[^\p{L}\p{N}]', ''))"
+    )
     return f"""
     WITH labelled AS (
       SELECT l.listen_hash, l.mapper_recording_mbid, {partition_sql} AS eval_partition,
@@ -263,8 +274,7 @@ def choose(grid: list[dict]) -> tuple[dict, dict]:
     """Apply the selection rule stated in the module docstring. No judgement calls here."""
     cells: dict[tuple, dict] = {}
     for r in grid:
-        key = (r["weight_set"], r["exact_threshold"], r["fallback_threshold"],
-               r["min_margin"])
+        key = (r["weight_set"], r["exact_threshold"], r["fallback_threshold"], r["min_margin"])
         c = cells.setdefault(key, {"accepted": 0, "listens": 0, "stages": {}})
         c["accepted"] += int(r["accepted"])
         c["listens"] += int(r["listens"])
@@ -286,36 +296,64 @@ def choose(grid: list[dict]) -> tuple[dict, dict]:
         }
     scored = []
     for key, c in cells.items():
-        worst = max(s["disagreement"] for s in c["stages"].values()
-                    if s["evaluable_accepted"] >= MIN_ACCEPTED_FOR_ELIGIBILITY) \
-            if any(s["evaluable_accepted"] >= MIN_ACCEPTED_FOR_ELIGIBILITY
-                   for s in c["stages"].values()) else 1.0
+        worst = (
+            max(
+                s["disagreement"]
+                for s in c["stages"].values()
+                if s["evaluable_accepted"] >= MIN_ACCEPTED_FOR_ELIGIBILITY
+            )
+            if any(
+                s["evaluable_accepted"] >= MIN_ACCEPTED_FOR_ELIGIBILITY
+                for s in c["stages"].values()
+            )
+            else 1.0
+        )
         # A cell that accepts nothing in a stage trivially satisfies the bound, so require
         # every scored stage to be present AND to have accepted enough listens for its rate
         # to mean something.
         complete = all(
             s in c["stages"]
             and c["stages"][s]["evaluable_accepted"] >= MIN_ACCEPTED_FOR_ELIGIBILITY
-            for s in SCORED_STAGES)
-        scored.append({"key": key, "accepted": c["accepted"], "worst_disagreement": worst,
-                       "complete": complete, "stages": c["stages"]})
-    eligible = [s for s in scored
-                if s["complete"] and s["worst_disagreement"] <= MAX_ACCEPTED_DISAGREEMENT]
+            for s in SCORED_STAGES
+        )
+        scored.append(
+            {
+                "key": key,
+                "accepted": c["accepted"],
+                "worst_disagreement": worst,
+                "complete": complete,
+                "stages": c["stages"],
+            }
+        )
+    eligible = [
+        s for s in scored if s["complete"] and s["worst_disagreement"] <= MAX_ACCEPTED_DISAGREEMENT
+    ]
     if eligible:
         best = max(eligible, key=lambda s: (s["accepted"], -s["worst_disagreement"]))
         rule = f"highest accepted coverage with worst-stage disagreement <= {MAX_ACCEPTED_DISAGREEMENT}"
     else:
-        best = min([s for s in scored if s["complete"]],
-                   key=lambda s: (s["worst_disagreement"], -s["accepted"]))
-        rule = ("NO configuration met the disagreement bound; fell back to the lowest "
-                "worst-stage disagreement, bound NOT relaxed")
+        best = min(
+            [s for s in scored if s["complete"]],
+            key=lambda s: (s["worst_disagreement"], -s["accepted"]),
+        )
+        rule = (
+            "NO configuration met the disagreement bound; fell back to the lowest "
+            "worst-stage disagreement, bound NOT relaxed"
+        )
     ws, et, ft, mm = best["key"]
-    return ({"weight_set": ws, "exact_threshold": et, "fallback_threshold": ft,
-             "min_margin": mm, "selection_rule": rule,
-             "accepted_listens": best["accepted"],
-             "worst_stage_disagreement": best["worst_disagreement"],
-             "per_stage": best["stages"]},
-            {"cells_evaluated": len(cells), "eligible_cells": len(eligible)})
+    return (
+        {
+            "weight_set": ws,
+            "exact_threshold": et,
+            "fallback_threshold": ft,
+            "min_margin": mm,
+            "selection_rule": rule,
+            "accepted_listens": best["accepted"],
+            "worst_stage_disagreement": best["worst_disagreement"],
+            "per_stage": best["stages"],
+        },
+        {"cells_evaluated": len(cells), "eligible_cells": len(eligible)},
+    )
 
 
 def main() -> None:
@@ -334,40 +372,58 @@ def main() -> None:
     t0 = time.time()
 
     def q(sql: str, label: str):
-        job = client.query(sql, job_config=bigquery.QueryJobConfig(
-            maximum_bytes_billed=MAX_BYTES))
+        job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
         rows = [dict(r) for r in job.result()]
-        stats.append({"step": label, "job_id": job.job_id,
-                      "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis})
-        print(f"  {label:<34} billed={job.total_bytes_billed or 0:>13,} "
-              f"slot_ms={job.slot_millis or 0:>9,}", flush=True)
+        stats.append(
+            {
+                "step": label,
+                "job_id": job.job_id,
+                "bytes_billed": job.total_bytes_billed,
+                "slot_ms": job.slot_millis,
+            }
+        )
+        print(
+            f"  {label:<34} billed={job.total_bytes_billed or 0:>13,} "
+            f"slot_ms={job.slot_millis or 0:>9,}",
+            flush=True,
+        )
         return rows
 
     grid = q(grid_sql(psql, args.partition, args.tie_epsilon), "threshold/weight grid")
     chosen, meta = choose(grid)
     chosen["tie_epsilon"] = args.tie_epsilon
-    chosen["weights"] = dict(zip(FEATURE_NAMES, WEIGHT_SETS[chosen["weight_set"]],
-                                 strict=True))
+    chosen["weights"] = dict(zip(FEATURE_NAMES, WEIGHT_SETS[chosen["weight_set"]], strict=True))
 
-    by_info = q(breakdown_sql(psql, args.partition, chosen,
-                              "blocking_key_information_class"), "chosen: by information class")
-    by_script = q(breakdown_sql(psql, args.partition, chosen, "script_class"),
-                  "chosen: by script class")
+    by_info = q(
+        breakdown_sql(psql, args.partition, chosen, "blocking_key_information_class"),
+        "chosen: by information class",
+    )
+    by_script = q(
+        breakdown_sql(psql, args.partition, chosen, "script_class"), "chosen: by script class"
+    )
 
     report = {
         "partition": args.partition,
-        "label_status": ("correlated reference label, not independent ground truth; "
-                         "agreement is not absolute matching accuracy"),
+        "label_status": (
+            "correlated reference label, not independent ground truth; "
+            "agreement is not absolute matching accuracy"
+        ),
         "selection_rule": chosen["selection_rule"],
         "max_accepted_disagreement": MAX_ACCEPTED_DISAGREEMENT,
         "min_evaluable_accepted_for_eligibility": MIN_ACCEPTED_FOR_ELIGIBILITY,
-        "disagreement_denominator": ("evaluable accepted decisions = accepted minus those "
-                                     "whose reference is absent from the canonical snapshot"),
+        "disagreement_denominator": (
+            "evaluable accepted decisions = accepted minus those "
+            "whose reference is absent from the canonical snapshot"
+        ),
         "min_accepted_for_eligibility": MIN_ACCEPTED_FOR_ELIGIBILITY,
         "weight_sets_evaluated": {k: list(v) for k, v in WEIGHT_SETS.items()},
-        "grid": {"exact_thresholds": EXACT_THRESHOLDS,
-                 "fallback_thresholds": FALLBACK_THRESHOLDS, "margins": MARGINS,
-                 "tie_epsilon": args.tie_epsilon, **meta},
+        "grid": {
+            "exact_thresholds": EXACT_THRESHOLDS,
+            "fallback_thresholds": FALLBACK_THRESHOLDS,
+            "margins": MARGINS,
+            "tie_epsilon": args.tie_epsilon,
+            **meta,
+        },
         "chosen": chosen,
         "trade_off_table": grid,
         "chosen_by_information_class": by_info,
@@ -380,29 +436,37 @@ def main() -> None:
     with open(args.out, "w") as fh:
         json.dump(report, fh, indent=1, default=str)
 
-    print(f"\nchosen: {json.dumps({k: chosen[k] for k in
-        ('weight_set', 'exact_threshold', 'fallback_threshold', 'min_margin', 'tie_epsilon')})}")
+    print(
+        f"\nchosen: {json.dumps({k: chosen[k] for k in
+        ('weight_set', 'exact_threshold', 'fallback_threshold', 'min_margin', 'tie_epsilon')})}"
+    )
     print(f"  rule: {chosen['selection_rule']}")
     for stage, s in sorted(chosen["per_stage"].items()):
-        print(f"  {stage:<16} accepted={s['accepted']:>7,} evaluable={s['evaluable_accepted']:>7,} "
-              f"disagreement={round(s['disagreement'], 6)} "
-              f"(rank_err={s['ranking_error']:,} not_retrieved={s['ref_not_retrieved']:,} "
-              f"not_in_snapshot={s['ref_not_in_snapshot']:,}) "
-              f"tie={s['ambiguous_tie']:>6,} below={s['below_threshold']:>7,}")
+        print(
+            f"  {stage:<16} accepted={s['accepted']:>7,} evaluable={s['evaluable_accepted']:>7,} "
+            f"disagreement={round(s['disagreement'], 6)} "
+            f"(rank_err={s['ranking_error']:,} not_retrieved={s['ref_not_retrieved']:,} "
+            f"not_in_snapshot={s['ref_not_in_snapshot']:,}) "
+            f"tie={s['ambiguous_tie']:>6,} below={s['below_threshold']:>7,}"
+        )
     print("\nby information class:")
     for r in by_info:
         ev = int(r["accepted"]) - int(r["ref_not_in_snapshot"])
         judged = int(r["ranking_error"]) + int(r["ref_not_retrieved"])
-        print(f"  {r['stage']:<16} {r['segment']:<26} listens={r['listens']:>8,} "
-              f"accepted={int(r['accepted']):>7,} evaluable={ev:>7,} "
-              f"disagreement={(judged / ev if ev else 0):.6f}")
+        print(
+            f"  {r['stage']:<16} {r['segment']:<26} listens={r['listens']:>8,} "
+            f"accepted={int(r['accepted']):>7,} evaluable={ev:>7,} "
+            f"disagreement={(judged / ev if ev else 0):.6f}"
+        )
     print("\nby script class:")
     for r in by_script:
         ev = int(r["accepted"]) - int(r["ref_not_in_snapshot"])
         judged = int(r["ranking_error"]) + int(r["ref_not_retrieved"])
-        print(f"  {r['stage']:<16} {r['segment']:<11} listens={r['listens']:>8,} "
-              f"accepted={int(r['accepted']):>7,} evaluable={ev:>7,} "
-              f"disagreement={(judged / ev if ev else 0):.6f}")
+        print(
+            f"  {r['stage']:<16} {r['segment']:<11} listens={r['listens']:>8,} "
+            f"accepted={int(r['accepted']):>7,} evaluable={ev:>7,} "
+            f"disagreement={(judged / ev if ev else 0):.6f}"
+        )
 
 
 if __name__ == "__main__":

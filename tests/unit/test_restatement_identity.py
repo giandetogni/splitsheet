@@ -46,6 +46,7 @@ def rejected() -> RestatementInputs:
 
 # --- 1. same inputs => same id ------------------------------------------------------------
 
+
 def test_the_same_inputs_always_produce_the_same_id():
     assert published().run_id == published().run_id == EXPECTED_PUBLISHED_RUN_ID
     # And across freshly loaded config, not just a cached object.
@@ -60,12 +61,12 @@ def test_the_id_carries_its_identity_scheme():
 
 # --- 2. changing ONLY the cohort => different id ------------------------------------------
 
+
 def test_changing_only_the_cohort_changes_the_id():
     """The exact defect being fixed: these two runs share every version and differ only in which
     records they touched, and under the legacy scheme they shared one identifier."""
     a, b = published(), rejected()
-    differing = [f for f in CANONICAL_INPUT_FIELDS
-                 if getattr(a, f) != getattr(b, f)]
+    differing = [f for f in CANONICAL_INPUT_FIELDS if getattr(a, f) != getattr(b, f)]
     assert differing == ["cohort_digest"], differing
     assert a.run_id != b.run_id
     assert (a.run_id, b.run_id) == (EXPECTED_PUBLISHED_RUN_ID, EXPECTED_REJECTED_RUN_ID)
@@ -77,13 +78,18 @@ def test_the_two_phase_6_cohorts_are_the_ones_that_used_to_collide():
     assert COHORTS[PUBLISHED_COHORT_KEY].digest != COHORTS[REJECTED_COHORT_KEY].digest
 
 
-@pytest.mark.parametrize("mutate", [
-    pytest.param(lambda p: p.update({"prior_failure_reasons": []}), id="drop_failure_reasons"),
-    pytest.param(lambda p: p.update({"required_scripts_any": ["hangul"]}), id="drop_kana"),
-    pytest.param(lambda p: p.update({"string_fields_examined": ["recording_name"]}),
-                 id="drop_artist_field"),
-    pytest.param(lambda p: p.update({"period_end": "2026-08-01"}), id="widen_period"),
-])
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        pytest.param(lambda p: p.update({"prior_failure_reasons": []}), id="drop_failure_reasons"),
+        pytest.param(lambda p: p.update({"required_scripts_any": ["hangul"]}), id="drop_kana"),
+        pytest.param(
+            lambda p: p.update({"string_fields_examined": ["recording_name"]}),
+            id="drop_artist_field",
+        ),
+        pytest.param(lambda p: p.update({"period_end": "2026-08-01"}), id="widen_period"),
+    ],
+)
 def test_any_predicate_change_changes_the_cohort_digest(mutate):
     base = COHORTS[PUBLISHED_COHORT_KEY]
     predicate = base.canonical_predicate()
@@ -101,11 +107,22 @@ def test_any_predicate_change_changes_the_cohort_digest(mutate):
 
 # --- 3. changing ONLY a version => different id -------------------------------------------
 
-@pytest.mark.parametrize("field_name", [
-    "prior_normalization_version", "new_normalization_version", "scoring_version",
-    "payout_policy_version", "rights_version", "rule_version_id", "trigger_reason",
-    "canonical_snapshot_date", "period_start", "period_end",
-])
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "prior_normalization_version",
+        "new_normalization_version",
+        "scoring_version",
+        "payout_policy_version",
+        "rights_version",
+        "rule_version_id",
+        "trigger_reason",
+        "canonical_snapshot_date",
+        "period_start",
+        "period_end",
+    ],
+)
 def test_changing_only_one_canonical_input_changes_the_id(field_name):
     base = published()
     changed = dataclasses.replace(base, **{field_name: getattr(base, field_name) + "-x"})
@@ -126,13 +143,15 @@ def test_changing_only_the_prior_publication_id_changes_the_id():
 
 # --- 4. field order is irrelevant ---------------------------------------------------------
 
+
 def test_the_order_of_set_valued_predicate_fields_does_not_change_the_digest():
     """These lists are sets semantically -- failure reasons, scripts, fields examined -- so their
     order must not carry identity. Otherwise reordering a YAML list would invent a new run."""
     base = COHORTS[PUBLISHED_COHORT_KEY]
     reordered = CohortDefinition(
         cohort_key=base.cohort_key,
-        period_start=base.period_start, period_end=base.period_end,
+        period_start=base.period_start,
+        period_end=base.period_end,
         prior_failure_reasons=tuple(reversed(base.prior_failure_reasons)),
         string_fields_examined=tuple(reversed(base.string_fields_examined)),
         required_scripts_any=tuple(reversed(base.required_scripts_any)),
@@ -147,8 +166,9 @@ def test_yaml_key_order_does_not_change_the_digest(tmp_path):
         cohort["predicate"] = dict(reversed(list(cohort["predicate"].items())))
     p = tmp_path / "reordered.yml"
     p.write_text(yaml.safe_dump(shuffled, sort_keys=False))
-    assert {k: v.digest for k, v in load_cohorts(p).items()} == \
-           {k: v.digest for k, v in COHORTS.items()}
+    assert {k: v.digest for k, v in load_cohorts(p).items()} == {
+        k: v.digest for k, v in COHORTS.items()
+    }
 
 
 def test_the_id_does_not_depend_on_dataclass_field_order():
@@ -162,11 +182,15 @@ def test_the_id_does_not_depend_on_dataclass_field_order():
 
 # --- 5. comments and documentation are irrelevant -----------------------------------------
 
+
 def test_notes_status_and_measured_counts_do_not_change_the_digest():
     base = COHORTS[PUBLISHED_COHORT_KEY]
     annotated = dataclasses.replace(
-        base, status="SOMETHING_ELSE", measured_listens=42,
-        notes="a completely different explanation of the same predicate")
+        base,
+        status="SOMETHING_ELSE",
+        measured_listens=42,
+        notes="a completely different explanation of the same predicate",
+    )
     assert annotated.digest == base.digest
     assert set(COHORT_FIELDS_EXCLUDED_FROM_HASH) >= {"status", "measured_listens", "notes"}
 
@@ -174,11 +198,13 @@ def test_notes_status_and_measured_counts_do_not_change_the_digest():
 def test_yaml_comments_and_prose_do_not_change_the_digest(tmp_path):
     raw_text = CONFIG.read_text()
     commented = "# an added comment that must not matter\n" + raw_text.replace(
-        "measured_listens: 982322", "measured_listens: 982322  # inline comment")
+        "measured_listens: 982322", "measured_listens: 982322  # inline comment"
+    )
     p = tmp_path / "commented.yml"
     p.write_text(commented)
-    assert {k: v.digest for k, v in load_cohorts(p).items()} == \
-           {k: v.digest for k, v in COHORTS.items()}
+    assert {k: v.digest for k, v in load_cohorts(p).items()} == {
+        k: v.digest for k, v in COHORTS.items()
+    }
 
 
 def test_editing_a_note_does_not_change_the_run_id(tmp_path):
@@ -190,6 +216,7 @@ def test_editing_a_note_does_not_change_the_run_id(tmp_path):
 
 
 # --- the config cannot drift from its digest ----------------------------------------------
+
 
 def test_a_predicate_edited_without_updating_its_digest_is_refused(tmp_path):
     raw = yaml.safe_load(CONFIG.read_text())
@@ -217,14 +244,25 @@ def test_incomplete_canonical_inputs_are_refused():
 
 def test_every_documented_canonical_input_is_actually_hashed():
     payload = published().canonical_payload()
-    for name in ("period_start", "period_end", "prior_publication_id",
-                 "prior_normalization_version", "new_normalization_version", "scoring_version",
-                 "payout_policy_version", "rights_version", "rule_version_id", "trigger_reason",
-                 "canonical_snapshot_date", "cohort_digest"):
+    for name in (
+        "period_start",
+        "period_end",
+        "prior_publication_id",
+        "prior_normalization_version",
+        "new_normalization_version",
+        "scoring_version",
+        "payout_policy_version",
+        "rights_version",
+        "rule_version_id",
+        "trigger_reason",
+        "canonical_snapshot_date",
+        "cohort_digest",
+    ):
         assert name in payload, name
 
 
 # --- the legacy identifier is preserved, not rewritten ------------------------------------
+
 
 def test_the_legacy_identifier_is_recorded_as_insufficient():
     assert LEGACY_RUN_ID.run_id == "restate:6b3923771883e860"
@@ -256,8 +294,10 @@ def test_sql_is_generated_from_the_predicate_and_is_not_its_identity():
 
 # --- the legacy scheme's defect, reproduced rather than asserted ---------------------------
 
+
 def test_the_legacy_formula_reproduces_the_published_identifier():
     from restatement.identity import LEGACY_INPUTS, legacy_run_id
+
     assert legacy_run_id(**LEGACY_INPUTS) == LEGACY_RUN_ID.run_id
 
 
@@ -267,6 +307,7 @@ def test_the_legacy_formula_cannot_see_the_cohort_at_all():
     import inspect
 
     from restatement.identity import LEGACY_INPUTS, legacy_run_id
+
     params = set(inspect.signature(legacy_run_id).parameters)
     assert "cohort" not in " ".join(params)
     assert legacy_run_id(**LEGACY_INPUTS) == legacy_run_id(**LEGACY_INPUTS)
@@ -280,8 +321,10 @@ def test_the_legacy_id_resolves_to_the_canonical_id_of_the_published_run():
 
 # --- the registry: additive, and consistent with the identity module -----------------------
 
+
 def test_the_registry_maps_one_legacy_id_to_two_canonical_ids():
     from restatement.registry import registry_rows
+
     cohort_rows = [r for r in registry_rows() if r["cohort_sha256"]]
     assert len({r["legacy_run_id"] for r in cohort_rows}) == 1
     assert len({r["canonical_run_id"] for r in cohort_rows}) == len(cohort_rows) == 2
@@ -291,6 +334,7 @@ def test_the_registry_maps_one_legacy_id_to_two_canonical_ids():
 
 def test_the_registry_records_which_run_was_published_and_which_was_rejected():
     from restatement.registry import registry_rows
+
     by_key = {r["registry_key"]: r for r in registry_rows()}
     published = by_key[PUBLISHED_COHORT_KEY]
     assert published["run_type"] == "PUBLISHED_RESTATEMENT"
@@ -306,9 +350,11 @@ def test_the_registry_records_which_run_was_published_and_which_was_rejected():
 
 # --- the pre-canonical placeholder is registered, not excepted ----------------------------
 
+
 def test_the_rehearsal_placeholder_has_its_own_registry_entry():
     """`restate:pending` is explained by data, so no test needs to name it as an exception."""
     from restatement.registry import registry_rows
+
     row = next(r for r in registry_rows() if r["registry_key"] == "restate:pending")
     assert row["run_type"] == "LEGACY_REHEARSAL"
     assert row["is_legacy"] is True
@@ -322,10 +368,19 @@ def test_the_rehearsal_placeholder_has_its_own_registry_entry():
 def test_the_placeholder_claims_no_identity_it_never_had():
     """Unrecorded is recorded as unrecorded. Reconstructing inputs would make this fiction."""
     from restatement.registry import registry_rows
+
     row = next(r for r in registry_rows() if r["registry_key"] == "restate:pending")
     assert row["canonical_inputs_available"] is False
-    for absent in ("canonical_run_id", "identity_scheme", "inputs_digest", "canonical_inputs",
-                   "cohort_key", "cohort_sha256", "cohort_predicate", "new_publication_id"):
+    for absent in (
+        "canonical_run_id",
+        "identity_scheme",
+        "inputs_digest",
+        "canonical_inputs",
+        "cohort_key",
+        "cohort_sha256",
+        "cohort_predicate",
+        "new_publication_id",
+    ):
         assert row[absent] is None, absent
 
 
@@ -334,6 +389,7 @@ def test_a_legacy_run_claiming_canonical_inputs_is_refused():
     import yaml
 
     from restatement.identity import load_legacy_runs
+
     raw = yaml.safe_load(CONFIG.read_text())
     raw["legacy_runs"][0]["canonical_inputs_available"] = True
     p = pathlib.Path(__file__).parent / "_tmp_legacy.yml"
@@ -348,6 +404,7 @@ def test_a_legacy_run_claiming_canonical_inputs_is_refused():
 def test_every_identifier_that_reaches_the_mart_has_exactly_one_entry():
     """The registry-side half of the warehouse invariant, checkable without a warehouse."""
     from restatement.registry import registry_rows
+
     mart_ids = [r["mart_run_id"] for r in registry_rows() if r["mart_run_id"]]
     assert sorted(mart_ids) == ["restate:6b3923771883e860", "restate:pending"]
     assert len(set(mart_ids)) == len(mart_ids), "two entries claim the same mart identifier"
@@ -355,10 +412,14 @@ def test_every_identifier_that_reaches_the_mart_has_exactly_one_entry():
 
 def test_the_cohort_digests_did_not_move_when_provenance_was_added():
     """mart_run_id, recorded_delta and rows_in_delta_mart are provenance, not identity."""
-    assert COHORTS[PUBLISHED_COHORT_KEY].digest == \
-        "cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5"
-    assert COHORTS[REJECTED_COHORT_KEY].digest == \
-        "90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3"
+    assert (
+        COHORTS[PUBLISHED_COHORT_KEY].digest
+        == "cc9e4a61308b6f31a77fe31576fd4e81e3f380e0e6bab6609d30c8b3925705d5"
+    )
+    assert (
+        COHORTS[REJECTED_COHORT_KEY].digest
+        == "90eaec5b2be2c3dfa7a07de0a7541396a721da4d166cd17534adf02ee86794e3"
+    )
     assert published().run_id == EXPECTED_PUBLISHED_RUN_ID
     for f in ("mart_run_id", "rows_in_delta_mart", "recorded_delta"):
         assert f in COHORT_FIELDS_EXCLUDED_FROM_HASH, f
@@ -368,12 +429,15 @@ def test_the_generated_dbt_model_is_current():
     """The warehouse cannot drift from the identity module: change a cohort or an input and this
     fails until the model is regenerated."""
     from restatement.registry import MODEL_PATH, registry_model_sql
-    assert MODEL_PATH.read_text() == registry_model_sql(), (
-        f"{MODEL_PATH} is stale; run `python -m restatement.registry --write`")
+
+    assert (
+        MODEL_PATH.read_text() == registry_model_sql()
+    ), f"{MODEL_PATH} is stale; run `python -m restatement.registry --write`"
 
 
 def test_the_generated_model_contains_both_identities_and_neither_is_the_legacy_one():
     from restatement.registry import MODEL_PATH
+
     sql = MODEL_PATH.read_text()
     assert EXPECTED_PUBLISHED_RUN_ID in sql and EXPECTED_REJECTED_RUN_ID in sql
     assert sql.count(f"'{LEGACY_RUN_ID.run_id}' as legacy_run_id") == 2

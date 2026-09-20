@@ -75,8 +75,9 @@ def base_cte(partition_sql: str, partition: str) -> str:
     )"""
 
 
-def auc_sql(expr: str, strata: str, partition_sql: str, partition: str,
-            extra_filter: str = "TRUE") -> str:
+def auc_sql(
+    expr: str, strata: str, partition_sql: str, partition: str, extra_filter: str = "TRUE"
+) -> str:
     """Exact rank-free AUC per stratum, ties counted as 0.5."""
     return f"""
     {base_cte(partition_sql, partition)},
@@ -126,60 +127,81 @@ def main() -> None:
     t0 = time.time()
 
     def q(sql: str, label: str):
-        job = client.query(sql, job_config=bigquery.QueryJobConfig(
-            maximum_bytes_billed=MAX_BYTES))
+        job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
         rows = [dict(r) for r in job.result()]
-        stats.append({"step": label, "job_id": job.job_id,
-                      "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis})
-        print(f"  {label:<46} billed={job.total_bytes_billed or 0:>13,} "
-              f"slot_ms={job.slot_millis or 0:>9,}", flush=True)
+        stats.append(
+            {
+                "step": label,
+                "job_id": job.job_id,
+                "bytes_billed": job.total_bytes_billed,
+                "slot_ms": job.slot_millis,
+            }
+        )
+        print(
+            f"  {label:<46} billed={job.total_bytes_billed or 0:>13,} "
+            f"slot_ms={job.slot_millis or 0:>9,}",
+            flush=True,
+        )
         return rows
 
     report: dict = {
         "partition_analysed": args.partition,
         "split_version": cfg.split_version,
         "calibration_split_version": cfg.calibration_split_version,
-        "label_status": ("correlated reference label, not independent ground truth; "
-                         "agreement is not absolute matching accuracy"),
+        "label_status": (
+            "correlated reference label, not independent ground truth; "
+            "agreement is not absolute matching accuracy"
+        ),
     }
 
     # Partition sizes first: the freeze is only meaningful if the partitions are disjoint
     # and non-trivial, and that has to be shown, not asserted.
-    report["partitions"] = q(f"""
+    report["partitions"] = q(
+        f"""
         SELECT {psql} AS eval_partition,
                COUNT(*) AS labelled_listens,
                COUNT(DISTINCT mapper_recording_mbid) AS distinct_reference_recordings
         FROM `{PROJECT}.splitsheet_eval.mapper_reference_labels`
         WHERE mapper_recording_mbid IS NOT NULL
         GROUP BY 1 ORDER BY 1
-    """, "partition sizes")
+    """,
+        "partition sizes",
+    )
 
-    report["overlap_check"] = q(f"""
+    report["overlap_check"] = q(
+        f"""
         SELECT COUNT(*) AS recordings_in_both_partitions FROM (
           SELECT mapper_recording_mbid
           FROM `{PROJECT}.splitsheet_eval.mapper_reference_labels`
           WHERE mapper_recording_mbid IS NOT NULL
           GROUP BY 1
           HAVING COUNT(DISTINCT {psql}) > 1)
-    """, "calibration/validation disjointness")
+    """,
+        "calibration/validation disjointness",
+    )
 
-    report["universe"] = q(f"""
+    report["universe"] = q(
+        f"""
         {base_cte(psql, args.partition)}
         SELECT stage, blocking_key_information_class, COUNT(*) AS pairs,
                COUNT(DISTINCT listen_hash) AS listens, COUNTIF(is_ref) AS reference_pairs
         FROM base GROUP BY 1, 2 ORDER BY 1, 2
-    """, "calibration universe")
+    """,
+        "calibration universe",
+    )
 
     report["features"] = {}
     for name, expr in SCORED_FEATURES + PROBE_FEATURES:
         report["features"][name] = {
             "distribution": q(dist_sql(expr, psql, args.partition), f"{name}: distribution"),
             "auc_overall": q(auc_sql(expr, "'ALL'", psql, args.partition), f"{name}: AUC all"),
-            "auc_by_stage": q(auc_sql(expr, "stage", psql, args.partition),
-                              f"{name}: AUC by stage"),
+            "auc_by_stage": q(
+                auc_sql(expr, "stage", psql, args.partition), f"{name}: AUC by stage"
+            ),
             "auc_by_information_class": q(
                 auc_sql(expr, "blocking_key_information_class", psql, args.partition),
-                f"{name}: AUC by info class"),
+                f"{name}: AUC by info class",
+            ),
         }
 
     # Incremental gain: AUC of the equal-weight sum, then the same sum with one feature
@@ -190,12 +212,15 @@ def main() -> None:
         return f"({' + '.join(used)}) / {len(used)}"
 
     report["combined"] = {
-        "all_features": q(auc_sql(equal_weight_expr(None), "'ALL'", psql, args.partition),
-                          "equal-weight sum: AUC")}
+        "all_features": q(
+            auc_sql(equal_weight_expr(None), "'ALL'", psql, args.partition), "equal-weight sum: AUC"
+        )
+    }
     for name, _ in SCORED_FEATURES:
         report["combined"][f"without_{name}"] = q(
             auc_sql(equal_weight_expr(name), "'ALL'", psql, args.partition),
-            f"equal-weight sum without {name}")
+            f"equal-weight sum without {name}",
+        )
 
     report["bytes_billed"] = sum(s["bytes_billed"] or 0 for s in stats)
     report["slot_ms"] = sum(s["slot_ms"] or 0 for s in stats)
@@ -206,10 +231,14 @@ def main() -> None:
 
     print("\npartitions (labelled listens):")
     for r in report["partitions"]:
-        print(f"  {r['eval_partition']:<16} listens={r['labelled_listens']:>10,} "
-              f"recordings={r['distinct_reference_recordings']:>9,}")
-    print(f"  recordings in more than one partition: "
-          f"{report['overlap_check'][0]['recordings_in_both_partitions']}")
+        print(
+            f"  {r['eval_partition']:<16} listens={r['labelled_listens']:>10,} "
+            f"recordings={r['distinct_reference_recordings']:>9,}"
+        )
+    print(
+        f"  recordings in more than one partition: "
+        f"{report['overlap_check'][0]['recordings_in_both_partitions']}"
+    )
 
     print(f"\nfeature AUC on {args.partition} (0.5 = no separation):")
     for name, _ in SCORED_FEATURES + PROBE_FEATURES:
@@ -219,12 +248,22 @@ def main() -> None:
         by_info = {r["stratum"]: r["auc"] for r in f["auc_by_information_class"]}
         nulls = sum(int(d["null_count"]) for d in f["distribution"])
         pairs = sum(int(d["pairs"]) for d in f["distribution"])
-        print(f"  {name:<28} auc={a['auc']}  null_rate={nulls / max(pairs, 1):.6f}  "
-              f"ref={a['reference_pairs']:,} other={a['other_pairs']:,}")
-        print(f"    {'by stage':<12} " + "  ".join(
-            f"{k}={v if v is None else round(v, 4)}" for k, v in sorted(by_stage.items())))
-        print(f"    {'by info':<12} " + "  ".join(
-            f"{k}={v if v is None else round(v, 4)}" for k, v in sorted(by_info.items())))
+        print(
+            f"  {name:<28} auc={a['auc']}  null_rate={nulls / max(pairs, 1):.6f}  "
+            f"ref={a['reference_pairs']:,} other={a['other_pairs']:,}"
+        )
+        print(
+            f"    {'by stage':<12} "
+            + "  ".join(
+                f"{k}={v if v is None else round(v, 4)}" for k, v in sorted(by_stage.items())
+            )
+        )
+        print(
+            f"    {'by info':<12} "
+            + "  ".join(
+                f"{k}={v if v is None else round(v, 4)}" for k, v in sorted(by_info.items())
+            )
+        )
 
     print("\nincremental gain (equal-weight sum):")
     allauc = report["combined"]["all_features"][0]["auc"]

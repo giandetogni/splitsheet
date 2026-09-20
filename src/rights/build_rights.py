@@ -46,15 +46,30 @@ from rights.generator import (
 
 PROJECT = "ss-de-944054e7"
 MAX_BYTES = 100 * 1024**3
-PERIOD = ("listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
-          "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'")
+PERIOD = (
+    "listened_at >= TIMESTAMP '2026-06-01 00:00:00+00' "
+    "AND listened_at < TIMESTAMP '2026-07-01 00:00:00+00'"
+)
 GCS_PREFIX = "derived/rights"
 
 HOLDER_COLUMNS = ["holder_id", "display_name", "holder_type", "payee_status", "model_scope"]
-SPLIT_COLUMNS = ["recording_mbid", "rights_holder_id", "share_pct", "valid_from", "valid_to",
-                 "split_version_id"]
-RATE_COLUMNS = ["rate_card_id", "model_scope", "valid_from", "valid_to", "rate_per_stream",
-                "currency", "rule_version_id"]
+SPLIT_COLUMNS = [
+    "recording_mbid",
+    "rights_holder_id",
+    "share_pct",
+    "valid_from",
+    "valid_to",
+    "split_version_id",
+]
+RATE_COLUMNS = [
+    "rate_card_id",
+    "model_scope",
+    "valid_from",
+    "valid_to",
+    "rate_per_stream",
+    "currency",
+    "rule_version_id",
+]
 
 
 def recording_universe(client, model: RightsModel) -> list[str]:
@@ -66,21 +81,27 @@ def recording_universe(client, model: RightsModel) -> list[str]:
     """
     from google.cloud import bigquery
 
-    job = client.query(f"""
+    job = client.query(
+        f"""
         SELECT DISTINCT matched_recording_mbid AS recording_mbid
         FROM `{PROJECT}.splitsheet_silver.silver_listen_matches`
         WHERE {PERIOD} AND match_status = 'MATCHED'
           AND match_run_id = '{model.universe_match_run_id}'
         ORDER BY recording_mbid
-    """, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
+    """,
+        job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES),
+    )
     mbids = [r["recording_mbid"] for r in job.result()]
-    print(f"  universe query billed={job.total_bytes_billed or 0:,} "
-          f"recordings={len(mbids):,}", flush=True)
+    print(
+        f"  universe query billed={job.total_bytes_billed or 0:,} " f"recordings={len(mbids):,}",
+        flush=True,
+    )
     if len(mbids) != model.expected_recordings:
         raise SystemExit(
             f"universe holds {len(mbids)} recordings but config/rights_model.yml expects "
             f"{model.expected_recordings} for match run {model.universe_match_run_id}: the "
-            f"catalogue changed, so this would be a different dataset under the same version")
+            f"catalogue changed, so this would be a different dataset under the same version"
+        )
     return mbids, job
 
 
@@ -112,7 +133,8 @@ def revise_holders(model: RightsModel, count: int) -> dict[str, str]:
     for i in range(count):
         current = holder_row(model, i)["payee_status"]
         flipped[f"{model.holder_id_prefix}{i:0{model.holder_id_digits}d}"] = (
-            "PENDING_VERIFICATION" if current == "ACTIVE" else "ACTIVE")
+            "PENDING_VERIFICATION" if current == "ACTIVE" else "ACTIVE"
+        )
     return flipped
 
 
@@ -121,8 +143,12 @@ def main() -> None:
     ap.add_argument("--bucket", required=True)
     ap.add_argument("--work-dir", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--revise-payee-status", type=int, default=0,
-                    help="re-land ONLY rights_holders with N holders' payee_status flipped")
+    ap.add_argument(
+        "--revise-payee-status",
+        type=int,
+        default=0,
+        help="re-land ONLY rights_holders with N holders' payee_status flipped",
+    )
     ap.add_argument("--fail-before-publish", action="store_true")
     args = ap.parse_args()
 
@@ -135,20 +161,30 @@ def main() -> None:
     work.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     stats: list = []
-    print(f"rights model {model.version}  universe {model.universe_match_run_id}"
-          f"{'  REVISION of ' + str(args.revise_payee_status) + ' holders' if args.revise_payee_status else ''}",
-          flush=True)
+    print(
+        f"rights model {model.version}  universe {model.universe_match_run_id}"
+        f"{'  REVISION of ' + str(args.revise_payee_status) + ' holders' if args.revise_payee_status else ''}",
+        flush=True,
+    )
 
     mbids, universe_job = recording_universe(client, model)
-    stats.append({"step": "universe", "job_id": universe_job.job_id,
-                  "bytes_billed": universe_job.total_bytes_billed})
+    stats.append(
+        {
+            "step": "universe",
+            "job_id": universe_job.job_id,
+            "bytes_billed": universe_job.total_bytes_billed,
+        }
+    )
 
     # Deterministic from the model and the universe. No wall-clock: a re-run must produce the
     # same id, which is how a re-run is distinguishable from a new dataset.
     revision_tag = f"|rev{args.revise_payee_status}" if args.revise_payee_status else ""
-    run_id = "rights:" + hashlib.sha256(
-        f"{model.version}|{model.universe_match_run_id}|{len(mbids)}{revision_tag}".encode()
-    ).hexdigest()[:16]
+    run_id = (
+        "rights:"
+        + hashlib.sha256(
+            f"{model.version}|{model.universe_match_run_id}|{len(mbids)}{revision_tag}".encode()
+        ).hexdigest()[:16]
+    )
     print(f"  generation_run_id {run_id}", flush=True)
 
     defects = select_defects(model, mbids)
@@ -166,27 +202,38 @@ def main() -> None:
             yield row
 
     files: dict[str, dict] = {}
-    targets = ["rights_holders"] if args.revise_payee_status else [
-        "rights_holders", "ownership_splits", "rate_card"]
+    targets = (
+        ["rights_holders"]
+        if args.revise_payee_status
+        else ["rights_holders", "ownership_splits", "rate_card"]
+    )
 
     for table in targets:
         path = work / f"{table}.tsv.gz"
         if table == "rights_holders":
             n, digest = write_tsv(path, HOLDER_COLUMNS, holders())
         elif table == "ownership_splits":
-            n, digest = write_tsv(path, SPLIT_COLUMNS,
-                                  generate_ownership(model, mbids, defects))
+            n, digest = write_tsv(path, SPLIT_COLUMNS, generate_ownership(model, mbids, defects))
         else:
             n, digest = write_tsv(path, RATE_COLUMNS, rate_card_rows(model))
-        object_name = (f"{GCS_PREFIX}/version={model.version}/run={run_id.replace(':', '_')}/"
-                       f"{table}.tsv.gz")
+        object_name = (
+            f"{GCS_PREFIX}/version={model.version}/run={run_id.replace(':', '_')}/"
+            f"{table}.tsv.gz"
+        )
         blob = bucket.blob(object_name)
         blob.metadata = {"sha256": digest, "rights_version": model.version}
         blob.upload_from_filename(str(path), content_type="application/gzip")
-        files[table] = {"rows": n, "bytes": path.stat().st_size, "sha256": digest,
-                        "object": f"gs://{args.bucket}/{object_name}"}
-        print(f"  {table:<18} rows={n:>10,}  bytes={path.stat().st_size:>12,}  "
-              f"sha256={digest[:12]}", flush=True)
+        files[table] = {
+            "rows": n,
+            "bytes": path.stat().st_size,
+            "sha256": digest,
+            "object": f"gs://{args.bucket}/{object_name}",
+        }
+        print(
+            f"  {table:<18} rows={n:>10,}  bytes={path.stat().st_size:>12,}  "
+            f"sha256={digest[:12]}",
+            flush=True,
+        )
 
     if args.fail_before_publish:
         raise SystemExit("INJECTED FAILURE after generation and upload, before publication.")
@@ -221,32 +268,52 @@ def main() -> None:
         # Staged load then INSERT, never a load straight into the Terraform-managed table: that
         # is what silently replaced a 13-column schema with a 10-column one in Phase 3A.
         load = client.load_table_from_uri(
-            files[table]["object"], stg,
+            files[table]["object"],
+            stg,
             job_config=bigquery.LoadJobConfig(
-                source_format=bigquery.SourceFormat.CSV, field_delimiter="\t",
-                quote_character='"', allow_quoted_newlines=True,
-                write_disposition="WRITE_TRUNCATE", schema=schemas[table]))
+                source_format=bigquery.SourceFormat.CSV,
+                field_delimiter="\t",
+                quote_character='"',
+                allow_quoted_newlines=True,
+                write_disposition="WRITE_TRUNCATE",
+                schema=schemas[table],
+            ),
+        )
         load.result()
         if load.output_rows != files[table]["rows"]:
-            raise SystemExit(f"{table}: staging holds {load.output_rows}, generated "
-                             f"{files[table]['rows']}")
-        cols = {"rights_holders": HOLDER_COLUMNS, "ownership_splits": SPLIT_COLUMNS,
-                "rate_card": RATE_COLUMNS}[table]
+            raise SystemExit(
+                f"{table}: staging holds {load.output_rows}, generated " f"{files[table]['rows']}"
+            )
+        cols = {
+            "rights_holders": HOLDER_COLUMNS,
+            "ownership_splits": SPLIT_COLUMNS,
+            "rate_card": RATE_COLUMNS,
+        }[table]
         tail = tails[table].format(v=model.version, r=run_id)
-        job = client.query(f"""
+        job = client.query(
+            f"""
             BEGIN TRANSACTION;
             DELETE FROM `{PROJECT}.splitsheet_rights.{table}` WHERE TRUE;
             INSERT INTO `{PROJECT}.splitsheet_rights.{table}`
             SELECT {', '.join(cols)}, {tail} FROM `{stg}`;
             COMMIT TRANSACTION;
-        """, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
+        """,
+            job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES),
+        )
         job.result()
-        stats.append({"step": f"publish_{table}", "job_id": job.job_id,
-                      "bytes_billed": job.total_bytes_billed, "load_job_id": load.job_id})
+        stats.append(
+            {
+                "step": f"publish_{table}",
+                "job_id": job.job_id,
+                "bytes_billed": job.total_bytes_billed,
+                "load_job_id": load.job_id,
+            }
+        )
         client.query(f"DROP TABLE IF EXISTS `{stg}`").result()
         print(f"  published {table}", flush=True)
 
-    check_job = client.query(f"""
+    check_job = client.query(
+        f"""
         SELECT
           (SELECT COUNT(*) FROM `{PROJECT}.splitsheet_rights.rights_holders`) AS holders,
           (SELECT COUNT(DISTINCT holder_id)
@@ -259,10 +326,13 @@ def main() -> None:
           (SELECT COUNT(*) FROM `{PROJECT}.splitsheet_rights.rate_card`) AS rate_rows,
           (SELECT COUNTIF(NOT is_modeled) FROM `{PROJECT}.splitsheet_rights.ownership_splits`)
             AS splits_not_declared_modeled
-    """, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
+    """,
+        job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES),
+    )
     landed = {k: int(v) for k, v in dict(next(iter(check_job.result()))).items()}
-    stats.append({"step": "verify", "job_id": check_job.job_id,
-                  "bytes_billed": check_job.total_bytes_billed})
+    stats.append(
+        {"step": "verify", "job_id": check_job.job_id, "bytes_billed": check_job.total_bytes_billed}
+    )
     if landed["splits_not_declared_modeled"]:
         raise SystemExit("a landed row does not declare itself modeled")
 
@@ -283,8 +353,11 @@ def main() -> None:
         "generation_run_id": run_id,
         "universe_match_run_id": model.universe_match_run_id,
         "recordings_in_universe": len(mbids),
-        "revision": {"payee_status_flipped": args.revise_payee_status,
-                     "holder_ids": sorted(flipped)} if args.revise_payee_status else None,
+        "revision": (
+            {"payee_status_flipped": args.revise_payee_status, "holder_ids": sorted(flipped)}
+            if args.revise_payee_status
+            else None
+        ),
         "tables_published": targets,
         "files": files,
         "defects_injected": injected,

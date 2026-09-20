@@ -61,10 +61,12 @@ class SplitConfig:
             f"AS INT64), {self.modulus}) < {self.calibration_upper_exclusive}, "
             f"'{CALIBRATION}', '{VALIDATION}')"
         )
-        return (f"CASE {self.sql_expression(column)} "
-                f"WHEN '{DEV}' THEN {dev_sub} "
-                f"WHEN '{HOLDOUT}' THEN '{HOLDOUT}' "
-                f"ELSE '{self.unlabelled_bucket}' END")
+        return (
+            f"CASE {self.sql_expression(column)} "
+            f"WHEN '{DEV}' THEN {dev_sub} "
+            f"WHEN '{HOLDOUT}' THEN '{HOLDOUT}' "
+            f"ELSE '{self.unlabelled_bucket}' END"
+        )
 
 
 def load_split_config(path: str | pathlib.Path | None = None) -> SplitConfig:
@@ -114,7 +116,6 @@ def partition_of(mapper_recording_mbid: str | None, cfg: SplitConfig) -> str:
     bucket = bucket_of(mapper_recording_mbid, cfg)
     if bucket != DEV:
         return bucket
-    digest = hashlib.sha256(
-        f"{cfg.calibration_salt}:{mapper_recording_mbid}".encode()).hexdigest()
+    digest = hashlib.sha256(f"{cfg.calibration_salt}:{mapper_recording_mbid}".encode()).hexdigest()
     value = int(digest[: cfg.hex_prefix_chars], 16) % cfg.modulus
     return CALIBRATION if value < cfg.calibration_upper_exclusive else VALIDATION

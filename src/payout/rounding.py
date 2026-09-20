@@ -35,11 +35,11 @@ HUNDRED = Decimal(100)
 class HolderAllocation:
     rights_holder_id: str
     share_pct: Decimal
-    unrounded: Decimal          # full internal precision, before any rounding
-    floor_cents: int            # unrounded floored to whole cents
+    unrounded: Decimal  # full internal precision, before any rounding
+    floor_cents: int  # unrounded floored to whole cents
     remainder_fraction: Decimal  # the part discarded by the floor, in cents
-    got_remainder_cent: bool     # whether this holder received one of the leftover cents
-    published: Decimal           # final published amount, exactly 2 decimals
+    got_remainder_cent: bool  # whether this holder received one of the leftover cents
+    published: Decimal  # final published amount, exactly 2 decimals
 
 
 def publish_gross(gross_unrounded: Decimal) -> Decimal:
@@ -48,8 +48,9 @@ def publish_gross(gross_unrounded: Decimal) -> Decimal:
     return gross_unrounded.quantize(CENT, rounding=ROUND_HALF_UP)
 
 
-def allocate(gross_unrounded: Decimal,
-             holders: list[tuple[str, Decimal]]) -> list[HolderAllocation]:
+def allocate(
+    gross_unrounded: Decimal, holders: list[tuple[str, Decimal]]
+) -> list[HolderAllocation]:
     """Distribute the published gross across holders by largest remainder.
 
     `holders` is [(rights_holder_id, share_pct)], shares summing to exactly 100 for a valid set.
@@ -70,13 +71,15 @@ def allocate(gross_unrounded: Decimal,
         unrounded = gross_unrounded * share / HUNDRED
         in_cents = unrounded / CENT
         floor_cents = int(in_cents.to_integral_value(rounding=ROUND_FLOOR))
-        rows.append({
-            "holder_id": holder_id,
-            "share": share,
-            "unrounded": unrounded,
-            "floor_cents": floor_cents,
-            "fraction": in_cents - Decimal(floor_cents),
-        })
+        rows.append(
+            {
+                "holder_id": holder_id,
+                "share": share,
+                "unrounded": unrounded,
+                "floor_cents": floor_cents,
+                "fraction": in_cents - Decimal(floor_cents),
+            }
+        )
 
     leftover = target_cents - sum(r["floor_cents"] for r in rows)
     if leftover < 0:
@@ -87,26 +90,28 @@ def allocate(gross_unrounded: Decimal,
         raise AssertionError(f"{leftover} leftover cents for {len(rows)} holders")
 
     # THE DETERMINISTIC ORDER: biggest discarded fraction first, holder id as the tiebreak.
-    order = sorted(range(len(rows)),
-                   key=lambda i: (-rows[i]["fraction"], rows[i]["holder_id"]))
+    order = sorted(range(len(rows)), key=lambda i: (-rows[i]["fraction"], rows[i]["holder_id"]))
     winners = set(order[:leftover])
 
     out = []
     for i, r in enumerate(rows):
         cents = r["floor_cents"] + (1 if i in winners else 0)
-        out.append(HolderAllocation(
-            rights_holder_id=r["holder_id"],
-            share_pct=r["share"],
-            unrounded=r["unrounded"],
-            floor_cents=r["floor_cents"],
-            remainder_fraction=r["fraction"],
-            got_remainder_cent=i in winners,
-            published=(Decimal(cents) * CENT).quantize(CENT),
-        ))
+        out.append(
+            HolderAllocation(
+                rights_holder_id=r["holder_id"],
+                share_pct=r["share"],
+                unrounded=r["unrounded"],
+                floor_cents=r["floor_cents"],
+                remainder_fraction=r["fraction"],
+                got_remainder_cent=i in winners,
+                published=(Decimal(cents) * CENT).quantize(CENT),
+            )
+        )
     # The invariant, asserted here rather than hoped for downstream.
     if sum(a.published for a in out) != published_total:
         raise AssertionError(
-            f"allocation does not close: {sum(a.published for a in out)} != {published_total}")
+            f"allocation does not close: {sum(a.published for a in out)} != {published_total}"
+        )
     return out
 
 
@@ -114,6 +119,7 @@ def allocate(gross_unrounded: Decimal,
 #
 # Generated from the constants above so the warehouse cannot drift from the Python the unit tests
 # pin. An integration test recomputes published rows in Python and asserts they agree.
+
 
 def sql_published_gross(gross_expr: str) -> str:
     """ROUND(x, 2) in BigQuery is half-away-from-zero, which matches ROUND_HALF_UP for the
@@ -126,12 +132,14 @@ def sql_floor_cents(unrounded_expr: str) -> str:
 
 
 def sql_remainder_fraction(unrounded_expr: str) -> str:
-    return (f"({unrounded_expr} / NUMERIC '0.01' "
-            f"- FLOOR({unrounded_expr} / NUMERIC '0.01'))")
+    return f"({unrounded_expr} / NUMERIC '0.01' " f"- FLOOR({unrounded_expr} / NUMERIC '0.01'))"
 
 
-def sql_remainder_rank(partition_by: str, fraction_col: str = "remainder_fraction",
-                       holder_col: str = "rights_holder_id") -> str:
+def sql_remainder_rank(
+    partition_by: str,
+    fraction_col: str = "remainder_fraction",
+    holder_col: str = "rights_holder_id",
+) -> str:
     """The deterministic order: largest discarded fraction first, holder id as the tiebreak.
 
     ROW_NUMBER appears here, and it is not an arbitrary pick: it is ordering by a measured
@@ -139,5 +147,7 @@ def sql_remainder_rank(partition_by: str, fraction_col: str = "remainder_fractio
     matcher and the ownership join, where ROW_NUMBER() = 1 would have chosen a winner among
     candidates that no measurement separated.
     """
-    return (f"ROW_NUMBER() OVER (PARTITION BY {partition_by} "
-            f"ORDER BY {fraction_col} DESC, {holder_col} ASC)")
+    return (
+        f"ROW_NUMBER() OVER (PARTITION BY {partition_by} "
+        f"ORDER BY {fraction_col} DESC, {holder_col} ASC)"
+    )

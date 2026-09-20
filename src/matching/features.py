@@ -40,6 +40,7 @@ LOW_INFORMATION = "POTENTIAL_LOW_INFORMATION"
 
 # --- pure Python -------------------------------------------------------------------------
 
+
 def _alnum_count(s: str) -> int:
     """Unicode alphanumerics, any script. Matches SQL's \\p{L}\\p{N} class."""
     return sum(1 for ch in s if unicodedata.category(ch)[0] in ("L", "N"))
@@ -49,8 +50,9 @@ def _ascii_alnum_count(s: str) -> int:
     return sum(1 for ch in s if ("a" <= ch <= "z") or ("0" <= ch <= "9"))
 
 
-def ascii_retention_ratio(artist_unicode: str, recording_unicode: str,
-                          lookup_key: str) -> float | None:
+def ascii_retention_ratio(
+    artist_unicode: str, recording_unicode: str, lookup_key: str
+) -> float | None:
     """How much of the Unicode content survived into the ASCII key.
 
     NULL (None) when there is no Unicode alphanumeric content at all: a ratio over zero
@@ -110,8 +112,9 @@ def string_similarity(left: str, right: str) -> float:
     return 1.0 - edit_distance(left, right) / max(len(left), len(right))
 
 
-def features_for_pair(listen_artist: str, listen_recording: str,
-                      canonical_artist: str, canonical_recording: str) -> dict:
+def features_for_pair(
+    listen_artist: str, listen_recording: str, canonical_artist: str, canonical_recording: str
+) -> dict:
     """The six scored features for one candidate pair, in one call."""
     return {
         "artist_unicode_exact": unicode_exact(listen_artist, canonical_artist),
@@ -124,6 +127,7 @@ def features_for_pair(listen_artist: str, listen_recording: str,
 
 
 # --- the same definitions as SQL ----------------------------------------------------------
+
 
 def sql_unicode_exact(left: str, right: str) -> str:
     return f"({left} != '' AND {left} = {right})"
@@ -143,22 +147,27 @@ def sql_token_similarity(left: str, right: str) -> str:
 
 
 def sql_string_similarity(left: str, right: str) -> str:
-    return (f"IF({left} = '' OR {right} = '', 0.0, "
-            f"1.0 - SAFE_DIVIDE(EDIT_DISTANCE({left}, {right}), "
-            f"GREATEST(CHAR_LENGTH({left}), CHAR_LENGTH({right}))))")
+    return (
+        f"IF({left} = '' OR {right} = '', 0.0, "
+        f"1.0 - SAFE_DIVIDE(EDIT_DISTANCE({left}, {right}), "
+        f"GREATEST(CHAR_LENGTH({left}), CHAR_LENGTH({right}))))"
+    )
 
 
-def sql_ascii_retention_ratio(artist_unicode: str, recording_unicode: str,
-                              lookup_key: str) -> str:
-    uni = (f"CHAR_LENGTH(REGEXP_REPLACE(CONCAT({artist_unicode}, {recording_unicode}), "
-           r"r'[^\p{L}\p{N}]', ''))")
+def sql_ascii_retention_ratio(artist_unicode: str, recording_unicode: str, lookup_key: str) -> str:
+    uni = (
+        f"CHAR_LENGTH(REGEXP_REPLACE(CONCAT({artist_unicode}, {recording_unicode}), "
+        r"r'[^\p{L}\p{N}]', ''))"
+    )
     asc = f"CHAR_LENGTH(REGEXP_REPLACE({lookup_key}, r'[^a-z0-9]', ''))"
     return f"SAFE_DIVIDE({asc}, NULLIF({uni}, 0))"
 
 
 def sql_information_class(ratio_expr: str) -> str:
-    return (f"IF({ratio_expr} IS NOT NULL AND {ratio_expr} < {LOW_INFORMATION_RATIO_CUT}, "
-            f"'{LOW_INFORMATION}', '{NORMAL}')")
+    return (
+        f"IF({ratio_expr} IS NOT NULL AND {ratio_expr} < {LOW_INFORMATION_RATIO_CUT}, "
+        f"'{LOW_INFORMATION}', '{NORMAL}')"
+    )
 
 
 def sql_feature_columns(listen_alias: str = "l", canon_alias: str = "k") -> str:
@@ -167,11 +176,13 @@ def sql_feature_columns(listen_alias: str = "l", canon_alias: str = "k") -> str:
     lr = f"{listen_alias}.recording_normalized_unicode"
     ka = f"{canon_alias}.artist_normalized_unicode"
     kr = f"{canon_alias}.recording_normalized_unicode"
-    return ",\n          ".join([
-        f"{sql_unicode_exact(la, ka)} AS artist_unicode_exact",
-        f"{sql_unicode_exact(lr, kr)} AS recording_unicode_exact",
-        f"{sql_token_similarity(la, ka)} AS artist_token_similarity",
-        f"{sql_token_similarity(lr, kr)} AS recording_token_similarity",
-        f"{sql_string_similarity(la, ka)} AS artist_string_similarity",
-        f"{sql_string_similarity(lr, kr)} AS recording_string_similarity",
-    ])
+    return ",\n          ".join(
+        [
+            f"{sql_unicode_exact(la, ka)} AS artist_unicode_exact",
+            f"{sql_unicode_exact(lr, kr)} AS recording_unicode_exact",
+            f"{sql_token_similarity(la, ka)} AS artist_token_similarity",
+            f"{sql_token_similarity(lr, kr)} AS recording_token_similarity",
+            f"{sql_string_similarity(la, ka)} AS artist_string_similarity",
+            f"{sql_string_similarity(lr, kr)} AS recording_string_similarity",
+        ]
+    )

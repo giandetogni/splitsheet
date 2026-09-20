@@ -42,10 +42,23 @@ ON_DEMAND_USD_PER_TIB = 6.25
 REPO = pathlib.Path(__file__).parents[2]
 
 HOLDER_COLUMNS = ["holder_id", "display_name", "holder_type", "payee_status", "model_scope"]
-SPLIT_COLUMNS = ["recording_mbid", "rights_holder_id", "share_pct", "valid_from", "valid_to",
-                 "split_version_id"]
-RATE_COLUMNS = ["rate_card_id", "model_scope", "valid_from", "valid_to", "rate_per_stream",
-                "currency", "rule_version_id"]
+SPLIT_COLUMNS = [
+    "recording_mbid",
+    "rights_holder_id",
+    "share_pct",
+    "valid_from",
+    "valid_to",
+    "split_version_id",
+]
+RATE_COLUMNS = [
+    "rate_card_id",
+    "model_scope",
+    "valid_from",
+    "valid_to",
+    "rate_per_stream",
+    "currency",
+    "rule_version_id",
+]
 
 
 def digest_of(columns: list[str], rows) -> str:
@@ -75,25 +88,36 @@ def main() -> None:
     t0 = time.time()
 
     def q(sql: str, label: str):
-        job = client.query(sql, job_config=bigquery.QueryJobConfig(
-            maximum_bytes_billed=MAX_BYTES))
+        job = client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
         out = [dict(r) for r in job.result()]
-        stats.append({"step": label, "job_id": job.job_id,
-                      "bytes_billed": job.total_bytes_billed, "slot_ms": job.slot_millis})
+        stats.append(
+            {
+                "step": label,
+                "job_id": job.job_id,
+                "bytes_billed": job.total_bytes_billed,
+                "slot_ms": job.slot_millis,
+            }
+        )
         print(f"  {label:<40} billed={job.total_bytes_billed or 0:>13,}", flush=True)
         return out
 
     generation = json.loads((REPO / "docs/phase0/rights_generation.json").read_text())
 
     # --- 1. reproducibility ---------------------------------------------------------------
-    mbids = [r["recording_mbid"] for r in q(f"""
+    mbids = [
+        r["recording_mbid"]
+        for r in q(
+            f"""
         SELECT DISTINCT matched_recording_mbid AS recording_mbid
         FROM `{PROJECT}.splitsheet_silver.silver_listen_matches`
         WHERE listened_at >= TIMESTAMP '2026-06-01 00:00:00+00'
           AND listened_at <  TIMESTAMP '2026-07-01 00:00:00+00'
           AND match_status = 'MATCHED' AND match_run_id = '{model.universe_match_run_id}'
         ORDER BY recording_mbid
-    """, "universe for regeneration")]
+    """,
+            "universe for regeneration",
+        )
+    ]
     defects = select_defects(model, mbids)
 
     def regen_ownership():
@@ -108,7 +132,8 @@ def main() -> None:
         "ownership_splits": digest_of(SPLIT_COLUMNS, regen_ownership()),
         "rate_card": digest_of(RATE_COLUMNS, rate_card_rows(model)),
         "rights_holders_base": digest_of(
-            HOLDER_COLUMNS, (holder_row(model, i) for i in range(model.holder_count))),
+            HOLDER_COLUMNS, (holder_row(model, i) for i in range(model.holder_count))
+        ),
     }
     # Digests recorded at land time were taken over the gzip FILE; recompute the payload digest
     # from the same generator to compare content rather than compression framing.
@@ -126,17 +151,21 @@ def main() -> None:
         "row_counts_regenerated": regen_rows,
         "row_counts_landed": landed_rows,
         "content_digests_regenerated": regenerated,
-        "note": ("digests are over the uncompressed payload; the gzip header carries a "
-                 "timestamp, so file-level digests are not a content comparison"),
+        "note": (
+            "digests are over the uncompressed payload; the gzip header carries a "
+            "timestamp, so file-level digests are not a content comparison"
+        ),
     }
 
     # Second regeneration to prove the generator is a pure function of the seed.
     reproducibility["second_pass_identical"] = (
         digest_of(RATE_COLUMNS, rate_card_rows(model)) == regenerated["rate_card"]
-        and digest_of(SPLIT_COLUMNS, regen_ownership()) == regenerated["ownership_splits"])
+        and digest_of(SPLIT_COLUMNS, regen_ownership()) == regenerated["ownership_splits"]
+    )
 
     # --- 2. reconciliation ----------------------------------------------------------------
-    found = q(f"""
+    found = q(
+        f"""
         SELECT
           COUNTIF(defect_share_sum_not_100) AS share_sum_sets,
           COUNT(DISTINCT IF(defect_temporal_overlap, recording_mbid, NULL)) AS overlap_recordings,
@@ -147,41 +176,62 @@ def main() -> None:
           COUNT(*) AS total_sets,
           COUNTIF(is_valid_set) AS valid_sets
         FROM `{PROJECT}.splitsheet_dbt.int_ownership_validity`
-    """, "defects detected by the quality layer")[0]
-    holders_without_split = q(f"""
+    """,
+        "defects detected by the quality layer",
+    )[0]
+    holders_without_split = q(
+        f"""
         SELECT COUNTIF(s.rights_holder_id IS NULL) AS holders_without_split
         FROM `{PROJECT}.splitsheet_rights.rights_holders` h
         LEFT JOIN (SELECT DISTINCT rights_holder_id
                    FROM `{PROJECT}.splitsheet_rights.ownership_splits`) s
                ON s.rights_holder_id = h.holder_id
-    """, "holders without ownership")[0]["holders_without_split"]
+    """,
+        "holders without ownership",
+    )[0]["holders_without_split"]
 
     injected = generation["defects_injected"]
     reconciliation = {
-        "shares_do_not_sum_to_100": {"injected": injected["shares_do_not_sum_to_100"],
-                                     "detected": int(found["share_sum_sets"])},
-        "temporal_overlap": {"injected": injected["temporal_overlap"],
-                             "detected": int(found["overlap_recordings"])},
-        "temporal_gap": {"injected": injected["temporal_gap"],
-                         "detected": int(found["gap_recordings"])},
-        "invalid_interval": {"injected": injected["invalid_interval"],
-                             "detected": int(found["invalid_interval_sets"])},
-        "missing_rights_holder": {"injected": injected["missing_rights_holder"],
-                                  "detected": int(found["missing_holder_sets"])},
-        "orphan_recording_mbid": {"injected": injected["orphan_recording_mbid"],
-                                  "detected": int(found["orphan_recordings"])},
-        "holder_without_split": {"injected": injected["holder_without_split_reserved"],
-                                 "detected": int(holders_without_split)},
+        "shares_do_not_sum_to_100": {
+            "injected": injected["shares_do_not_sum_to_100"],
+            "detected": int(found["share_sum_sets"]),
+        },
+        "temporal_overlap": {
+            "injected": injected["temporal_overlap"],
+            "detected": int(found["overlap_recordings"]),
+        },
+        "temporal_gap": {
+            "injected": injected["temporal_gap"],
+            "detected": int(found["gap_recordings"]),
+        },
+        "invalid_interval": {
+            "injected": injected["invalid_interval"],
+            "detected": int(found["invalid_interval_sets"]),
+        },
+        "missing_rights_holder": {
+            "injected": injected["missing_rights_holder"],
+            "detected": int(found["missing_holder_sets"]),
+        },
+        "orphan_recording_mbid": {
+            "injected": injected["orphan_recording_mbid"],
+            "detected": int(found["orphan_recordings"]),
+        },
+        "holder_without_split": {
+            "injected": injected["holder_without_split_reserved"],
+            "detected": int(holders_without_split),
+        },
     }
     for kind, pair in reconciliation.items():
         pair["agrees"] = pair["injected"] == pair["detected"]
-    reconciliation["all_agree"] = all(v["agrees"] for v in reconciliation.values()
-                                      if isinstance(v, dict))
+    reconciliation["all_agree"] = all(
+        v["agrees"] for v in reconciliation.values() if isinstance(v, dict)
+    )
 
     # --- 3. temporal proof ----------------------------------------------------------------
     change = model.change_date
     before = change - dt.timedelta(days=1)
-    boundary = q(f"""
+    boundary = q(
+        f"""
         WITH changed AS (
           SELECT recording_mbid
           FROM `{PROJECT}.splitsheet_dbt.int_ownership_validity`
@@ -212,23 +262,32 @@ def main() -> None:
                  MAX(IF(probe_date = DATE '{before}', holders, NULL)) AS holders_before,
                  MAX(IF(probe_date = DATE '{change}', holders, NULL)) AS holders_after
           FROM owners GROUP BY recording_mbid)
-    """, "mid-June ownership change")[0]
+    """,
+        "mid-June ownership change",
+    )[0]
 
-    resolution = q(f"""
+    resolution = q(
+        f"""
         SELECT resolution_status, COUNT(*) AS recording_days, SUM(streams) AS streams,
                COUNTIF(is_attributable) AS attributable,
                COUNTIF(rate_per_stream IS NOT NULL) AS priced
         FROM `{PROJECT}.splitsheet_dbt.int_ownership_resolution`
         GROUP BY 1 ORDER BY recording_days DESC
-    """, "resolution status distribution")
+    """,
+        "resolution status distribution",
+    )
 
-    eligibility = q(f"""
+    eligibility = q(
+        f"""
         SELECT payout_eligible, hold_reason, COUNT(*) AS listens
         FROM `{PROJECT}.splitsheet_dbt.int_payout_eligibility`
         GROUP BY 1, 2 ORDER BY listens DESC
-    """, "payout eligibility")
+    """,
+        "payout eligibility",
+    )
 
-    scd2 = q(f"""
+    scd2 = q(
+        f"""
         SELECT COUNT(*) AS versions, COUNT(DISTINCT holder_id) AS holders,
                COUNTIF(dbt_valid_to IS NULL) AS current_versions,
                COUNTIF(dbt_valid_to IS NOT NULL) AS closed_versions,
@@ -236,14 +295,19 @@ def main() -> None:
                   SELECT holder_id FROM `{PROJECT}.splitsheet_dbt.snap_rights_holders`
                   GROUP BY holder_id HAVING COUNT(*) > 1)) AS holders_with_history
         FROM `{PROJECT}.splitsheet_dbt.snap_rights_holders`
-    """, "SCD2 state")[0]
+    """,
+        "SCD2 state",
+    )[0]
 
-    quality = q(f"""
+    quality = q(
+        f"""
         SELECT rule, severity, status, failed_records, total_records, failure_rate,
                business_impact, expectation
         FROM `{PROJECT}.splitsheet_dbt.quality_report`
         ORDER BY severity, failed_records DESC
-    """, "quality report")
+    """,
+        "quality report",
+    )
 
     # --- 4. cost --------------------------------------------------------------------------
     phase_bytes = sum(s["bytes_billed"] or 0 for s in stats)
@@ -255,8 +319,10 @@ def main() -> None:
     report = {
         "artifact": "rights_verification",
         "declaration": {
-            "listenbrainz_listens": "REAL", "musicbrainz_recordings": "REAL",
-            "rights_holders": "MODELED", "ownership_splits": "MODELED",
+            "listenbrainz_listens": "REAL",
+            "musicbrainz_recordings": "REAL",
+            "rights_holders": "MODELED",
+            "ownership_splits": "MODELED",
             "rate_cards": "MODELED",
             "royalty_amounts": "illustrative modeled amounts, not observed industry payouts",
             "monetary_arithmetic_performed": False,
@@ -269,7 +335,8 @@ def main() -> None:
             "universe_match_run_id": model.universe_match_run_id,
             "split_version_id_scheme": (
                 f"{model.split_version_id_prefix}<sha256(seed|rights_version|recording|"
-                f"valid_from)[:{model.digest_chars}]>"),
+                f"valid_from)[:{model.digest_chars}]>"
+            ),
         },
         "reproducibility": reproducibility,
         "reconciliation_injected_vs_detected": reconciliation,
@@ -289,8 +356,10 @@ def main() -> None:
             "phase_bytes_billed": phase_bytes,
             "phase_tib": round(phase_bytes / 1024**4, 6),
             "list_price_equivalent_usd": round(phase_bytes / 1024**4 * ON_DEMAND_USD_PER_TIB, 4),
-            "caveat": ("list-price equivalent of processing consumption; actual monetary cost "
-                       "UNKNOWN without billing evidence"),
+            "caveat": (
+                "list-price equivalent of processing consumption; actual monetary cost "
+                "UNKNOWN without billing evidence"
+            ),
         },
         "verification_bytes_billed": sum(s["bytes_billed"] or 0 for s in stats),
         "wall_seconds": round(time.time() - t0, 1),
@@ -304,34 +373,45 @@ def main() -> None:
     print("\nRECONCILIATION  injected -> detected")
     for kind, pair in reconciliation.items():
         if isinstance(pair, dict):
-            print(f"  {kind:<28} {pair['injected']:>6,} -> {pair['detected']:>6,}  "
-                  f"{'OK' if pair['agrees'] else 'MISMATCH'}")
-    print(f"\nTEMPORAL  {before} vs {change}: "
-          f"{int(boundary['holders_changed'])}/{int(boundary['recordings_probed'])} recordings "
-          f"changed holders, {int(boundary['holders_unchanged'])} unchanged")
-    print(f"SCD2  versions={int(scd2['versions']):,} holders={int(scd2['holders']):,} "
-          f"current={int(scd2['current_versions']):,} closed={int(scd2['closed_versions']):,} "
-          f"with_history={int(scd2['holders_with_history']):,}")
-    print(f"\nCOST  {report['cost']['phase_tib']} TiB "
-          f"~ ${report['cost']['list_price_equivalent_usd']} list-price equivalent "
-          f"(actual monetary cost UNKNOWN)")
+            print(
+                f"  {kind:<28} {pair['injected']:>6,} -> {pair['detected']:>6,}  "
+                f"{'OK' if pair['agrees'] else 'MISMATCH'}"
+            )
+    print(
+        f"\nTEMPORAL  {before} vs {change}: "
+        f"{int(boundary['holders_changed'])}/{int(boundary['recordings_probed'])} recordings "
+        f"changed holders, {int(boundary['holders_unchanged'])} unchanged"
+    )
+    print(
+        f"SCD2  versions={int(scd2['versions']):,} holders={int(scd2['holders']):,} "
+        f"current={int(scd2['current_versions']):,} closed={int(scd2['closed_versions']):,} "
+        f"with_history={int(scd2['holders_with_history']):,}"
+    )
+    print(
+        f"\nCOST  {report['cost']['phase_tib']} TiB "
+        f"~ ${report['cost']['list_price_equivalent_usd']} list-price equivalent "
+        f"(actual monetary cost UNKNOWN)"
+    )
 
     # THE GATE. The generator injected a known number of defects and the quality layer counted
     # them independently; disagreement means the rights layer is not verified. This task is the
     # last step before publication, so it has to fail rather than report -- a green step here is
     # read as a clearance. The report and the summary above are already written, so the evidence
     # of the divergence survives the exit.
-    diverged = [f"{k} injected={v['injected']} detected={v['detected']}"
-                for k, v in sorted(reconciliation.items())
-                if isinstance(v, dict) and not v["agrees"]]
+    diverged = [
+        f"{k} injected={v['injected']} detected={v['detected']}"
+        for k, v in sorted(reconciliation.items())
+        if isinstance(v, dict) and not v["agrees"]
+    ]
     # The two reproducibility booleans are flat, not injected/detected pairs. They belong in the
     # same gate: rights that no longer regenerate from the declared seed cannot support a
     # published payout, whatever the defect counts say.
-    diverged += [k for k in ("row_counts_match", "second_pass_identical")
-                 if not reproducibility[k]]
+    diverged += [k for k in ("row_counts_match", "second_pass_identical") if not reproducibility[k]]
     if diverged:
-        raise SystemExit("rights verification diverged, refusing to clear the rights layer: "
-                         + "; ".join(diverged))
+        raise SystemExit(
+            "rights verification diverged, refusing to clear the rights layer: "
+            + "; ".join(diverged)
+        )
 
 
 if __name__ == "__main__":

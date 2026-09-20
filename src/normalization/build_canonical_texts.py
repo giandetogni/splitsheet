@@ -61,7 +61,8 @@ def rules_for_version(requested: str):
         found.append(f"{path.name} declares {rules.version}")
     raise SystemExit(
         f"no rules file declares normalization version {requested}. "
-        f"expected {requested}, found: {found or 'no rules file at all'}")
+        f"expected {requested}, found: {found or 'no rules file at all'}"
+    )
 
 
 def source_rows(client, candidate_run_id: str):
@@ -94,11 +95,14 @@ def source_rows(client, candidate_run_id: str):
     """
     cfg = bigquery.QueryJobConfig(
         maximum_bytes_billed=MAX_BYTES,
-        query_parameters=[bigquery.ScalarQueryParameter("run", "STRING", candidate_run_id)])
+        query_parameters=[bigquery.ScalarQueryParameter("run", "STRING", candidate_run_id)],
+    )
     job = client.query(sql, job_config=cfg)
     rows = job.result()
-    print(f"  source query billed={job.total_bytes_billed or 0:,} "
-          f"rows={rows.total_rows:,}", flush=True)
+    print(
+        f"  source query billed={job.total_bytes_billed or 0:,} " f"rows={rows.total_rows:,}",
+        flush=True,
+    )
     return rows, job
 
 
@@ -111,7 +115,10 @@ def published_identity(client, rules, candidate_run_id: str):
     Those three are frozen upstream, so together they determine the payload -- which makes
     a rerun on unchanged inputs a no-op instead of a new key for the same content.
     """
-    row = next(iter(client.query(f"""
+    row = next(
+        iter(
+            client.query(
+                f"""
         SELECT COUNT(*) AS n,
                COUNT(DISTINCT ingestion_run_id) AS runs, MIN(ingestion_run_id) AS run_id,
                COUNT(DISTINCT normalization_version) AS versions,
@@ -121,23 +128,34 @@ def published_identity(client, rules, candidate_run_id: str):
                MIN(source_universe) AS universe,
                COUNT(DISTINCT snapshot_date) AS snapshots, MIN(snapshot_date) AS snapshot
         FROM `{PROJECT}.splitsheet_bronze.canonical_match_texts`
-    """).result()))
-    matches = (int(row["n"]) > 0 and int(row["runs"]) == 1 and int(row["versions"]) == 1
-               and int(row["universes"]) == 1 and int(row["snapshots"]) == 1
-               and row["version"] == rules.version
-               and row["rules_digest"] == rules.rules_digest
-               and row["universe"] == candidate_run_id
-               and str(row["snapshot"]) == SNAPSHOT)
+    """
+            ).result()
+        )
+    )
+    matches = (
+        int(row["n"]) > 0
+        and int(row["runs"]) == 1
+        and int(row["versions"]) == 1
+        and int(row["universes"]) == 1
+        and int(row["snapshots"]) == 1
+        and row["version"] == rules.version
+        and row["rules_digest"] == rules.rules_digest
+        and row["universe"] == candidate_run_id
+        and str(row["snapshot"]) == SNAPSHOT
+    )
     return dict(row) if matches else None
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate-run-id", required=True)
-    ap.add_argument("--norm-version", required=True,
-                    help="the frozen normalization version to build under, e.g. "
-                         "1.0.0+0bc0dd643e06. The rules file that declares it is "
-                         "the one that is loaded; there is no latest fallback.")
+    ap.add_argument(
+        "--norm-version",
+        required=True,
+        help="the frozen normalization version to build under, e.g. "
+        "1.0.0+0bc0dd643e06. The rules file that declares it is "
+        "the one that is loaded; there is no latest fallback.",
+    )
     ap.add_argument("--bucket", required=True)
     ap.add_argument("--work-dir", required=True, help="local scratch, outside the repo")
     ap.add_argument("--out", required=True)
@@ -153,11 +171,15 @@ def main() -> None:
     # Before the source query, before the local file, before GCS and before the target.
     published = published_identity(client, rules, args.candidate_run_id)
     if published:
-        print(f"target already holds {published['run_id']} for these inputs: nothing written",
-              flush=True)
+        print(
+            f"target already holds {published['run_id']} for these inputs: nothing written",
+            flush=True,
+        )
         report = {
-            "artifact": "canonical_match_texts", "skipped": True,
-            "source_universe": args.candidate_run_id, "snapshot_date": SNAPSHOT,
+            "artifact": "canonical_match_texts",
+            "skipped": True,
+            "source_universe": args.candidate_run_id,
+            "snapshot_date": SNAPSHOT,
             "recordings": int(published["n"]),
             "ingestion_run_id": published["run_id"],
             "normalization_version": rules.version,
@@ -177,9 +199,11 @@ def main() -> None:
     empty_artist = empty_recording = no_release = 0
     # mtime=0 and an empty filename: the gzip header must not carry a timestamp, or the
     # digest below -- and so the run id -- would change for identical content.
-    with open(local, "wb") as raw, \
-            gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz, \
-            io.TextIOWrapper(gz, encoding="utf-8", newline="") as fh:
+    with (
+        open(local, "wb") as raw,
+        gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz,
+        io.TextIOWrapper(gz, encoding="utf-8", newline="") as fh,
+    ):
         w = csv.writer(fh, delimiter="\t", lineterminator="\n", quoting=csv.QUOTE_MINIMAL)
         for r in rows:
             artist = normalized_unicode(r["artist_credit_name"] or "", rules=rules)
@@ -194,13 +218,18 @@ def main() -> None:
                 print(f"  {n:,} recordings normalized", flush=True)
 
     digest = hashlib.sha256(local.read_bytes()).hexdigest()
-    run_id = "cantext:" + hashlib.sha256(
-        f"{rules.version}|{rules.rules_digest}|{args.candidate_run_id}|{n}|{digest}".encode()
-    ).hexdigest()[:16]
+    run_id = (
+        "cantext:"
+        + hashlib.sha256(
+            f"{rules.version}|{rules.rules_digest}|{args.candidate_run_id}|{n}|{digest}".encode()
+        ).hexdigest()[:16]
+    )
 
-    object_name = (f"{GCS_PREFIX}/version={rules.version}/"
-                   f"universe={args.candidate_run_id.replace(':', '_')}/"
-                   "canonical_match_texts.tsv.gz")
+    object_name = (
+        f"{GCS_PREFIX}/version={rules.version}/"
+        f"universe={args.candidate_run_id.replace(':', '_')}/"
+        "canonical_match_texts.tsv.gz"
+    )
     blob = storage.Client(project=PROJECT).bucket(args.bucket).blob(object_name)
     blob.metadata = {"sha256": digest, "normalization_version": rules.version}
     blob.upload_from_filename(str(local), content_type="application/gzip")
@@ -222,14 +251,16 @@ def main() -> None:
             bigquery.SchemaField("artist_normalized_unicode", "STRING"),
             bigquery.SchemaField("recording_normalized_unicode", "STRING"),
             bigquery.SchemaField("release_lower", "STRING"),
-        ])
+        ],
+    )
     load = client.load_table_from_uri(uri, stg, job_config=load_cfg)
     load.result()
     print(f"  loaded {load.output_rows:,} rows into staging", flush=True)
     if load.output_rows != n:
         raise SystemExit(f"staging holds {load.output_rows} rows, expected {n}")
 
-    ins = client.query(f"""
+    ins = client.query(
+        f"""
         BEGIN TRANSACTION;
         DELETE FROM `{PROJECT}.splitsheet_bronze.canonical_match_texts` WHERE TRUE;
         INSERT INTO `{PROJECT}.splitsheet_bronze.canonical_match_texts`
@@ -240,17 +271,25 @@ def main() -> None:
                '{args.candidate_run_id}', '{run_id}', CURRENT_TIMESTAMP()
         FROM `{stg}`;
         COMMIT TRANSACTION;
-    """, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES))
+    """,
+        job_config=bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES),
+    )
     ins.result()
     client.query(f"DROP TABLE IF EXISTS `{stg}`").result()
 
-    check = next(iter(client.query(f"""
+    check = next(
+        iter(
+            client.query(
+                f"""
         SELECT COUNT(*) AS n, COUNT(DISTINCT recording_mbid) AS distinct_mbid,
                COUNTIF(artist_normalized_unicode = '') AS empty_artist,
                COUNTIF(recording_normalized_unicode = '') AS empty_recording,
                COUNTIF(release_lower IS NULL) AS no_release
         FROM `{PROJECT}.splitsheet_bronze.canonical_match_texts`
-    """).result()))
+    """
+            ).result()
+        )
+    )
     if check["n"] != n or check["distinct_mbid"] != n:
         raise SystemExit(f"published table disagrees with the build: {dict(check)} vs {n}")
 
