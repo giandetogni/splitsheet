@@ -17,6 +17,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    # `black --check` is a CI gate in PROJECT_SPEC. Pinned to the same major the repo was
+    # formatted under, so a release cannot silently reformat the codebase from under CI.
+    "black>=24,<25",
     "dbt-bigquery>=1.8,<2.0",
     # The DAG spec tests render task commands the way Airflow will. dbt pulls Jinja2 in
     # anyway, but our own code imports it, so it is declared rather than inherited.
@@ -24,6 +27,11 @@ dev = [
     "pytest>=8,<9",
     "ruff>=0.6,<1.0",
 ]
+
+[tool.black]
+# The same width ruff enforces: two formatters disagreeing on line length would make one
+# of them unsatisfiable.
+line-length = 100
 
 [tool.ruff]
 line-length = 100

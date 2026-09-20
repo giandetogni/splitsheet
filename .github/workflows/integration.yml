@@ -66,5 +66,15 @@ jobs:
       # Read-only subset only. Destructive tests carry integration_destructive and the
       # GCS-object test carries requires_gcs; neither is selected here, and the CI
       # identity has no permission to satisfy them anyway.
+      # `dbt compile` is in the spec's CI list but needs a warehouse connection to
+      # initialise the adapter, so it cannot live in the credential-free ci.yml. It runs
+      # here, where the federated identity is already present and is read-only by
+      # construction: compiling renders SQL, it does not execute it.
+      - name: dbt compile
+        working-directory: dbt
+        env:
+          DBT_PROFILES_DIR: ${{ github.workspace }}/dbt
+        run: uv run dbt compile
+
       - name: Read-only integration tests
         run: uv run pytest tests/integration -v --durations=10 -m "integration_readonly and not requires_gcs"

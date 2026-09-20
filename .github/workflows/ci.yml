@@ -43,6 +43,9 @@ jobs:
       - name: Lint
         run: uv run ruff check src tests dags
 
+      - name: Format check
+        run: uv run black --check src tests dags
+
       # Unit tests only. tests/integration is excluded by testpaths in pyproject.toml
       # and additionally requires credentials this job does not have.
       - name: Unit tests
@@ -74,3 +77,37 @@ jobs:
         run: |
           uv run pytest tests/unit --collect-only -q | tail -1
           echo "integration tests are not part of this job by construction"
+
+  # Airflow is deliberately absent from the project's dependency groups: it is a heavy,
+  # tightly constrained install that the pipeline code never imports. The DAG import test
+  # still has to run for real, so it gets its own job with Airflow installed from the
+  # official constraints file. Credential-free like the rest of this workflow: DagBag
+  # parses the file, it does not reach GCP.
+  dag-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow 2.10.5 from the official constraints
+        run: |
+          pip install "apache-airflow==2.10.5" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+
+      - name: Import the DAG for real
+        env:
+          AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+        run: |
+          python - <<'PY'
+          from airflow.models.dagbag import DagBag
+
+          bag = DagBag(dag_folder="dags", include_examples=False)
+          assert bag.import_errors == {}, bag.import_errors
+          assert "splitsheet_monthly_pipeline" in bag.dags, sorted(bag.dags)
+          dag = bag.dags["splitsheet_monthly_pipeline"]
+          assert len(dag.tasks) == 11, [t.task_id for t in dag.tasks]
+          print("DAG import OK:", len(dag.tasks), "tasks, no import errors")
+          PY

@@ -8,6 +8,7 @@ evidence, and a publication that could happen without someone asking for it.
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -77,9 +78,18 @@ def test_publish_guard_refuses_unless_explicitly_enabled(allow_publication, expe
 
 
 def test_importing_the_spec_reaches_neither_airflow_nor_gcp():
+    """Importing the task graph must not drag in Airflow or a GCP client.
+
+    Measured as a delta, not as an absolute: `google` and `google.cloud` are namespace
+    packages that some dependency sets register at interpreter start, before any code of
+    ours runs. What this test defends is that IMPORTING pipeline_spec adds none of them.
+    """
     probe = (
-        "import sys; sys.path.insert(0, 'dags'); import pipeline_spec;"
-        " print([m for m in sys.modules if m.startswith(('airflow', 'google'))])"
+        "import sys, json;"
+        " before = {m for m in sys.modules if m.startswith(('airflow', 'google'))};"
+        " sys.path.insert(0, 'dags'); import pipeline_spec;"
+        " after = {m for m in sys.modules if m.startswith(('airflow', 'google'))};"
+        " print(json.dumps(sorted(after - before)))"
     )
     loaded = subprocess.run(
         [sys.executable, "-c", probe],
@@ -89,7 +99,8 @@ def test_importing_the_spec_reaches_neither_airflow_nor_gcp():
         check=False,
     )
     assert loaded.returncode == 0, loaded.stderr
-    assert loaded.stdout.strip() == "[]"
+    introduced = json.loads(loaded.stdout)
+    assert introduced == [], f"importing pipeline_spec pulled in {introduced}"
 
 
 def test_dag_file_imports_under_airflow():
